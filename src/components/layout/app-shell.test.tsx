@@ -68,6 +68,14 @@ it('uses the attendance section breadcrumb on an employee detail page', () => {
     screen.getByRole('navigation', { name: 'გვერდის მდებარეობა' }),
   ).toHaveTextContent('დასწრებები')
 })
+
+it('uses the GPS section breadcrumb on a device history page', () => {
+  mocks.path = '/manage/gps/019abb95-5882-78b2-94c1-83d1093b44ca'
+  render(<AppShell actor={actor} />)
+  expect(
+    screen.getByRole('navigation', { name: 'გვერდის მდებარეობა' }),
+  ).toHaveTextContent('GPS მოწყობილობები')
+})
 const actor = {
   id: 'admin',
   name: 'ტესტი',

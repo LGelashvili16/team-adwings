@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { IconFocus2, IconGps, IconSearch } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
   Empty,
@@ -13,6 +14,7 @@ import { Map, MapControls, useMap } from '#/components/ui/map'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
 import { gpsKey, gpsMapQuery, hasGpsPosition } from '../gps.queries'
+import { useGpsNow } from '../hooks/use-gps-now'
 import { GpsDeviceCard } from './gps-device-card'
 import { GpsTrackerLayer } from './gps-tracker-layer'
 import type { GpsLocatedDevice, GpsMapDevice } from '../gps.queries'
@@ -83,6 +85,7 @@ export function GpsMapView({
         : undefined,
   })
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const now = useGpsNow()
   if (query.isPending) return <Skeletons />
   const devices = query.isSuccess ? query.data.devices : []
   const total = query.isSuccess ? query.data.total : 0
@@ -90,7 +93,6 @@ export function GpsMapView({
     (device): device is GpsLocatedDevice =>
       device.enabled && hasGpsPosition(device),
   )
-  const now = Date.now()
   return (
     <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
       <section
@@ -109,60 +111,67 @@ export function GpsMapView({
       </section>
       <aside
         aria-busy={query.isPlaceholderData}
-        className="min-w-0 overflow-hidden rounded-xl border bg-card lg:max-h-[min(72dvh,52rem)] lg:overflow-y-auto"
+        className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-muted/25 lg:max-h-[min(72dvh,52rem)]"
       >
-        <div className="flex items-center justify-between border-b p-4">
-          <h2 className="font-medium">მოწყობილობები</h2>
-          <span className="flex items-center gap-2 text-sm tabular-nums text-muted-foreground">
+        <div className="flex items-center justify-between border-b bg-card px-4 py-3.5">
+          <h2 className="font-semibold">მოწყობილობები</h2>
+          <div className="flex items-center gap-2">
             {query.isPlaceholderData && <Spinner aria-hidden="true" />}
-            {query.isSuccess ? total : null}
-          </span>
-        </div>
-        {query.isPlaceholderData && (
-          <p role="status" className="sr-only">
-            ძიების შედეგები იტვირთება.
-          </p>
-        )}
-        {query.isError ? (
-          <div className="p-3">
-            <Alert variant="destructive">
-              <AlertDescription>
-                მოწყობილობები ვერ ჩაიტვირთა. განაახლეთ გვერდი.
-              </AlertDescription>
-            </Alert>
+            {query.isSuccess && (
+              <Badge variant="secondary" className="tabular-nums">
+                {total}
+              </Badge>
+            )}
           </div>
-        ) : devices.length === 0 && !query.isPlaceholderData ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia aria-hidden="true">
-                {q ? <IconSearch /> : <IconGps />}
-              </EmptyMedia>
-              <EmptyTitle>
-                {q
-                  ? 'ძიების შედეგები ვერ მოიძებნა.'
-                  : 'GPS მოწყობილობები ჯერ არ არის დამატებული.'}
-              </EmptyTitle>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <ul className="divide-y">
-            {devices.map((device) => (
-              <GpsDeviceCard
-                key={device.id}
-                device={device}
-                selected={device.id === selectedId}
-                onSelect={setSelectedId}
-                onEdit={onEdit}
-                now={now}
-              />
-            ))}
-          </ul>
-        )}
-        {total > devices.length ? (
-          <p className="border-t p-4 text-sm text-muted-foreground">
-            ნაჩვენებია {devices.length} / {total} მოწყობილობა. დააზუსტეთ ძიება.
-          </p>
-        ) : null}
+        </div>
+        <div className="app-scrollbar flex-1 overflow-y-auto">
+          {query.isPlaceholderData && (
+            <p role="status" className="sr-only">
+              ძიების შედეგები იტვირთება.
+            </p>
+          )}
+          {query.isError ? (
+            <div className="p-3">
+              <Alert variant="destructive">
+                <AlertDescription>
+                  მოწყობილობები ვერ ჩაიტვირთა. განაახლეთ გვერდი.
+                </AlertDescription>
+              </Alert>
+            </div>
+          ) : devices.length === 0 && !query.isPlaceholderData ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia aria-hidden="true">
+                  {q ? <IconSearch /> : <IconGps />}
+                </EmptyMedia>
+                <EmptyTitle>
+                  {q
+                    ? 'ძიების შედეგები ვერ მოიძებნა.'
+                    : 'GPS მოწყობილობები ჯერ არ არის დამატებული.'}
+                </EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <ul className="flex flex-col gap-3 p-3">
+              {devices.map((device) => (
+                <GpsDeviceCard
+                  key={device.id}
+                  device={device}
+                  selected={device.id === selectedId}
+                  onSelect={setSelectedId}
+                  onEdit={onEdit}
+                  now={now}
+                />
+              ))}
+            </ul>
+          )}
+          {total > devices.length ? (
+            <p className="border-t bg-card px-4 py-3 text-xs text-muted-foreground">
+              ნაჩვენებია {devices.length} / {total} მოწყობილობა. დააზუსტეთ
+              ძიება.
+            </p>
+          ) : null}
+        </div>
       </aside>
     </div>
   )

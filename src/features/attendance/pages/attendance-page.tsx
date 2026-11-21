@@ -12,9 +12,9 @@ export function AttendancePage({
 }) {
   return (
     <section className="flex flex-col gap-6">
-      <AttendanceOverview key={actorId} actorId={actorId} />
+      <AttendanceOverview key={`overview:${actorId}`} actorId={actorId} />
       <AttendanceCorrections
-        key={actorId}
+        key={`corrections:${actorId}`}
         actorId={actorId}
         page={correctionsPage}
         onPageChange={onCorrectionsPageChange}

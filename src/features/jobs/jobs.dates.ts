@@ -1,4 +1,4 @@
-import { formatGeorgianDate } from '#/lib/date-format'
+import { formatGeorgianDate, formatGeorgianShortDate } from '#/lib/date-format'
 
 export const jobsTimeZone = 'Asia/Tbilisi'
 
@@ -29,7 +29,7 @@ export function jobCalendarDateString(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
 }
 export function formatJobsRange(range: { from: string; to: string }) {
-  return `${formatJobDay(range.from)} - ${formatJobDay(range.to)}`
+  return `${formatGeorgianShortDate(range.from)} - ${formatGeorgianShortDate(range.to)}`
 }
 export function formatJobDay(date: string) {
   return formatGeorgianDate(date)

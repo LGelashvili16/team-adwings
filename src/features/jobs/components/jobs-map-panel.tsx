@@ -73,7 +73,7 @@ export function JobsMapPanel({
   const [expanded, setExpanded] = useState(false)
   const [showPlaces, setShowPlaces] = useState(false)
   const [showBuildings, setShowBuildings] = useState(false)
-  const [showGps, setShowGps] = useState(false)
+  const [showGps, setShowGps] = useState(true)
   // The server also requires these permissions; this only decides whether to offer the layer.
   const canViewGps =
     hasPermission(actor, 'manage.access') && hasPermission(actor, 'gps.read')

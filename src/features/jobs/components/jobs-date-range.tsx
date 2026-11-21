@@ -67,7 +67,7 @@ export function JobsDateRange({
             type="button"
             variant="outline"
             depth="raised"
-            className="h-8 w-full justify-start sm:w-auto"
+            className="h-8 w-full justify-start md:w-auto"
             aria-label={`სამუშაოების შექმნის პერიოდი: ${formatJobsRange(value)}`}
           />
         }
@@ -77,7 +77,7 @@ export function JobsDateRange({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="max-h-[min(85dvh,var(--available-height))] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto p-3 sm:w-xl"
+        className="max-h-[min(85dvh,var(--available-height))] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto p-3 md:w-2xl"
       >
         <PopoverHeader>
           <PopoverTitle>შექმნის პერიოდი</PopoverTitle>
@@ -127,6 +127,7 @@ export function JobsDateRange({
                     <JobCalendar
                       mode="range"
                       resetOnSelect
+                      className="mx-auto"
                       month={month}
                       onMonthChange={setMonth}
                       numberOfMonths={mobile ? 1 : 2}

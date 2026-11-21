@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { gpsHistoryRange } from './gps.schemas'
-import { buildGpsTrack } from './gps-track'
+import { buildGpsTrack, computeGpsTrackDistanceKm } from './gps-track'
 
 it('accepts up to seven inclusive calendar days', () => {
   expect(
@@ -37,4 +37,18 @@ it('does not draw a continuous track through invalid fixes or long gaps', () => 
     [[46, 41]],
     [[47, 41]],
   ])
+})
+
+it('computes segment distances without connecting separate gaps', () => {
+  expect(computeGpsTrackDistanceKm([])).toBe(0)
+  expect(computeGpsTrackDistanceKm([[[44.7408, 41.7186]]])).toBe(0)
+  const km = computeGpsTrackDistanceKm([
+    [
+      [44.7408, 41.7186],
+      [44.7528, 41.7186],
+    ],
+    [[44.8, 41.7]],
+  ])
+  expect(km).toBeGreaterThan(0.9)
+  expect(km).toBeLessThan(1.1)
 })

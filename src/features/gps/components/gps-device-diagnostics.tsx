@@ -56,9 +56,10 @@ export function GpsDeviceDiagnostics({
       </CardHeader>
       <CardContent>
         {query.isPending ? (
-          <div role="status" aria-busy="true">
+          <div className="flex flex-col gap-2" role="status" aria-busy="true">
             <span className="sr-only">კავშირის დიაგნოსტიკა იტვირთება</span>
-            <Skeleton className="h-16" aria-hidden="true" />
+            <Skeleton className="h-14" aria-hidden="true" />
+            <Skeleton className="h-14" aria-hidden="true" />
           </div>
         ) : query.isError ? (
           <Alert variant="destructive">
@@ -67,10 +68,11 @@ export function GpsDeviceDiagnostics({
             </AlertDescription>
           </Alert>
         ) : (
-          <dl className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <dl className="flex flex-col gap-2">
             {activity.map(({ kind, label, icon: Icon }) => {
               const event = query.data.find((item) => item.kind === kind)
               const receivedAt = event?.receivedAt
+              const hasDecodeError = kind === 'decode_error' && Boolean(event)
               const value = receivedAt && (
                 <time dateTime={receivedAt.toISOString()}>
                   {formatGeorgianDateTime(
@@ -83,23 +85,31 @@ export function GpsDeviceDiagnostics({
               return (
                 <div
                   key={kind}
-                  className="flex flex-col gap-2 rounded-lg border bg-muted/25 p-3"
+                  className="flex flex-col gap-1.5 rounded-lg border bg-muted/25 px-3 py-2.5"
                 >
-                  <dt className="flex items-center gap-2 text-sm font-medium">
+                  <dt className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <Icon
-                      className="size-4 shrink-0 text-muted-foreground"
+                      className={
+                        hasDecodeError
+                          ? 'size-4 shrink-0 text-destructive'
+                          : 'size-4 shrink-0 text-muted-foreground'
+                      }
                       aria-hidden="true"
                     />
                     {label}
                   </dt>
-                  <dd className="text-sm tabular-nums text-muted-foreground">
-                    {kind === 'decode_error' && event ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        {value}
-                        <GpsErrorSheet deviceName={deviceName} error={event} />
-                      </div>
-                    ) : (
-                      (value ?? 'არ დაფიქსირებულა')
+                  <dd className="flex flex-wrap items-center justify-between gap-2 text-sm tabular-nums">
+                    <span
+                      className={
+                        receivedAt
+                          ? 'font-medium text-foreground'
+                          : 'text-muted-foreground'
+                      }
+                    >
+                      {value ?? 'არ დაფიქსირებულა'}
+                    </span>
+                    {hasDecodeError && event && (
+                      <GpsErrorSheet deviceName={deviceName} error={event} />
                     )}
                   </dd>
                 </div>

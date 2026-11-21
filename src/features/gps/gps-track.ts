@@ -7,6 +7,7 @@ type TrackFix = {
 }
 
 const maxGapMs = 5 * 60_000
+const earthRadiusKm = 6371.0088
 
 export function buildGpsTrack(fixes: TrackFix[]) {
   const segments: Coordinate[][] = []
@@ -28,4 +29,26 @@ export function buildGpsTrack(fixes: TrackFix[]) {
   }
   if (segment.length) segments.push(segment)
   return segments
+}
+
+function haversineKm(from: Coordinate, to: Coordinate) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180
+  const dLat = toRad(to[1] - from[1])
+  const dLon = toRad(to[0] - from[0])
+  const lat1 = toRad(from[1])
+  const lat2 = toRad(to[1])
+  const sinLat = Math.sin(dLat / 2)
+  const sinLon = Math.sin(dLon / 2)
+  const a = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLon * sinLon
+  return 2 * earthRadiusKm * Math.asin(Math.min(1, Math.sqrt(a)))
+}
+
+export function computeGpsTrackDistanceKm(segments: Coordinate[][]) {
+  let total = 0
+  for (const segment of segments) {
+    for (let i = 1; i < segment.length; i++) {
+      total += haversineKm(segment[i - 1], segment[i])
+    }
+  }
+  return total
 }

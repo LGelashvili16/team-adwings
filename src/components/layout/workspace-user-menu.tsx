@@ -22,6 +22,7 @@ import {
   useSidebar,
 } from '#/components/ui/sidebar'
 import { Spinner } from '#/components/ui/spinner'
+import ThemeToggle from '#/components/ThemeToggle'
 import { roleLabels } from '#/lib/authorization/permissions'
 import type { Actor } from '#/lib/authorization/actor'
 
@@ -96,6 +97,14 @@ export function WorkspaceUserMenu({
                 ანგარიშის უსაფრთხოება
               </DropdownMenuItem>
             </DropdownMenuGroup>
+            {isMobile ? (
+              <>
+                <DropdownMenuSeparator />
+                <div className="p-1.5">
+                  <ThemeToggle fullWidth />
+                </div>
+              </>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem
