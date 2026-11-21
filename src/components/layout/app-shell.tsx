@@ -115,7 +115,9 @@ function WorkspaceShell({ actor }: { actor: Actor }) {
             </Breadcrumb>
             <div className="ml-auto flex items-center gap-2">
               <NotificationsPopover actorId={actor.id} />
-              <ThemeToggle />
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
             </div>
           </header>
           <div

@@ -81,6 +81,7 @@ export function JobsCards({
             <Link
               to="/jobs"
               search={{ ...search, pin: job.id }}
+              resetScroll={false}
               className="group block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <Card

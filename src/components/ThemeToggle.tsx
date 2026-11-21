@@ -40,7 +40,11 @@ function applyThemeMode(mode: ThemeMode) {
   document.documentElement.style.colorScheme = resolved
 }
 
-export default function ThemeToggle() {
+export default function ThemeToggle({
+  fullWidth = false,
+}: {
+  fullWidth?: boolean
+} = {}) {
   const [mode, setMode] = useState<ThemeMode>('auto')
 
   // Synchronize the browser-only stored preference after SSR hydration.
@@ -75,7 +79,10 @@ export default function ThemeToggle() {
     <div
       role="group"
       aria-label="ფერების თემა"
-      className="inline-flex shrink-0 items-center gap-0.5 rounded-xl border border-border bg-muted/60 p-1"
+      className={cn(
+        'items-center gap-0.5 rounded-xl border border-border bg-muted/60 p-1',
+        fullWidth ? 'flex w-full' : 'inline-flex shrink-0',
+      )}
     >
       {themeOptions.map(({ mode: option, label, icon: Icon }) => (
         <Button
@@ -90,6 +97,7 @@ export default function ThemeToggle() {
           onClick={() => selectMode(option)}
           className={cn(
             'rounded-lg',
+            fullWidth ? 'flex-1' : 'min-h-0 size-8',
             mode !== option && 'text-muted-foreground',
           )}
         >

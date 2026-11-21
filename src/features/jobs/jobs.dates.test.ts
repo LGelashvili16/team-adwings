@@ -26,7 +26,7 @@ it('defaults to the current Tbilisi month at the UTC month boundary and handles 
     '2026-11-01',
   )
   expect(formatJobsRange({ from: '2026-11-01', to: '2026-11-30' })).toBe(
-    '1 ნოემბერი, 2026 - 30 ნოემბერი, 2026',
+    '1 ნოე, 2026 - 30 ნოე, 2026',
   )
 })
 it('validates full calendar dates, single-day ranges and malformed URLs in Georgian', () => {

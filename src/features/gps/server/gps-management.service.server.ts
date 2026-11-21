@@ -116,6 +116,7 @@ export async function readGpsHistory(
           speedKmh: gpsPosition.speedKmh,
           course: gpsPosition.course,
           altitude: gpsPosition.altitude,
+          batteryPercent: gpsPosition.batteryPercent,
         })
         .from(gpsPosition)
         .where(filter)
@@ -159,6 +160,7 @@ function latestFix() {
       longitude: gpsPosition.longitude,
       fixAt: gpsPosition.fixAt,
       speedKmh: gpsPosition.speedKmh,
+      satellites: gpsPosition.satellites,
     })
     .from(gpsPosition)
     .where(and(eq(gpsPosition.deviceId, gpsDevice.id), gpsPosition.valid))
@@ -221,6 +223,7 @@ export async function readGpsMapDevices(
           longitude: latest.longitude,
           fixAt: latest.fixAt,
           speedKmh: latest.speedKmh,
+          satellites: latest.satellites,
         },
       })
       .from(gpsDevice)

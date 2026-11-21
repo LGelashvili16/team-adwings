@@ -44,12 +44,12 @@ export function JobsWorkspace({
   const [editor, setEditor] = useState<JobMapPosition | 'new' | null>(null)
   const [location, setLocation] = useState<ResolvedLocation | null>(null)
   const manager = canManageJobs(actor)
-  function update(next: JobSearch, replace = false) {
-    void navigate({ to: '/jobs', search: next, replace })
+  function update(next: JobSearch, replace = false, resetScroll = true) {
+    void navigate({ to: '/jobs', search: next, replace, resetScroll })
   }
   function select(id: string) {
     setLocation(null)
-    update({ ...search, pin: id })
+    update({ ...search, pin: id }, false, false)
   }
   function create(position: JobMapPosition) {
     setEditor(position)
@@ -71,7 +71,7 @@ export function JobsWorkspace({
       key={search.pin}
       actor={actor}
       id={search.pin}
-      onClose={() => update({ ...search, pin: undefined })}
+      onClose={() => update({ ...search, pin: undefined }, false, false)}
     />
   ) : null
   const cards = query.isPending ? (
@@ -118,15 +118,16 @@ export function JobsWorkspace({
     />
   ) : null
   return (
-    <div className="flex min-w-0 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex min-w-0 flex-col gap-4 sm:gap-6">
+      <header className="flex flex-wrap items-center justify-between gap-3 sm:gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">
           სამუშაოების რუკა
         </h1>
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <Button
             variant="outline"
             depth="raised"
+            className="flex-1 sm:flex-none"
             disabled={query.isFetching}
             aria-busy={query.isFetching}
             onClick={async () => {
@@ -147,7 +148,7 @@ export function JobsWorkspace({
             განახლება
           </Button>
           {manager ? (
-            <Button onClick={openEditor}>
+            <Button className="flex-1 sm:flex-none" onClick={openEditor}>
               <IconPlus aria-hidden="true" />
               ახალი სამუშაო
             </Button>
@@ -155,7 +156,7 @@ export function JobsWorkspace({
         </div>
       </header>
       <Tabs
-        className="min-w-0 gap-6"
+        className="min-w-0 gap-4 sm:gap-6"
         value={search.view}
         onValueChange={(value) => {
           if (value === 'map' || value === 'list') {
@@ -164,21 +165,21 @@ export function JobsWorkspace({
         }}
       >
         <TabsList
-          className="w-max gap-1 rounded-xl border p-0.5 group-data-horizontal/tabs:h-auto"
+          className="w-full gap-1 rounded-xl border p-0.5 group-data-horizontal/tabs:h-auto sm:w-max"
           aria-label="სამუშაოების ხედი"
         >
-          <TabsTrigger value="map" className="h-9 px-4">
+          <TabsTrigger value="map" className="h-9 flex-1 px-4 sm:flex-none">
             <IconMap aria-hidden="true" />
             რუკა
           </TabsTrigger>
-          <TabsTrigger value="list" className="h-9 px-4">
+          <TabsTrigger value="list" className="h-9 flex-1 px-4 sm:flex-none">
             <IconList aria-hidden="true" />
             სია
           </TabsTrigger>
         </TabsList>
         <TabsContent
           value={search.view}
-          className="flex min-w-0 flex-col gap-6"
+          className="flex min-w-0 flex-col gap-4 sm:gap-6"
         >
           <JobsFilters
             search={search}
@@ -228,7 +229,7 @@ export function JobsWorkspace({
               onSelect={select}
               onLocation={(result) => {
                 setLocation(result)
-                update({ ...search, pin: undefined })
+                update({ ...search, pin: undefined }, false, false)
               }}
               onCreate={create}
               onShowJobs={(q) =>
@@ -253,7 +254,7 @@ export function JobsWorkspace({
               <Sheet
                 open={Boolean(search.pin)}
                 onOpenChange={(open) => {
-                  if (!open) update({ ...search, pin: undefined })
+                  if (!open) update({ ...search, pin: undefined }, false, false)
                 }}
               >
                 <SheetContent
@@ -270,7 +271,9 @@ export function JobsWorkspace({
                         actor={actor}
                         id={search.pin}
                         inSheet
-                        onClose={() => update({ ...search, pin: undefined })}
+                        onClose={() =>
+                          update({ ...search, pin: undefined }, false, false)
+                        }
                       />
                     ) : null}
                   </div>

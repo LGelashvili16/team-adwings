@@ -1,6 +1,17 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
-import { IconSearch, IconX } from '@tabler/icons-react'
+import {
+  IconAdjustmentsHorizontal,
+  IconSearch,
+  IconX,
+} from '@tabler/icons-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '#/components/ui/accordion'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import {
   Field,
@@ -21,6 +32,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { useIsMobile } from '#/hooks/use-mobile'
+import { cn } from '#/lib/utils'
 import {
   jobFilterSchema,
   jobKindSchema,
@@ -85,6 +98,20 @@ const filterFields = [
     ],
   },
 ] as const
+
+function countActiveFilters(search: JobSearch) {
+  const defaultRange = jobsMonthRange()
+  let count = 0
+  if (search.from !== defaultRange.from || search.to !== defaultRange.to)
+    count++
+  if (search.q.trim()) count++
+  if (search.status !== 'all') count++
+  if (search.kind !== 'all') count++
+  if (search.scope !== 'all') count++
+  if (search.sort !== 'newest') count++
+  return count
+}
+
 export function JobsFilters({
   search,
   onChange,
@@ -94,6 +121,7 @@ export function JobsFilters({
   onChange: (search: JobSearch, replace?: boolean) => void
   showSearch?: boolean
 }) {
+  const isMobile = useIsMobile()
   const applied = signature(search)
   const previous = useRef(applied)
   const pending = useRef(new Set<string>())
@@ -151,6 +179,129 @@ export function JobsFilters({
     const timer = setTimeout(debounce, 300)
     return () => clearTimeout(timer)
   }, [draft.q, applied, search.q])
+
+  const activeCount = countActiveFilters(search)
+
+  const fields = (
+    <FieldGroup
+      className={cn(
+        isMobile
+          ? 'flex flex-col gap-3'
+          : 'flex flex-row flex-wrap items-start gap-3',
+      )}
+    >
+      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
+        <JobsDateRange
+          key={`${search.from}:${search.to}`}
+          value={{ from: search.from, to: search.to }}
+          onChange={(range) => {
+            form.setFieldValue('from', range.from)
+            form.setFieldValue('to', range.to)
+            commit({ ...form.state.values, ...range }, false)
+          }}
+        />
+      </Field>
+      {showSearch ? (
+        <form.Field name="q">
+          {(field) => (
+            <Field
+              className={cn(isMobile ? 'w-full' : 'min-w-48 flex-1')}
+              data-invalid={!field.state.meta.isValid}
+            >
+              <FieldLabel className="sr-only" htmlFor="jobs-search">
+                სამუშაოს ძიება
+              </FieldLabel>
+              <InputGroup>
+                <InputGroupAddon>
+                  <IconSearch aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="jobs-search"
+                  placeholder="სამუშაოს სათაური, შენახული მისამართი ან შენიშვნა"
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  aria-invalid={!field.state.meta.isValid}
+                  aria-describedby={
+                    field.state.meta.errors.length
+                      ? 'jobs-search-error'
+                      : undefined
+                  }
+                />
+              </InputGroup>
+              <FieldError
+                id="jobs-search-error"
+                errors={field.state.meta.errors}
+              />
+            </Field>
+          )}
+        </form.Field>
+      ) : null}
+      {filterFields.map(({ name, label, options }) => (
+        <form.Field key={name} name={name}>
+          {(field) => (
+            <Field className={cn(isMobile ? 'w-full' : 'w-auto')}>
+              <FieldLabel className="sr-only" htmlFor={`jobs-filter-${name}`}>
+                {label}
+              </FieldLabel>
+              <Select
+                value={field.state.value}
+                items={options}
+                onValueChange={(value) => {
+                  const parsed = jobFilterSchema.shape[name].safeParse(value)
+                  if (!parsed.success) return
+                  field.handleChange(parsed.data)
+                  commit({ ...form.state.values, [name]: parsed.data }, false)
+                }}
+              >
+                <SelectTrigger
+                  id={`jobs-filter-${name}`}
+                  className="w-full shadow-control-raised active:shadow-control-pressed"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          )}
+        </form.Field>
+      ))}
+      <Button
+        type="button"
+        variant="destructive"
+        depth="raised"
+        className={cn(isMobile && 'w-full')}
+        aria-label="ფილტრების გასუფთავება"
+        title="ფილტრების გასუფთავება"
+        onClick={() => {
+          const defaults: Filters = {
+            ...jobsMonthRange(),
+            q: '',
+            status: 'all',
+            kind: 'all',
+            scope: 'all',
+            sort: 'newest',
+          }
+          pending.current.clear()
+          form.reset(defaults)
+          onChange({ ...search, ...defaults, page: 1, pin: undefined })
+        }}
+      >
+        <IconX aria-hidden="true" />
+        <span className={cn(!isMobile && 'md:sr-only')}>გასუფთავება</span>
+      </Button>
+    </FieldGroup>
+  )
+
   return (
     <form
       noValidate
@@ -159,116 +310,33 @@ export function JobsFilters({
         void form.handleSubmit()
       }}
     >
-      <FieldGroup className="flex flex-row flex-wrap items-start gap-3">
-        <Field className="w-full sm:w-auto">
-          <JobsDateRange
-            key={`${search.from}:${search.to}`}
-            value={{ from: search.from, to: search.to }}
-            onChange={(range) => {
-              form.setFieldValue('from', range.from)
-              form.setFieldValue('to', range.to)
-              commit({ ...form.state.values, ...range }, false)
-            }}
-          />
-        </Field>
-        {showSearch ? (
-          <form.Field name="q">
-            {(field) => (
-              <Field
-                className="min-w-48 flex-1"
-                data-invalid={!field.state.meta.isValid}
-              >
-                <FieldLabel className="sr-only" htmlFor="jobs-search">
-                  სამუშაოს ძიება
-                </FieldLabel>
-                <InputGroup>
-                  <InputGroupAddon>
-                    <IconSearch aria-hidden="true" />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    id="jobs-search"
-                    placeholder="სამუშაოს სათაური, შენახული მისამართი ან შენიშვნა"
-                    value={field.state.value}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    onBlur={field.handleBlur}
-                    aria-invalid={!field.state.meta.isValid}
-                    aria-describedby={
-                      field.state.meta.errors.length
-                        ? 'jobs-search-error'
-                        : undefined
-                    }
+      {isMobile ? (
+        <div className="rounded-xl border bg-card px-3.5">
+          <Accordion>
+            <AccordionItem value="filters">
+              <AccordionTrigger className="items-center py-3 hover:no-underline">
+                <span className="flex items-center gap-2 font-medium">
+                  <IconAdjustmentsHorizontal
+                    className="size-4 text-muted-foreground"
+                    aria-hidden="true"
                   />
-                </InputGroup>
-                <FieldError
-                  id="jobs-search-error"
-                  errors={field.state.meta.errors}
-                />
-              </Field>
-            )}
-          </form.Field>
-        ) : null}
-        {filterFields.map(({ name, label, options }) => (
-          <form.Field key={name} name={name}>
-            {(field) => (
-              <Field className="w-full min-w-36 flex-1 sm:w-auto sm:flex-none">
-                <FieldLabel className="sr-only" htmlFor={`jobs-filter-${name}`}>
-                  {label}
-                </FieldLabel>
-                <Select
-                  value={field.state.value}
-                  items={options}
-                  onValueChange={(value) => {
-                    const parsed = jobFilterSchema.shape[name].safeParse(value)
-                    if (!parsed.success) return
-                    field.handleChange(parsed.data)
-                    commit({ ...form.state.values, [name]: parsed.data }, false)
-                  }}
-                >
-                  <SelectTrigger
-                    id={`jobs-filter-${name}`}
-                    className="w-full shadow-control-raised active:shadow-control-pressed"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      {options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-                <FieldError errors={field.state.meta.errors} />
-              </Field>
-            )}
-          </form.Field>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          depth="raised"
-          aria-label="ფილტრების გასუფთავება"
-          title="ფილტრების გასუფთავება"
-          onClick={() => {
-            const defaults: Filters = {
-              ...jobsMonthRange(),
-              q: '',
-              status: 'all',
-              kind: 'all',
-              scope: 'all',
-              sort: 'newest',
-            }
-            pending.current.clear()
-            form.reset(defaults)
-            onChange({ ...search, ...defaults, page: 1, pin: undefined })
-          }}
-        >
-          <IconX aria-hidden="true" />
-          <span className="sm:sr-only">გასუფთავება</span>
-        </Button>
-      </FieldGroup>
+                  ფილტრები
+                  {activeCount > 0 ? (
+                    <Badge variant="secondary" className="tabular-nums">
+                      {activeCount}
+                    </Badge>
+                  ) : null}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pt-1 pb-3.5">
+                {fields}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </div>
+      ) : (
+        fields
+      )}
       <form.Subscribe selector={(state) => state.errors}>
         {(errors) =>
           errors.length ? (

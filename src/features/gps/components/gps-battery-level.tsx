@@ -4,11 +4,12 @@ export function gpsBatteryTone(percent: number | null) {
   if (percent === null) return 'text-muted-foreground'
   if (percent <= 20) return 'text-badge-red-foreground'
   if (percent <= 50) return 'text-badge-yellow-foreground'
-  return 'text-badge-green-foreground'
+  return 'text-emerald-600 dark:text-badge-green-foreground'
 }
 
 export function GpsBatteryLevel({ percent }: { percent: number | null }) {
   const color = gpsBatteryTone(percent)
+  const isHealthy = percent !== null && percent > 50
 
   return (
     <span
@@ -20,7 +21,10 @@ export function GpsBatteryLevel({ percent }: { percent: number | null }) {
       <span aria-hidden="true" className="inline-flex shrink-0 items-center">
         <span className="block h-4 w-8 rounded-[0.3rem] border border-current p-0.5">
           <span
-            className="block h-full rounded-[0.12rem] bg-current"
+            className={cn(
+              'block h-full rounded-[0.12rem]',
+              isHealthy ? 'bg-emerald-500 dark:bg-current' : 'bg-current',
+            )}
             style={{ width: `${percent ?? 0}%` }}
           />
         </span>

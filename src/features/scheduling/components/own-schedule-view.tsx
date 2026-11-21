@@ -55,9 +55,9 @@ export function OwnScheduleView({ actorId }: { actorId: string }) {
   )?.hours
   const workingDays = schedule.week.filter((day) => day.hours).length
   return (
-    <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[16rem_minmax(0,1fr)]">
-      <Card className="gap-0 overflow-hidden rounded-2xl py-0 xl:sticky xl:top-6">
-        <CardHeader className="schedule-daylight-panel gap-6 p-6">
+    <div className="grid min-w-0 items-stretch gap-6 xl:grid-cols-[16rem_minmax(0,1fr)]">
+      <Card className="h-full gap-0 overflow-hidden rounded-2xl py-0">
+        <CardHeader className="schedule-daylight-panel flex-1 content-between gap-6 p-6">
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               {todayHours ? (
@@ -96,7 +96,7 @@ export function OwnScheduleView({ actorId }: { actorId: string }) {
               </div>
             </dl>
           ) : (
-            <p className="text-2xl font-semibold tracking-tight">
+            <p className="schedule-night-copy text-2xl font-semibold tracking-tight">
               დღეს ისვენებთ
             </p>
           )}

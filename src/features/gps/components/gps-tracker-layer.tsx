@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useMap } from '#/components/ui/map'
+import { useGpsNow } from '../hooks/use-gps-now'
 import { GpsTrackerMarker } from './gps-tracker-marker'
 import type { GpsLocatedDevice } from '../gps.queries'
 
@@ -31,7 +32,7 @@ export function GpsTrackerLayer({
         : 500,
     })
   }, [map, loaded, selectedId])
-  const now = Date.now()
+  const now = useGpsNow()
   return devices.map((device) => (
     <GpsTrackerMarker
       key={device.id}

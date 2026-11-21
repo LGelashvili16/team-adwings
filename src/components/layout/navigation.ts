@@ -252,7 +252,8 @@ export function isNavigationItemActive(pathname: string, destination: string) {
   }
   if (
     destination === '/manage/employees' ||
-    destination === '/manage/attendance'
+    destination === '/manage/attendance' ||
+    destination === '/manage/gps'
   ) {
     return path === destination || path.startsWith(`${destination}/`)
   }

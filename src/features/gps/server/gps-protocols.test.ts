@@ -46,6 +46,10 @@ describe('GPS stream and protocol strategies', () => {
         longitude: 4.331906,
         valid: true,
         timestamp: '2025-02-19T03:51:32.000Z',
+        batteryPercent: 89,
+        satellites: 21,
+        cellularSignal: 20,
+        odometerKm: 0,
       },
     })
     expect(result.decoded?.replies).toEqual([])

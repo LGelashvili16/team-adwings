@@ -5,7 +5,7 @@ const now = Date.parse('2026-11-21T12:00:00Z')
 const ago = (minutes: number) => new Date(now - minutes * 60_000)
 
 it.each([
-  [0, 'ახლახან'],
+  [0, 'აქტიური'],
   [5, '5 წუთის წინ'],
   [125, '2 საათის წინ'],
   [3 * 24 * 60, '3 დღის წინ'],

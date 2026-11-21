@@ -879,3 +879,18 @@ a {
 .schedule-work-block .schedule-work-end {
   color: #f1f5ff;
 }
+
+.dark .maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background-color: color-mix(in oklab, var(--card) 92%, transparent);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+}
+
+.dark .maplibregl-ctrl.maplibregl-ctrl-attrib a {
+  color: var(--foreground);
+}
+
+.dark .maplibregl-ctrl.maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  filter: invert(1);
+}

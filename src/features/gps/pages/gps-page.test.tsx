@@ -30,7 +30,16 @@ vi.mock('../gps.functions', () => ({
   updateGpsDevice: saveDevice,
 }))
 vi.mock('../components/gps-history-map', () => ({
-  GpsHistoryMap: () => <div aria-label="მარშრუტის რუკა" />,
+  GpsHistoryMap: ({
+    selectedPoint,
+  }: {
+    selectedPoint?: { id: string } | null
+  }) => (
+    <div
+      aria-label="მარშრუტის რუკა"
+      data-selected-point={selectedPoint?.id ?? ''}
+    />
+  ),
 }))
 vi.mock('@tanstack/react-start', () => ({ useServerFn: (fn: unknown) => fn }))
 vi.mock('@tanstack/react-router', () => ({
@@ -226,6 +235,7 @@ it('shows recorded history and submits a two-day calendar selection', async () =
     receivedAt: tracker.lastContactAt,
     altitude: 410,
     course: 0,
+    batteryPercent: 63,
   }
   getHistory.mockResolvedValue({
     device: tracker,
@@ -258,7 +268,15 @@ it('shows recorded history and submits a two-day calendar selection', async () =
   })
   expect(within(table).getByText('ვალიდური')).toBeVisible()
   expect(within(table).getByText('41.718530, 44.740870')).toBeVisible()
-  expect(screen.getByText('63%')).toBeVisible()
+  expect(within(table).getByText('63%')).toBeVisible()
+  expect(screen.getAllByText('63%').length).toBeGreaterThanOrEqual(2)
+  await user.click(
+    within(table).getByRole('button', { name: 'რუკაზე ჩვენება' }),
+  )
+  expect(screen.getByLabelText('მარშრუტის რუკა')).toHaveAttribute(
+    'data-selected-point',
+    'fix',
+  )
   expect(await screen.findByText('ბოლო საკონტროლო სიგნალი')).toBeVisible()
   await user.click(
     await screen.findByRole('button', { name: 'შეცდომის ნახვა' }),

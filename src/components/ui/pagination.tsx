@@ -49,6 +49,7 @@ function PaginationLink({
             variant: isActive ? 'outline' : 'ghost',
             size: 'icon',
           }),
+          'h-10 min-w-10 w-auto px-2',
           className,
         ),
       },
@@ -76,7 +77,7 @@ function PaginationEllipsis({ className, ...props }: ComponentProps<'span'>) {
     <span
       aria-hidden="true"
       data-slot="pagination-ellipsis"
-      className={cn('flex size-8 items-center justify-center', className)}
+      className={cn('flex size-10 items-center justify-center', className)}
       {...props}
     >
       <IconDots className="size-4" />
