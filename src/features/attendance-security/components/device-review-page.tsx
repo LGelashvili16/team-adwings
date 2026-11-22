@@ -239,7 +239,7 @@ function DeviceReviewWorkspace() {
         }}
         className="min-w-0"
       >
-        <div className="max-w-full overflow-x-auto">
+        <div className="-my-1 flex max-w-full overflow-x-auto overflow-y-hidden py-1">
           <TabsList
             aria-label="მოწყობილობების სტატუსი"
             className="w-max gap-1 rounded-xl border p-0.5 group-data-horizontal/tabs:h-auto"

@@ -25,6 +25,7 @@ export function AnnouncementsTable({
   sort,
   onSort,
   onOpen,
+  onPrefetch,
   showDelivery = false,
   showAuthor = false,
   showStatus = true,
@@ -33,6 +34,7 @@ export function AnnouncementsTable({
   sort: 'newest' | 'oldest'
   onSort: () => void
   onOpen: (id: string) => void
+  onPrefetch?: (id: string) => void
   showDelivery?: boolean
   showAuthor?: boolean
   showStatus?: boolean
@@ -46,6 +48,8 @@ export function AnnouncementsTable({
             <Button
               variant="link"
               className="h-auto max-w-full justify-start px-0 py-1 text-start whitespace-normal wrap-anywhere"
+              onMouseEnter={() => onPrefetch?.(row.original.id)}
+              onFocus={() => onPrefetch?.(row.original.id)}
               onClick={() => onOpen(row.original.id)}
             >
               {row.original.title}
@@ -66,7 +70,11 @@ export function AnnouncementsTable({
           : []),
         helper.accessor('publishedAt', {
           header: () => (
-            <Button variant="link" onClick={onSort}>
+            <Button
+              variant="link"
+              className="h-auto px-0 text-foreground hover:text-foreground"
+              onClick={onSort}
+            >
               გამოქვეყნდა
               <IconArrowsSort aria-hidden="true" />
             </Button>
@@ -100,7 +108,7 @@ export function AnnouncementsTable({
             ]
           : []),
       ]),
-    [onOpen, onSort, showDelivery, showAuthor, showStatus],
+    [onOpen, onPrefetch, onSort, showDelivery, showAuthor, showStatus],
   )
   const table = useTable({
     features,

@@ -67,10 +67,10 @@ export function DeviceFilters({
         void form.handleSubmit()
       }}
     >
-      <FieldGroup className="flex-row flex-wrap items-end gap-3">
+      <FieldGroup className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <form.Field name="q">
           {(field) => (
-            <Field className="min-w-56 flex-1">
+            <Field className="w-full min-w-0 sm:max-w-sm">
               <FieldLabel htmlFor="device-search">ძიება</FieldLabel>
               <Input
                 id="device-search"
@@ -100,7 +100,7 @@ export function DeviceFilters({
           )}
         </form.Field>
         {showState ? (
-          <Field className="w-52">
+          <Field className="w-full sm:w-48">
             <FieldLabel htmlFor="device-state">სტატუსი</FieldLabel>
             <Select
               value={search.state}
@@ -114,7 +114,7 @@ export function DeviceFilters({
                 if (next.success) onChange(next.data)
               }}
             >
-              <SelectTrigger id="device-state">
+              <SelectTrigger id="device-state" className="w-full">
                 <SelectValue>{stateLabels[search.state]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -129,7 +129,7 @@ export function DeviceFilters({
             </Select>
           </Field>
         ) : null}
-        <Field className="w-52">
+        <Field className="w-full sm:w-48">
           <FieldLabel htmlFor="device-sort">დალაგება</FieldLabel>
           <Select
             value={search.sort}
@@ -143,7 +143,7 @@ export function DeviceFilters({
               if (next.success) onChange(next.data)
             }}
           >
-            <SelectTrigger id="device-sort">
+            <SelectTrigger id="device-sort" className="w-full">
               <SelectValue>
                 {search.sort === 'newest' ? 'ჯერ ახალი' : 'ჯერ ძველი'}
               </SelectValue>

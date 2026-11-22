@@ -190,10 +190,12 @@ describe('workspace navigation', () => {
   })
   it.each(['owner'] as const)('shows all workspace sections to %s', (role) => {
     renderSidebar(role)
-    expect(screen.getByRole('link', { name: 'არყოფნები' })).toHaveAttribute(
-      'href',
-      '/manage/leave',
-    )
+    const leaveLinks = screen.getAllByRole('link', {
+      name: 'შვებულება & ბიულეტენი',
+    })
+    expect(
+      leaveLinks.some((link) => link.getAttribute('href') === '/manage/leave'),
+    ).toBe(true)
     expect(screen.getByText('ჩემი სივრცე')).toBeInTheDocument()
     expect(screen.getByText('მართვა')).toBeInTheDocument()
     expect(
@@ -318,16 +320,15 @@ describe('workspace navigation', () => {
   )
   it('hides administration and management from employees', () => {
     renderSidebar('employee')
-    expect(screen.getByRole('link', { name: 'არყოფნა' })).toHaveAttribute(
-      'href',
-      '/leave',
-    )
+    expect(
+      screen.getByRole('link', { name: 'შვებულება & ბიულეტენი' }),
+    ).toHaveAttribute('href', '/leave')
     for (const name of [
       'მთავარი გვერდი',
       'დასწრება',
       'ჩემი განრიგი',
       'სამუშაოების რუკა',
-      'არყოფნა',
+      'შვებულება & ბიულეტენი',
     ]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument()
     }

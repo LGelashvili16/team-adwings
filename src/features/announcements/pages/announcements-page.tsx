@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { IconSpeakerphone } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
@@ -14,12 +14,6 @@ import {
   EmptyTitle,
 } from '#/components/ui/empty'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '#/components/ui/dialog'
-import {
   announcementsQuery,
   announcementDetailQuery,
 } from '../announcements.queries'
@@ -28,50 +22,29 @@ import { AnnouncementsTable } from '../components/announcements-table'
 import { AnnouncementDialog } from '../components/announcement-dialog'
 import { PublishAnnouncementSheet } from '../components/publish-announcement-sheet'
 import type { AnnouncementSearch } from '../announcements.schemas'
+import type { AnnouncementListItem } from '../announcements.types'
 
 function AnnouncementReader({
   id,
+  preview,
   actorId,
   onClose,
 }: {
   id: string
+  preview?: AnnouncementListItem
   actorId: string
   onClose: () => void
 }) {
   const query = useQuery(announcementDetailQuery(actorId, id))
-  if (query.data)
-    return (
-      <AnnouncementDialog
-        value={query.data}
-        actorId={actorId}
-        onClose={onClose}
-      />
-    )
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose()
-      }}
-    >
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>განცხადება</DialogTitle>
-        </DialogHeader>
-        {query.isPending ? (
-          <div role="status" aria-label="განცხადება იტვირთება" aria-busy="true">
-            <Skeleton className="h-48" aria-hidden="true" />
-          </div>
-        ) : (
-          <Alert variant="destructive">
-            <AlertDescription>
-              განცხადება ვერ ჩაიტვირთა. გადაამოწმეთ თქვენი წვდომა და სცადეთ
-              ხელახლა.
-            </AlertDescription>
-          </Alert>
-        )}
-      </DialogContent>
-    </Dialog>
+    <AnnouncementDialog
+      value={query.data}
+      preview={preview}
+      loading={query.isPending}
+      error={query.isError || (!query.isPending && !query.data)}
+      actorId={actorId}
+      onClose={onClose}
+    />
   )
 }
 
@@ -86,7 +59,14 @@ export function AnnouncementsPage({
   manage?: boolean
   onSearch: (next: AnnouncementSearch, replace?: boolean) => void
 }) {
+  const client = useQueryClient()
   const query = useQuery(announcementsQuery(actorId, search))
+  const prefetch = (id: string) => {
+    void client.prefetchQuery({
+      ...announcementDetailQuery(actorId, id),
+      staleTime: 30_000,
+    })
+  }
   const changeSort = () =>
     onSearch({
       ...search,
@@ -99,21 +79,21 @@ export function AnnouncementsPage({
         <h1 className="text-2xl font-semibold tracking-tight">
           {manage ? 'განცხადებების მართვა' : 'განცხადებები'}
         </h1>
-        {manage ? (
-          <PublishAnnouncementSheet
-            actorId={actorId}
-            onPublished={() =>
-              onSearch({ page: 1, q: '', status: 'all', sort: 'newest' })
-            }
-          />
-        ) : null}
+        <div className="flex items-center gap-3">
+          {query.data ? (
+            <Badge variant="secondary">სულ {query.data.total}</Badge>
+          ) : null}
+          {manage ? (
+            <PublishAnnouncementSheet
+              actorId={actorId}
+              onPublished={() =>
+                onSearch({ page: 1, q: '', status: 'all', sort: 'newest' })
+              }
+            />
+          ) : null}
+        </div>
       </header>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <AnnouncementFilters search={search} onChange={onSearch} />
-        {query.data ? (
-          <Badge variant="secondary">სულ {query.data.total}</Badge>
-        ) : null}
-      </div>
+      <AnnouncementFilters search={search} onChange={onSearch} />
       <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
         <div aria-busy={query.isFetching}>
           {query.isPending ? (
@@ -143,6 +123,7 @@ export function AnnouncementsPage({
               sort={search.sort}
               onSort={changeSort}
               onOpen={(id) => onSearch({ ...search, announcementId: id })}
+              onPrefetch={prefetch}
             />
           ) : (
             <Empty>
@@ -192,6 +173,9 @@ export function AnnouncementsPage({
         <AnnouncementReader
           key={search.announcementId}
           id={search.announcementId}
+          preview={query.data?.items.find(
+            (item) => item.id === search.announcementId,
+          )}
           actorId={actorId}
           onClose={() =>
             onSearch({ ...search, announcementId: undefined }, true)

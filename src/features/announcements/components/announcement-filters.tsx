@@ -62,7 +62,7 @@ export function AnnouncementFilters({
   }, [form, search.q, search.status, search.sort, search.page])
   return (
     <form
-      className="flex-1"
+      className="w-full"
       noValidate
       onSubmit={(event) => {
         event.preventDefault()
@@ -73,7 +73,7 @@ export function AnnouncementFilters({
         <form.Field name="q">
           {(field) => (
             <Field
-              className="min-w-0 sm:max-w-md"
+              className="w-full min-w-0 sm:max-w-md"
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel htmlFor="announcements-search" className="sr-only">
@@ -101,7 +101,7 @@ export function AnnouncementFilters({
             </Field>
           )}
         </form.Field>
-        <Field className="sm:w-48">
+        <Field className="w-full sm:w-48">
           <FieldLabel htmlFor="announcements-status" className="sr-only">
             წაკითხვის სტატუსი
           </FieldLabel>
@@ -118,7 +118,7 @@ export function AnnouncementFilters({
               if (parsed.success) onChange(parsed.data)
             }}
           >
-            <SelectTrigger id="announcements-status">
+            <SelectTrigger id="announcements-status" className="w-full">
               <SelectValue>{statuses[search.status]}</SelectValue>
             </SelectTrigger>
             <SelectContent>

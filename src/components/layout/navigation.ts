@@ -76,7 +76,7 @@ export const navigationItems = [
   {
     to: '/leave',
     icon: IconCalendarOff,
-    label: 'არყოფნა',
+    label: 'შვებულება & ბიულეტენი',
     permission: null,
   },
 
@@ -140,7 +140,7 @@ export const navigationItems = [
   {
     to: '/manage/leave',
     icon: IconCalendarCheck,
-    label: 'არყოფნები',
+    label: 'შვებულება & ბიულეტენი',
     permission: 'leave.review',
   },
 

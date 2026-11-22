@@ -66,16 +66,16 @@ export function OwnDayOffBalance({ actorId }: { actorId: string }) {
   if (query.isPending) return <PendingBalance />
   if (!query.data) return <BalanceError />
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
       <Badge
         variant="blue"
-        className="h-auto max-w-full px-3 py-1.5 text-sm whitespace-normal"
+        className="h-auto w-full max-w-full px-3 py-1.5 text-sm whitespace-normal sm:w-fit"
       >
         დასვენების დღეები: {query.data.remainingDays}
       </Badge>
       <Badge
         variant="purple"
-        className="h-auto max-w-full px-3 py-1.5 text-sm whitespace-normal"
+        className="h-auto w-full max-w-full px-3 py-1.5 text-sm whitespace-normal sm:w-fit"
       >
         შვებულება: {query.data.vacationRemainingDays} სამუშაო დღე
       </Badge>
