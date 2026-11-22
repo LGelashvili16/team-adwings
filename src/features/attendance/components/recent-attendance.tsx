@@ -45,13 +45,7 @@ export function RecentAttendance({
     getRowId: (day) => day.date,
   })
   return (
-    <Card
-      className={cn(
-        'rounded-2xl shadow-sm [--card-spacing:--spacing(5)] sm:[--card-spacing:--spacing(6)]',
-        workLog &&
-          'gap-4 rounded-none bg-transparent shadow-none ring-0 [--card-spacing:0] sm:[--card-spacing:0]',
-      )}
-    >
+    <Card className="overflow-hidden pb-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span
@@ -65,8 +59,8 @@ export function RecentAttendance({
           {workLog ? <h2>ბოლო დასწრებები</h2> : 'ბოლო დასწრებები'}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        {!overview.recent.length ? (
+      {!overview.recent.length ? (
+        <CardContent className="pb-6">
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 py-10 text-center">
             <IconHistory
               className="size-7 text-muted-foreground"
@@ -76,13 +70,15 @@ export function RecentAttendance({
               დასწრების ჩანაწერები ჯერ არ არის.
             </p>
           </div>
-        ) : (
+        </CardContent>
+      ) : (
+        <div className="border-t">
           <Table aria-label="ბოლო დასწრებები">
-            <TableHeader>
+            <TableHeader className="bg-muted/40">
               {table.getHeaderGroups().map((group) => (
                 <TableRow key={group.id}>
                   {group.headers.map((header) => (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="h-12 px-4">
                       <table.FlexRender header={header} />
                     </TableHead>
                   ))}
@@ -92,21 +88,21 @@ export function RecentAttendance({
             <TableBody>
               {table.getRowModel().rows.map(({ original: day }) => (
                 <TableRow key={day.date}>
-                  <TableCell className="whitespace-nowrap font-medium">
+                  <TableCell className="px-4 py-3.5 font-medium whitespace-nowrap">
                     {formatAttendanceDate(day.date, true)}
                   </TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="px-4 py-3.5 tabular-nums">
                     {formatAttendanceTime(day.firstIn, day.timezone)}
                   </TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="px-4 py-3.5 tabular-nums">
                     {day.lastOut
                       ? `${companyLocalDate(new Date(day.lastOut), day.timezone) !== day.date ? `${formatAttendanceDate(companyLocalDate(new Date(day.lastOut), day.timezone), true)} ` : ''}${formatAttendanceTime(day.lastOut, day.timezone)}`
                       : 'ჯერ არ დაფიქსირებულა'}
                   </TableCell>
-                  <TableCell className="tabular-nums">
+                  <TableCell className="px-4 py-3.5 tabular-nums">
                     {formatWorkedTime(day.seconds)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="px-4 py-3.5">
                     <div className="flex flex-wrap gap-1">
                       {day.incomplete ? (
                         <Badge variant={day.requiresReview ? 'red' : 'green'}>
@@ -130,8 +126,8 @@ export function RecentAttendance({
               ))}
             </TableBody>
           </Table>
-        )}
-      </CardContent>
+        </div>
+      )}
     </Card>
   )
 }

@@ -1,5 +1,8 @@
 import { IconPlus, IconX } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
+import { Card, CardContent } from '#/components/ui/card'
+import { Separator } from '#/components/ui/separator'
+import { GpsMapLegendSections } from '#/features/gps/components/gps-map-legend'
 import { jobKinds } from '../jobs.presentation'
 import { jobStatusSchema } from '../jobs.schemas'
 import { JobStatusBadge } from './job-status-badge'
@@ -52,45 +55,68 @@ export function JobsMapOverlays({
     </>
   )
 }
-export function JobsMapLegend() {
+
+export function JobsMapLegend({ showGps = false }: { showGps?: boolean }) {
   return (
-    <div
-      className="flex flex-col gap-3"
-      role="group"
-      aria-label="რუკის ნიშნების განმარტება"
-    >
-      <div
+    <Card size="sm">
+      <CardContent
         role="group"
-        aria-label="სამუშაოს ტიპები"
-        className="flex flex-wrap gap-x-5 gap-y-3"
+        aria-label="რუკის ნიშნების განმარტება"
+        className="flex flex-col gap-4 py-1"
       >
-        {Object.entries(jobKinds).map(([kind, item]) => {
-          const Icon = item.icon
-          return (
-            <span
-              key={kind}
-              className="flex items-center gap-2 text-sm text-muted-foreground"
-            >
-              <span
-                className="flex size-6 items-center justify-center rounded-lg border"
-                style={item.markerStyle}
-              >
-                <Icon className="size-3.5" aria-hidden="true" />
-              </span>
-              {item.label}
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+          <div
+            role="group"
+            aria-label="სამუშაოს ტიპები"
+            className="flex flex-col gap-2"
+          >
+            <span className="text-xs font-medium text-muted-foreground">
+              სამუშაოს ტიპები
             </span>
-          )
-        })}
-      </div>
-      <div
-        role="group"
-        aria-label="სამუშაოს სტატუსები"
-        className="flex flex-wrap gap-3"
-      >
-        {jobStatusSchema.options.map((status) => (
-          <JobStatusBadge key={status} status={status} />
-        ))}
-      </div>
-    </div>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              {Object.entries(jobKinds).map(([kind, item]) => {
+                const Icon = item.icon
+                return (
+                  <span
+                    key={kind}
+                    className="flex items-center gap-2 text-sm text-foreground"
+                  >
+                    <span
+                      className="flex size-6 shrink-0 items-center justify-center rounded-lg border"
+                      style={item.markerStyle}
+                    >
+                      <Icon className="size-3.5" aria-hidden="true" />
+                    </span>
+                    {item.label}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+
+          <div
+            role="group"
+            aria-label="სამუშაოს სტატუსები"
+            className="flex flex-col gap-2"
+          >
+            <span className="text-xs font-medium text-muted-foreground">
+              სამუშაოს სტატუსები
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              {jobStatusSchema.options.map((status) => (
+                <JobStatusBadge key={status} status={status} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {showGps ? (
+          <>
+            <Separator />
+            <GpsMapLegendSections />
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   )
 }

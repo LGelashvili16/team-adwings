@@ -144,7 +144,7 @@ function Popup({
         <div className="flex min-w-0 flex-col gap-1.5">
           <span className="font-semibold break-words">{device.name}</span>
           <Badge variant={stale ? 'secondary' : 'green'} className="w-max">
-            {stale ? 'ძველი მდებარეობა' : 'აქტუალური მდებარეობა'}
+            {stale ? 'ძველი მდებარეობა' : 'აქტიური მდებარეობა'}
           </Badge>
         </div>
         <Button

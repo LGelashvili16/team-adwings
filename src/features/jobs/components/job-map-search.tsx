@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react'
-import { IconSearch, IconChevronLeft, IconX } from '@tabler/icons-react'
+import { IconSearch, IconMinus, IconX } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Field, FieldError, FieldLabel } from '#/components/ui/field'
 import {
@@ -116,13 +116,16 @@ export function JobMapSearch({
                       }
                     }}
                   />
-                  <InputGroupAddon align="inline-end">
+                  <InputGroupAddon
+                    align="inline-end"
+                    className="gap-1.5 pr-1.5 has-[>button]:mr-0"
+                  >
                     {model.value ? (
                       <Button
                         type="button"
                         variant="ghost"
                         depth="raised"
-                        size="icon"
+                        size="icon-sm"
                         aria-label="რუკის ძიების გასუფთავება"
                         onClick={() => {
                           field.handleChange('')
@@ -134,9 +137,9 @@ export function JobMapSearch({
                     ) : null}
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       depth="raised"
-                      size="icon"
+                      size="icon-sm"
                       aria-label="რუკის ძიების ჩაკეცვა"
                       title="ძიების ჩაკეცვა"
                       onClick={() => {
@@ -144,7 +147,7 @@ export function JobMapSearch({
                         model.setMinimized(true)
                       }}
                     >
-                      <IconChevronLeft aria-hidden="true" />
+                      <IconMinus aria-hidden="true" />
                     </Button>
                   </InputGroupAddon>
                 </InputGroup>
