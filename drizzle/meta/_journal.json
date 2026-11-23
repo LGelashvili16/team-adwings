@@ -323,6 +323,34 @@
       "when": 1795279230702,
       "tag": "0045_gps_telemetry_diagnostics",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1795424361330,
+      "tag": "0046_gps_device_phone",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795431332330,
+      "tag": "0047_nullable_employee_username",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795434597841,
+      "tag": "0048_notification_popup_dismissed",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1795457504297,
+      "tag": "0049_notification_deleted_at",
+      "breakpoints": true
     }
   ]
 }

@@ -67,7 +67,7 @@ export function JobsDateRange({
             type="button"
             variant="outline"
             depth="raised"
-            className="h-8 w-full justify-start md:w-auto"
+            className="w-full justify-start md:w-auto"
             aria-label={`სამუშაოების შექმნის პერიოდი: ${formatJobsRange(value)}`}
           />
         }

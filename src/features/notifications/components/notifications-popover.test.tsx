@@ -12,12 +12,14 @@ const api = vi.hoisted(() => ({
   mark: vi.fn(),
   unseen: vi.fn(),
   all: vi.fn(),
+  clearPopup: vi.fn(),
 }))
 vi.mock('../notifications.functions', () => ({
   getOwnNotifications: api.read,
   markOwnNotifications: api.mark,
   markOwnNotificationsAsUnseen: api.unseen,
   markAllOwnNotifications: api.all,
+  clearOwnNotificationsPopup: api.clearPopup,
 }))
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -41,6 +43,7 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 let items: Array<NotificationItem>
+let popupCleared = false
 function setup() {
   const user = userEvent.setup()
   render(
@@ -52,6 +55,7 @@ function setup() {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  popupCleared = false
   items = [
     {
       id: '019aac01-0000-7000-8000-000000000001',
@@ -61,14 +65,25 @@ beforeEach(() => {
       seenAt: null,
     },
   ]
-  api.read.mockImplementation(async () => ({
-    ok: true,
-    value: {
-      items: [...items],
-      unseenCount: items.filter((item) => !item.seenAt).length,
-      hasMore: false,
+  api.read.mockImplementation(
+    async ({ data }: { data?: { scope?: 'all' | 'popup' } } = {}) => {
+      const visible =
+        data?.scope === 'popup' && popupCleared ? [] : [...items]
+      return {
+        ok: true,
+        value: {
+          items: visible,
+          unseenCount: visible.filter((item) => !item.seenAt).length,
+          totalCount: visible.length,
+          hasMore: false,
+        },
+      }
     },
-  }))
+  )
+  api.clearPopup.mockImplementation(async () => {
+    popupCleared = true
+    return { ok: true, value: { clearedCount: items.length } }
+  })
   api.all.mockImplementation(async () => {
     items = items.map((item) => ({ ...item, seenAt: '2026-11-05T09:00:00Z' }))
     return { ok: true, value: { updatedCount: items.length } }
@@ -94,6 +109,31 @@ beforeEach(() => {
 })
 
 describe('notifications popover', () => {
+  it('clears all notifications from the popup and bell dot without marking them seen', async () => {
+    const user = setup()
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'შეტყობინებები, ახალი შეტყობინება',
+      }),
+    )
+    expect(
+      screen.queryByText('თქვენი სამუშაო სივრცის სიახლეები'),
+    ).not.toBeInTheDocument()
+    await user.click(
+      await screen.findByRole('button', { name: 'ყველას გასუფთავება' }),
+    )
+    await waitFor(() =>
+      expect(
+        screen
+          .getByRole('button', { name: 'შეტყობინებები' })
+          .querySelector('[data-slot="notification-unread-dot"]'),
+      ).toBeNull(),
+    )
+    expect(api.clearPopup).toHaveBeenCalledWith({ data: {} })
+    expect(items.every((item) => item.seenAt === null)).toBe(true)
+    expect(await screen.findByText('შეტყობინებები ჯერ არ გაქვთ')).toBeVisible()
+  })
+
   it('clears older unread notifications beyond the read preview', async () => {
     items = Array.from({ length: 7 }, (_, index) => ({
       ...items[0],

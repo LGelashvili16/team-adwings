@@ -39,7 +39,6 @@ export function DataPagination({
                 role="link"
                 aria-disabled="true"
                 tabIndex={-1}
-                className="pointer-events-none opacity-50"
               />
             )}
           </PaginationItem>
@@ -61,12 +60,7 @@ export function DataPagination({
             {page < pages ? (
               <PaginationNext render={renderLink(page + 1)} />
             ) : (
-              <PaginationNext
-                role="link"
-                aria-disabled="true"
-                tabIndex={-1}
-                className="pointer-events-none opacity-50"
-              />
+              <PaginationNext role="link" aria-disabled="true" tabIndex={-1} />
             )}
           </PaginationItem>
         </PaginationContent>

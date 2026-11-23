@@ -1,0 +1,2 @@
+ALTER TABLE "gps_device" ADD COLUMN "phone" text;--> statement-breakpoint
+ALTER TABLE "gps_device" ADD CONSTRAINT "gps_device_phone_valid" CHECK ("gps_device"."phone" is null or (length("gps_device"."phone") <= 32 and "gps_device"."phone" ~ '^\+?[0-9][0-9 ()-]{5,30}[0-9]$'));

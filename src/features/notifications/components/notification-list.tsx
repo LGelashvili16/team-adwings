@@ -4,6 +4,7 @@ import {
   IconCheck,
   IconClock,
   IconMail,
+  IconTrash,
 } from '@tabler/icons-react'
 import { cn } from 'cn'
 import { Link } from '@tanstack/react-router'
@@ -11,44 +12,61 @@ import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
 import type { NotificationItem } from '../notifications.types'
-import { notificationDestination } from '../notification-destination'
+import { resolveNotificationLink } from '../notification-destination'
 import { formatGeorgianDateTime } from '#/lib/date-format'
 
 export function NotificationList({
   items,
   pendingIds,
+  deletingIds,
   onMarkSeen,
   onMarkUnseen,
+  onDelete,
   onNavigate,
   actorId = '',
+  variant = 'popover',
 }: {
   items: Array<NotificationItem>
   pendingIds: Array<string>
+  deletingIds?: Array<string>
   onMarkSeen: (ids: Array<string>) => void
   onMarkUnseen: (ids: Array<string>) => void
+  onDelete?: (item: NotificationItem) => void
   onNavigate?: () => void
   actorId?: string
+  variant?: 'popover' | 'page'
 }) {
   return (
-    <ul aria-label="შეტყობინებების სია" className="flex flex-col gap-1 p-2">
+    <ul
+      aria-label="შეტყობინებების სია"
+      className={cn(
+        'flex flex-col',
+        variant === 'page' ? 'divide-y divide-border/70' : 'gap-1 p-2',
+      )}
+    >
       {items.map((item) => {
         const unseen = item.seenAt === null
         const pending = pendingIds.includes(item.id)
-        const destination = notificationDestination(item.destination, actorId)
+        const deleting = deletingIds?.includes(item.id) ?? false
+        const rowBusy = pendingIds.length > 0 || (deletingIds?.length ?? 0) > 0
+        const linkTarget = resolveNotificationLink(item, actorId)
         return (
           <li
             key={item.id}
             className={cn(
-              'flex items-start gap-3 rounded-xl px-3 py-3.5 transition-colors hover:bg-accent focus-within:bg-accent motion-reduce:transition-none',
-              unseen && 'bg-muted/30',
+              'group relative flex items-start gap-3 transition-colors motion-reduce:transition-none',
+              variant === 'page'
+                ? 'px-4 py-4 hover:bg-accent/55 focus-within:bg-accent/55 sm:px-6'
+                : 'rounded-xl px-3 py-3 hover:bg-accent/70 focus-within:bg-accent/70',
+              unseen && (variant === 'page' ? 'bg-muted/20' : 'bg-muted/35'),
             )}
           >
             <div
               aria-hidden="true"
               data-slot="notification-item-icon"
               className={cn(
-                'relative flex size-10 shrink-0 items-center justify-center rounded-2xl bg-muted text-muted-foreground ring-1 ring-border/60',
-                unseen && 'bg-background text-primary',
+                'relative flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/70 text-muted-foreground',
+                unseen && 'border-border bg-background text-primary shadow-xs',
               )}
             >
               {unseen ? (
@@ -63,40 +81,18 @@ export function NotificationList({
                 />
               ) : null}
             </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
               <p
                 className={cn(
                   'text-sm leading-5 font-medium wrap-anywhere',
-                  !unseen && 'text-muted-foreground',
+                  unseen ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
-                {destination ? (
+                {linkTarget ? (
                   <Link
-                    {...destination}
+                    {...linkTarget}
                     onClick={onNavigate}
-                    className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  >
-                    {item.title}
-                  </Link>
-                ) : item.announcementId ? (
-                  <Link
-                    to="/announcements"
-                    onClick={onNavigate}
-                    search={{ announcementId: item.announcementId }}
-                    className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                  >
-                    {item.title}
-                  </Link>
-                ) : item.complaintId ? (
-                  <Link
-                    to={
-                      item.complaintReview
-                        ? '/manage/complaints'
-                        : '/complaints'
-                    }
-                    search={{ complaintId: item.complaintId }}
-                    onClick={onNavigate}
-                    className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="rounded-sm underline-offset-4 after:absolute after:inset-0 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                   >
                     {item.title}
                   </Link>
@@ -110,20 +106,25 @@ export function NotificationList({
               </p>
               <time
                 dateTime={item.createdAt}
-                className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground"
+                className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground/85"
               >
                 <IconClock className="size-3 shrink-0" aria-hidden="true" />
                 {formatGeorgianDateTime(item.createdAt, 'Asia/Tbilisi')}
               </time>
               {!unseen ? <span className="sr-only">ნანახია</span> : null}
             </div>
-            <div className="flex w-11 shrink-0 items-center justify-center self-center">
+            <div
+              className={cn(
+                'relative z-10 flex shrink-0 items-center justify-center self-center',
+                onDelete ? 'gap-1' : 'w-9',
+              )}
+            >
               {unseen ? (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-11 rounded-xl"
-                  disabled={pendingIds.length > 0}
+                  size="icon-sm"
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                  disabled={rowBusy}
                   aria-busy={pending}
                   aria-label={`ნანახად მონიშვნა: ${item.title}`}
                   title="ნანახად მონიშვნა"
@@ -138,9 +139,9 @@ export function NotificationList({
               ) : (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-11 rounded-xl"
-                  disabled={pendingIds.length > 0}
+                  size="icon-sm"
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                  disabled={rowBusy}
                   aria-busy={pending}
                   aria-label={`წაუკითხავად მონიშვნა: ${item.title}`}
                   title="წაუკითხავად მონიშვნა"
@@ -153,6 +154,24 @@ export function NotificationList({
                   )}
                 </Button>
               )}
+              {onDelete ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  disabled={rowBusy}
+                  aria-busy={deleting}
+                  aria-label={`წაშლა: ${item.title}`}
+                  title="წაშლა"
+                  onClick={() => onDelete(item)}
+                >
+                  {deleting ? (
+                    <Spinner aria-hidden="true" />
+                  ) : (
+                    <IconTrash aria-hidden="true" />
+                  )}
+                </Button>
+              ) : null}
             </div>
           </li>
         )
@@ -200,9 +219,6 @@ export function NotificationsEmpty() {
         <IconBellCheck className="size-7 text-muted-foreground" />
       </div>
       <p className="font-medium">შეტყობინებები ჯერ არ გაქვთ</p>
-      <p className="max-w-64 text-sm leading-6 text-muted-foreground">
-        ახალი შეტყობინებები აქ გამოჩნდება.
-      </p>
     </div>
   )
 }

@@ -125,3 +125,64 @@ it('shows temporary failure if IP extraction fails instead of denying the accoun
   expect(response.status).toBe(503)
   expect(await response.text()).not.toContain('invalid private setting')
 })
+it.each([
+  [
+    'http://localhost/auth/login?identifier=admin&password=secret',
+    '/auth/login',
+  ],
+  [
+    'http://localhost/auth/login?identifier=admin&password=secret&error=expired',
+    '/auth/login?error=expired',
+  ],
+  [
+    'http://localhost/auth/register?code=ABCD-1234&newPassword=secret&confirmPassword=secret',
+    '/auth/register',
+  ],
+  [
+    'http://localhost/settings/security?currentPassword=old&newPassword=new',
+    '/settings/security',
+  ],
+])(
+  'strips credential query parameters from %s with a non-cacheable 303 redirect',
+  async (url, expectedLocation) => {
+    calls.networkAllowed.mockResolvedValue(true)
+    const next = vi.fn()
+    const response = await calls.middleware({
+      request: new Request(url, { headers: { accept: 'text/html' } }),
+      next,
+    })
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(expectedLocation)
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+    expect(next).not.toHaveBeenCalled()
+  },
+)
+it('redirects native POST submissions to credential pages back to the clean page URL', async () => {
+  calls.networkAllowed.mockResolvedValue(true)
+  const next = vi.fn()
+  const response = await calls.middleware({
+    request: new Request('http://localhost/auth/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'identifier=admin&password=secret',
+    }),
+    next,
+  })
+  expect(response.status).toBe(303)
+  expect(response.headers.get('location')).toBe('/auth/login')
+  expect(response.headers.get('cache-control')).toBe('private, no-store')
+  expect(response.headers.get('referrer-policy')).toBe('no-referrer')
+  expect(next).not.toHaveBeenCalled()
+})
+it('does not intercept API callback query parameters such as code', async () => {
+  calls.networkAllowed.mockResolvedValue(true)
+  const expected = new Response('ok')
+  const next = vi.fn().mockResolvedValue(expected)
+  const response = await calls.middleware({
+    request: new Request('http://localhost/api/auth/callback?code=oauth-code'),
+    next,
+  })
+  expect(response).toBe(expected)
+  expect(next).toHaveBeenCalledOnce()
+})

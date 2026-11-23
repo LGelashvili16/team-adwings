@@ -2,11 +2,16 @@ import { createServerFn } from '@tanstack/react-start'
 import { setResponseHeader } from '@tanstack/react-start/server'
 import { authenticatedMiddleware } from '#/lib/auth/auth.middleware'
 import {
+  deleteAllNotificationsSchema,
+  deleteNotificationSchema,
   markNotificationsSeenSchema,
   markAllNotificationsSeenSchema,
   notificationListSchema,
 } from './notifications.schemas'
 import {
+  clearOwnNotificationPopup,
+  deleteAllOwnNotifications,
+  deleteOwnNotification,
   listOwnNotifications,
   markOwnNotificationsSeen,
   markOwnNotificationsUnseen,
@@ -81,6 +86,60 @@ export const markAllOwnNotifications = createServerFn({ method: 'POST' })
       return {
         ok: false as const,
         message: 'მონიშვნა ვერ მოხერხდა. სცადეთ ხელახლა.',
+      }
+    }
+  })
+
+export const clearOwnNotificationsPopup = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(markAllNotificationsSeenSchema)
+  .handler(async ({ context }) => {
+    setResponseHeader('Cache-Control', 'private, no-store')
+    try {
+      return {
+        ok: true as const,
+        value: await clearOwnNotificationPopup(context.actor),
+      }
+    } catch {
+      return {
+        ok: false as const,
+        message: 'გასუფთავება ვერ მოხერხდა. სცადეთ ხელახლა.',
+      }
+    }
+  })
+
+export const removeOwnNotification = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(deleteNotificationSchema)
+  .handler(async ({ context, data }) => {
+    setResponseHeader('Cache-Control', 'private, no-store')
+    try {
+      return {
+        ok: true as const,
+        value: await deleteOwnNotification(context.actor, data),
+      }
+    } catch {
+      return {
+        ok: false as const,
+        message: 'შეტყობინება ვერ წაიშალა. სცადეთ ხელახლა.',
+      }
+    }
+  })
+
+export const removeAllOwnNotifications = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(deleteAllNotificationsSchema)
+  .handler(async ({ context }) => {
+    setResponseHeader('Cache-Control', 'private, no-store')
+    try {
+      return {
+        ok: true as const,
+        value: await deleteAllOwnNotifications(context.actor),
+      }
+    } catch {
+      return {
+        ok: false as const,
+        message: 'შეტყობინებები ვერ წაიშალა. სცადეთ ხელახლა.',
       }
     }
   })

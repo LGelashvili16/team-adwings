@@ -5,6 +5,7 @@ import {
   IconHistory,
   IconMapPin,
   IconPencil,
+  IconPhone,
   IconSatellite,
 } from '@tabler/icons-react'
 import { Badge } from '#/components/ui/badge'
@@ -122,6 +123,14 @@ export function GpsDeviceCard({
                   {device.position.latitude.toFixed(5)},{' '}
                   {device.position.longitude.toFixed(5)}
                 </dd>
+              </div>
+            )}
+
+            {device.phone && (
+              <div className="flex items-center gap-1.5 tabular-nums">
+                <IconPhone className="size-3.5 shrink-0" aria-hidden="true" />
+                <dt className="sr-only">ტელეფონის ნომერი</dt>
+                <dd className="truncate">{device.phone}</dd>
               </div>
             )}
           </dl>

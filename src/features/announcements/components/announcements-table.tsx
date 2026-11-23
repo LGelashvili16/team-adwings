@@ -25,17 +25,21 @@ export function AnnouncementsTable({
   sort,
   onSort,
   onOpen,
+  onPrefetch,
   showDelivery = false,
   showAuthor = false,
   showStatus = true,
+  showContent = false,
 }: {
   items: Array<AnnouncementListItem>
   sort: 'newest' | 'oldest'
   onSort: () => void
   onOpen: (id: string) => void
+  onPrefetch?: (id: string) => void
   showDelivery?: boolean
   showAuthor?: boolean
   showStatus?: boolean
+  showContent?: boolean
 }) {
   const columns = useMemo(
     () =>
@@ -46,12 +50,26 @@ export function AnnouncementsTable({
             <Button
               variant="link"
               className="h-auto max-w-full justify-start px-0 py-1 text-start whitespace-normal wrap-anywhere"
+              onMouseEnter={() => onPrefetch?.(row.original.id)}
+              onFocus={() => onPrefetch?.(row.original.id)}
               onClick={() => onOpen(row.original.id)}
             >
               {row.original.title}
             </Button>
           ),
         }),
+        ...(showContent
+          ? [
+              helper.accessor('body', {
+                header: 'შინაარსი',
+                cell: ({ row }) => (
+                  <span className="block w-64 truncate text-muted-foreground lg:w-96">
+                    {row.original.body}
+                  </span>
+                ),
+              }),
+            ]
+          : []),
         ...(showAuthor
           ? [
               helper.accessor('authorName', {
@@ -66,7 +84,11 @@ export function AnnouncementsTable({
           : []),
         helper.accessor('publishedAt', {
           header: () => (
-            <Button variant="link" onClick={onSort}>
+            <Button
+              variant="link"
+              className="h-auto px-0 text-foreground hover:text-foreground"
+              onClick={onSort}
+            >
               გამოქვეყნდა
               <IconArrowsSort aria-hidden="true" />
             </Button>
@@ -100,7 +122,15 @@ export function AnnouncementsTable({
             ]
           : []),
       ]),
-    [onOpen, onSort, showDelivery, showAuthor, showStatus],
+    [
+      onOpen,
+      onPrefetch,
+      onSort,
+      showDelivery,
+      showAuthor,
+      showStatus,
+      showContent,
+    ],
   )
   const table = useTable({
     features,
@@ -133,7 +163,26 @@ export function AnnouncementsTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
+          <TableRow
+            key={row.id}
+            className="cursor-pointer"
+            onMouseEnter={() => onPrefetch?.(row.original.id)}
+            onClick={(event) => {
+              if (
+                event.defaultPrevented ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey ||
+                window.getSelection()?.toString() ||
+                (event.target instanceof Element &&
+                  event.target.closest('button, a, input, select, textarea'))
+              ) {
+                return
+              }
+              onOpen(row.original.id)
+            }}
+          >
             {row.getAllCells().map((cell) => (
               <TableCell key={cell.id} className="px-5 py-4">
                 <table.FlexRender cell={cell} />

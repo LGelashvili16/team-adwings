@@ -131,9 +131,7 @@ it('confirms transfers inside the same sheet without opening a second dialog', a
   vi.mocked(saveTeam).mockResolvedValue({ ok: true, value: id })
   mount(teamSearchSchema.parse({ team: id }))
   const user = userEvent.setup()
-  await user.click(
-    await screen.findByRole('button', { name: 'გადმოყვანის დამატება' }),
-  )
+  await user.click(await screen.findByRole('button', { name: 'დამატება' }))
   expect(screen.getAllByRole('dialog')).toHaveLength(1)
   expect(saveTeam).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'ხელმძღვანელად არჩევა' }))

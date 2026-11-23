@@ -7,6 +7,7 @@ import {
   hasPermission,
 } from '#/lib/authorization/permissions'
 import {
+  deleteNotificationSchema,
   deliverNotificationsSchema,
   markNotificationsSeenSchema,
   notificationListSchema,
@@ -119,10 +120,15 @@ export async function listOwnNotifications(
   input: unknown,
 ): Promise<NotificationList> {
   if (!actor) throw new AuthorizationError()
-  const { limit, offset } = notificationListSchema.parse(input)
-  const result = await repository.listForRecipient(actor.id, limit, offset)
+  const { limit, offset, scope, unreadOnly } =
+    notificationListSchema.parse(input)
+  const result = await repository.listForRecipient(actor.id, limit, offset, {
+    scope,
+    unreadOnly,
+  })
   return {
     unseenCount: result.unseenCount,
+    totalCount: result.totalCount,
     hasMore: result.items.length > limit,
     items: result.items.slice(0, limit).map((item) => ({
       ...item,
@@ -140,6 +146,11 @@ export async function listOwnNotifications(
       seenAt: item.seenAt?.toISOString() ?? null,
     })),
   }
+}
+
+export async function clearOwnNotificationPopup(actor: Actor | null) {
+  if (!actor) throw new AuthorizationError()
+  return repository.dismissPopupForRecipient(actor.id)
 }
 
 export async function markOwnNotificationsSeen(
@@ -163,4 +174,18 @@ export async function markOwnNotificationsUnseen(
   if (!actor) throw new AuthorizationError()
   const { ids } = markNotificationsSeenSchema.parse(input)
   return repository.markUnseenForRecipient(actor.id, ids)
+}
+
+export async function deleteOwnNotification(
+  actor: Actor | null,
+  input: unknown,
+) {
+  if (!actor) throw new AuthorizationError()
+  const { id } = deleteNotificationSchema.parse(input)
+  return repository.deleteForRecipient(actor.id, id)
+}
+
+export async function deleteAllOwnNotifications(actor: Actor | null) {
+  if (!actor) throw new AuthorizationError()
+  return repository.deleteAllForRecipient(actor.id)
 }

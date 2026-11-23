@@ -401,4 +401,72 @@ describe.runIf(enabled)('notification inbox against PostgreSQL', () => {
       (await service.markAllOwnNotificationsSeen(actor)).updatedCount,
     ).toBe(0)
   })
+  it('deletes only the actors own notification without affecting other recipients or re-delivering', async () => {
+    await expect(
+      service.deleteOwnNotification(null, { id: ownId }),
+    ).rejects.toThrow()
+    await expect(
+      service.deleteOwnNotification(actor, { id: 'invalid' }),
+    ).rejects.toThrow()
+    const delivered = await database!.transaction((tx) =>
+      service.deliverNotifications(tx, {
+        eventKey: 'delete:shared-event',
+        recipientIds: ['inbox-a', 'inbox-b'],
+        title: 'საერთო შეტყობინება',
+        body: 'თითოეულ მომხმარებელს აქვს საკუთარი ასლი.',
+      }),
+    )
+    const ownRow = delivered.find((row) => row.recipientId === 'inbox-a')!
+    const otherRow = delivered.find((row) => row.recipientId === 'inbox-b')!
+    expect(
+      await service.deleteOwnNotification(actor, { id: otherRow.id }),
+    ).toEqual({ deletedCount: 0 })
+    expect(
+      await service.deleteOwnNotification(actor, { id: ownRow.id }),
+    ).toEqual({ deletedCount: 1 })
+    expect(
+      await service.deleteOwnNotification(actor, { id: ownRow.id }),
+    ).toEqual({ deletedCount: 0 })
+    const ownInbox = await service.listOwnNotifications(actor, {
+      limit: 50,
+      offset: 0,
+    })
+    expect(ownInbox.items.some((item) => item.id === ownRow.id)).toBe(false)
+    const otherInbox = await service.listOwnNotifications(
+      { ...actor, id: 'inbox-b' },
+      { limit: 50, offset: 0 },
+    )
+    expect(otherInbox.items.some((item) => item.id === otherRow.id)).toBe(true)
+    // Deduplication prevents re-delivering the deleted event to inbox-a.
+    const redelivered = await database!.transaction((tx) =>
+      service.deliverNotifications(tx, {
+        eventKey: 'delete:shared-event',
+        recipientIds: ['inbox-a', 'inbox-b'],
+        title: 'საერთო შეტყობინება',
+        body: 'თითოეულ მომხმარებელს აქვს საკუთარი ასლი.',
+      }),
+    )
+    expect(redelivered).toEqual([])
+  })
+  it('deletes all own notifications while preserving other recipients', async () => {
+    await expect(service.deleteAllOwnNotifications(null)).rejects.toThrow()
+    const foreign = { ...actor, id: 'inbox-b' }
+    const otherBefore = (
+      await service.listOwnNotifications(foreign, { limit: 50, offset: 0 })
+    ).totalCount
+    expect(
+      (await service.deleteAllOwnNotifications(actor)).deletedCount,
+    ).toBeGreaterThan(0)
+    expect(
+      (await service.listOwnNotifications(actor, { limit: 50, offset: 0 }))
+        .totalCount,
+    ).toBe(0)
+    expect(
+      (await service.listOwnNotifications(foreign, { limit: 50, offset: 0 }))
+        .totalCount,
+    ).toBe(otherBefore)
+    expect(await service.deleteAllOwnNotifications(actor)).toEqual({
+      deletedCount: 0,
+    })
+  })
 })

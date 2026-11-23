@@ -34,9 +34,13 @@ function PaginationItem(props: ComponentProps<'li'>) {
 function PaginationLink({
   className,
   isActive,
+  variant,
   render,
   ...props
-}: useRender.ComponentProps<'a'> & { isActive?: boolean }) {
+}: useRender.ComponentProps<'a'> & {
+  isActive?: boolean
+  variant?: 'outline' | 'ghost'
+}) {
   return useRender({
     defaultTagName: 'a',
     render,
@@ -46,10 +50,13 @@ function PaginationLink({
         className: cn(
           buttonVariants({
             depth: 'raised',
-            variant: isActive ? 'outline' : 'ghost',
+            variant: variant ?? (isActive ? 'outline' : 'ghost'),
             size: 'icon',
           }),
           'h-10 min-w-10 w-auto px-2',
+          isActive &&
+            'border-primary/40 bg-accent text-accent-foreground dark:border-primary/45 dark:bg-accent',
+          'aria-disabled:pointer-events-none aria-disabled:border-border/60 aria-disabled:bg-muted/40 aria-disabled:text-muted-foreground/60 aria-disabled:shadow-none dark:aria-disabled:border-input/50 dark:aria-disabled:bg-muted/25',
           className,
         ),
       },
@@ -58,16 +65,38 @@ function PaginationLink({
     state: { slot: 'pagination-link' },
   })
 }
-function PaginationPrevious(props: ComponentProps<typeof PaginationLink>) {
+function PaginationPrevious({
+  className,
+  ...props
+}: ComponentProps<typeof PaginationLink>) {
   return (
-    <PaginationLink aria-label="წინა გვერდი" {...props}>
+    <PaginationLink
+      aria-label="წინა გვერდი"
+      variant="outline"
+      className={cn(
+        'border-border bg-secondary/75 text-foreground hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/50 dark:hover:bg-accent',
+        className,
+      )}
+      {...props}
+    >
       <IconChevronLeft aria-hidden="true" />
     </PaginationLink>
   )
 }
-function PaginationNext(props: ComponentProps<typeof PaginationLink>) {
+function PaginationNext({
+  className,
+  ...props
+}: ComponentProps<typeof PaginationLink>) {
   return (
-    <PaginationLink aria-label="შემდეგი გვერდი" {...props}>
+    <PaginationLink
+      aria-label="შემდეგი გვერდი"
+      variant="outline"
+      className={cn(
+        'border-border bg-secondary/75 text-foreground hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/50 dark:hover:bg-accent',
+        className,
+      )}
+      {...props}
+    >
       <IconChevronRight aria-hidden="true" />
     </PaginationLink>
   )

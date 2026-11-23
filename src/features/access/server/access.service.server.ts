@@ -21,6 +21,8 @@ import {
   accountActionSchema,
   accountListSchema,
   accountLookupSchema,
+  activateAccountSchema,
+  bootstrapOwnerSchema,
   completeAccountSchema,
   employeeDetailsSchema,
   ownPhoneSchema,
@@ -38,7 +40,13 @@ import type { Actor } from '#/lib/authorization/actor'
 import type { z } from 'zod'
 import type { Role } from '#/lib/authorization/permissions'
 
-export class AccountWorkflowError extends Error {}
+export class AccountWorkflowError extends Error {
+  readonly code?: string
+  constructor(message: string, code?: string) {
+    super(message)
+    this.code = code
+  }
+}
 const invalidCode = () =>
   new AccountWorkflowError('კოდი არასწორია, ვადაგასულია ან უკვე გამოყენებულია.')
 export const hashSetupCode = (code: string) =>
@@ -100,18 +108,19 @@ async function issueChallenge(
 
 async function createEmployee(
   tx: repository.AccessTransaction,
-  input: z.infer<typeof provisionAccountSchema>,
+  input: z.infer<typeof provisionAccountSchema> & { code?: string | null },
   actorId: string | null,
   role: Role,
 ) {
+  const username = input.code ?? null
   const userId = await provisionIdentity(
     tx,
     input.name,
-    input.code,
+    username,
     input.contactEmail,
   )
   const person = await repository.insertEmployee(tx, {
-    username: input.code,
+    username,
     userId,
     fullName: input.name,
     contactEmail: input.contactEmail || null,
@@ -159,7 +168,13 @@ export async function provisionEmployee(
   const input = provisionAccountSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
-    if (input.role !== 'employee') assertPermissions(manager, ['roles.manage'])
+    if (input.role === 'admin') {
+      assertPermissions(manager, [
+        'admin.access',
+        'users.manage',
+        'roles.manage',
+      ])
+    }
     return createEmployee(tx, input, manager.id, input.role)
   })
 }
@@ -253,7 +268,30 @@ export async function editEmployeeDetails(
     const target = await repository.lockedAccount(tx, input.userId)
     if (!target?.person)
       throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
-    checkTarget(manager, input.userId, parseRoles(target.identity.roles))
+    const targetRoles = parseRoles(target.identity.roles)
+    checkTarget(manager, input.userId, targetRoles)
+    let roleChanged = false
+    if (input.role !== undefined) {
+      if (targetRoles.length !== 1 || targetRoles.includes('owner'))
+        throw new AccountWorkflowError(
+          'ამ ანგარიშის როლის შეცვლა მხოლოდ წვდომის მართვის გვერდიდანაა შესაძლებელი.',
+        )
+      if (input.role !== targetRoles[0]) {
+        if (input.role === 'admin') {
+          assertPermissions(manager, [
+            'admin.access',
+            'users.manage',
+            'roles.manage',
+          ])
+        }
+        await tx
+          .update(user)
+          .set({ roles: input.role })
+          .where(sql`${user.id} = ${input.userId}`)
+        await repository.revokeSessions(tx, input.userId)
+        roleChanged = true
+      }
+    }
     // An email-based account signs in with this address, so it follows the contact email;
     // contact-only addresses of email-less accounts never become login identities.
     const usesLoginEmail = !isSyntheticAuthEmail(target.identity.email)
@@ -266,6 +304,24 @@ export async function editEmployeeDetails(
       (await repository.emailInUse(tx, input.contactEmail, input.userId))
     )
       throw new AccountWorkflowError('ეს ელფოსტა სხვა ანგარიშს უკვე უკავია.')
+    let usernameChanged = false
+    if (input.code !== undefined) {
+      const currentUsername = target.person.username ?? target.identity.username
+      if (input.code === '') {
+        if (currentUsername !== null)
+          throw new AccountWorkflowError(
+            'მომხმარებლის სახელის წაშლა შეუძლებელია.',
+          )
+      } else if (input.code !== currentUsername) {
+        if (await repository.usernameInUse(tx, input.code, input.userId))
+          throw new AccountWorkflowError(
+            'ეს მომხმარებლის სახელი უკვე დაკავებულია.',
+            'USERNAME_TAKEN',
+          )
+        await repository.setAccountUsername(tx, input.userId, input.code)
+        usernameChanged = true
+      }
+    }
     await repository.updateEmployeeDetails(tx, input.userId, {
       name: input.name,
       contactEmail: input.contactEmail,
@@ -279,6 +335,22 @@ export async function editEmployeeDetails(
       action: 'account.details_updated',
       reason: 'თანამშრომლის მონაცემების განახლება.',
     })
+    if (usernameChanged) {
+      await repository.auditAccess(tx, {
+        actorId: manager.id,
+        targetId: input.userId,
+        action: 'account.username_updated',
+        reason: 'თანამშრომლის მომხმარებლის სახელის განახლება.',
+      })
+    }
+    if (roleChanged) {
+      await repository.auditAccess(tx, {
+        actorId: manager.id,
+        targetId: input.userId,
+        action: 'account.role_updated',
+        reason: 'თანამშრომლის როლის განახლება.',
+      })
+    }
     if (input.workingWeek === undefined) return
     // Schedule rights are separate from account management; replaceEmployeeWeek rechecks them against the database.
     assertPermissions(manager, ['attendance.configure'])
@@ -320,16 +392,17 @@ export async function updateOwnPhone(
 }
 
 /** Called by a Better Auth endpoint; hashing uses its configured password implementation. */
-export async function completeEmployeeSetup(
-  input: z.infer<typeof completeAccountSchema>,
+async function executeEmployeeSetup(
+  code: string,
+  newPassword: string,
+  username: string | null,
   purpose: 'activation' | 'reset',
   hashPassword: (password: string) => Promise<string>,
 ) {
-  const parsed = completeAccountSchema.parse(input)
-  const hash = hashSetupCode(parsed.code)
+  const hash = hashSetupCode(code)
   const candidate = await repository.lookupChallenge(hash)
   if (!candidate) throw invalidCode()
-  const passwordHash = await hashPassword(parsed.newPassword)
+  const passwordHash = await hashPassword(newPassword)
   await repository.transactAccounts(async (tx) => {
     // Always lock the user before the challenge, matching issue/suspend lock order.
     const target = await repository.lockedAccount(tx, candidate.userId)
@@ -340,10 +413,21 @@ export async function completeEmployeeSetup(
         (purpose === 'activation' ? 'invited' : 'active')
     )
       throw invalidCode()
+    // Validate and consume the challenge before checking username availability so invalid codes cannot probe usernames.
+    // If username is taken, throwing rolls back the transaction and preserves the one-time code for retry.
     if (
       !(await repository.consumeChallenge(tx, candidate.userId, hash, purpose))
     )
       throw invalidCode()
+    if (purpose === 'activation') {
+      if (!username) throw invalidCode()
+      if (await repository.usernameInUse(tx, username, candidate.userId))
+        throw new AccountWorkflowError(
+          'ეს მომხმარებლის სახელი უკვე დაკავებულია. აირჩიეთ სხვა სახელი.',
+          'USERNAME_TAKEN',
+        )
+      await repository.setAccountUsername(tx, candidate.userId, username)
+    }
     await repository.replacePassword(tx, candidate.userId, passwordHash)
     await repository.updateIdentity(
       tx,
@@ -363,17 +447,47 @@ export async function completeEmployeeSetup(
   })
 }
 
+export async function completeEmployeeActivation(
+  input: z.input<typeof activateAccountSchema>,
+  hashPassword: (password: string) => Promise<string>,
+) {
+  const parsed = activateAccountSchema.parse(input)
+  await executeEmployeeSetup(
+    parsed.code,
+    parsed.newPassword,
+    parsed.username,
+    'activation',
+    hashPassword,
+  )
+}
+
+export async function completeEmployeeReset(
+  input: z.input<typeof completeAccountSchema>,
+  hashPassword: (password: string) => Promise<string>,
+) {
+  const parsed = completeAccountSchema.parse(input)
+  await executeEmployeeSetup(
+    parsed.code,
+    parsed.newPassword,
+    null,
+    'reset',
+    hashPassword,
+  )
+}
+
 /** Operator-only entry point. No route or server-function exposes first-owner creation. */
 export async function bootstrapOwner(
-  untrusted: Pick<
-    z.infer<typeof provisionAccountSchema>,
-    'code' | 'name' | 'contactEmail'
-  >,
+  untrusted: z.input<typeof bootstrapOwnerSchema>,
 ) {
-  const input = provisionAccountSchema.parse({
-    ...untrusted,
-    role: 'employee',
-  })
+  const ownerInput = bootstrapOwnerSchema.parse(untrusted)
+  const input = {
+    ...provisionAccountSchema.parse({
+      name: ownerInput.name,
+      contactEmail: ownerInput.contactEmail,
+      role: 'employee',
+    }),
+    code: ownerInput.code,
+  }
   return repository.transactAccounts(async (tx) => {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext('teamwork-owner-bootstrap'))`,

@@ -12,6 +12,7 @@ import { companyAttendanceUserQuery } from '../company-attendance.queries'
 import { EmployeeAttendanceSummary } from '../components/employee-attendance-summary'
 import { Avatar, AvatarImage, AvatarFallback } from '#/components/ui/avatar'
 import { Button } from '#/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
 import { AssistedClockSheet } from '#/features/attendance-security/components/assisted-clock-sheet'
 import { hasPermission } from '#/lib/authorization/permissions'
 
@@ -138,36 +139,32 @@ function EmployeeAttendanceWorkspace() {
             />
           ) : (
             <div className="flex min-w-0 flex-col gap-6">
-              <div
-                role="group"
-                aria-label="დასწრების პერიოდი"
-                className="flex w-fit gap-1 rounded-xl border bg-muted/40 p-1"
+              <Tabs
+                value={period}
+                onValueChange={(value) => {
+                  if (value !== 'week' && value !== 'month') return
+                  void navigate({
+                    search: {
+                      ...search,
+                      period: value,
+                      date: selectedDate ?? result.date,
+                      view: undefined,
+                    },
+                  })
+                }}
               >
-                {(['week', 'month'] as const).map((value) => (
-                  <Button
-                    key={value}
-                    variant={period === value ? 'secondary' : 'ghost'}
-                    size="sm"
-                    nativeButton={false}
-                    role="link"
-                    render={
-                      <Link
-                        to="/manage/attendance/$userId"
-                        params={{ userId }}
-                        search={{
-                          ...search,
-                          period: value,
-                          date: selectedDate ?? result.date,
-                          view: undefined,
-                        }}
-                      />
-                    }
-                    aria-current={period === value ? 'true' : undefined}
-                  >
-                    {value === 'week' ? 'კვირა' : 'თვე'}
-                  </Button>
-                ))}
-              </div>
+                <TabsList
+                  aria-label="დასწრების პერიოდი"
+                  className="w-max gap-1 rounded-xl border p-0.5 group-data-horizontal/tabs:h-auto"
+                >
+                  <TabsTrigger value="week" className="h-9 px-4">
+                    კვირა
+                  </TabsTrigger>
+                  <TabsTrigger value="month" className="h-9 px-4">
+                    თვე
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <AttendanceDayPicker
                   weekly={period === 'week'}

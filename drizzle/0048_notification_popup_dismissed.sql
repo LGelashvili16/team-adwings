@@ -1,0 +1,1 @@
+ALTER TABLE "notification" ADD COLUMN "popup_dismissed_at" timestamp with time zone;

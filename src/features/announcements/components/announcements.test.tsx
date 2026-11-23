@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AnnouncementDialog } from './announcement-dialog'
 import { PublishAnnouncementSheet } from './publish-announcement-sheet'
 import { LoginAnnouncement } from './login-announcement'
@@ -65,7 +65,42 @@ beforeEach(() => {
     value: { item: value, remaining: 1 },
   })
 })
+afterEach(() => {
+  vi.useRealTimers()
+})
 describe('announcement delivery', () => {
+  it('locks close and read actions with a 4-second countdown before enabling them', async () => {
+    vi.useFakeTimers()
+    render(
+      <AnnouncementDialog
+        actorId="worker"
+        value={value}
+        automatic
+        onClose={vi.fn()}
+      />,
+      { wrapper },
+    )
+    const closeButton = screen.getByRole('button', { name: 'დახურვა' })
+    const readButton = screen.getByRole('button', { name: 'წავიკითხე' })
+    expect(closeButton).toBeDisabled()
+    expect(readButton).toBeDisabled()
+    expect(screen.getByText('მოიცადეთ 4 წმ')).toBeVisible()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(closeButton).toBeDisabled()
+    expect(readButton).toBeDisabled()
+    expect(screen.getByText('მოიცადეთ 2 წმ')).toBeVisible()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2050)
+    })
+    expect(closeButton).toBeEnabled()
+    expect(readButton).toBeEnabled()
+    expect(screen.queryByText(/მოიცადეთ/)).not.toBeInTheDocument()
+  })
+
   it('checks again after signing back into the same account with a cached empty result', async () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -101,6 +136,7 @@ describe('announcement delivery', () => {
         actorId="worker"
         value={value}
         automatic
+        lockDurationMs={0}
         onClose={close}
       />,
       { wrapper },
@@ -113,7 +149,8 @@ describe('announcement delivery', () => {
     expect(api.success).toHaveBeenCalledOnce()
   })
   it('queues live arrivals after the open modal and advances through all items once', async () => {
-    const user = userEvent.setup()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
@@ -151,6 +188,9 @@ describe('announcement delivery', () => {
       expect(screen.getByRole('status')).toHaveTextContent('განცხადება 1 / 3'),
     )
     expect(screen.getByRole('dialog', { name: value.title })).toBeVisible()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100)
+    })
     await user.click(screen.getByRole('button', { name: 'დახურვა' }))
     expect(
       await screen.findByRole('dialog', { name: second.title }),
@@ -158,6 +198,9 @@ describe('announcement delivery', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('განცხადება 2 / 3'),
     )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100)
+    })
     await user.click(screen.getByRole('button', { name: 'წავიკითხე' }))
     expect(
       await screen.findByRole('dialog', { name: third.title }),
@@ -165,6 +208,9 @@ describe('announcement delivery', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('განცხადება 3 / 3'),
     )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4100)
+    })
     await user.click(screen.getByRole('button', { name: 'დახურვა' }))
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument(),
@@ -181,6 +227,7 @@ describe('announcement delivery', () => {
         actorId="worker"
         value={value}
         automatic
+        lockDurationMs={0}
         onClose={close}
       />,
       { wrapper },
@@ -199,7 +246,12 @@ describe('announcement delivery', () => {
     const user = userEvent.setup()
     const close = vi.fn()
     render(
-      <AnnouncementDialog actorId="worker" value={value} onClose={close} />,
+      <AnnouncementDialog
+        actorId="worker"
+        value={value}
+        lockDurationMs={0}
+        onClose={close}
+      />,
       { wrapper },
     )
     await user.click(screen.getByRole('button', { name: 'დახურვა' }))
@@ -213,6 +265,7 @@ describe('announcement delivery', () => {
       <AnnouncementDialog
         actorId="worker"
         value={{ ...value, isRecipient: true }}
+        lockDurationMs={0}
         onClose={close}
       />,
       { wrapper },

@@ -125,13 +125,13 @@ export function ComplaintListView({
         }}
       >
         <SheetContent
-          className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
+          className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
           aria-describedby={undefined}
         >
           <SheetHeader className="shrink-0 border-b px-6 py-5">
             <SheetTitle>ახალი საჩივარი</SheetTitle>
           </SheetHeader>
-          <div className="min-h-0 overflow-y-auto px-6 pb-6">
+          <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {creating ? (
               <ComplaintCreateForm
                 onPendingChange={setSaving}
@@ -161,7 +161,7 @@ export function ComplaintListView({
         }}
       >
         <SheetContent
-          className="data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
+          className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
           aria-describedby={undefined}
         >
           <SheetHeader className="shrink-0 border-b px-6 py-5">
@@ -169,7 +169,7 @@ export function ComplaintListView({
               {review ? 'საჩივრის განხილვა' : 'საჩივრის დეტალები'}
             </SheetTitle>
           </SheetHeader>
-          <div className="min-h-0 overflow-y-auto px-6 pb-6">
+          <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-6 py-5">
             {search.complaintId ? (
               <ComplaintDetailView
                 actorId={actorId}

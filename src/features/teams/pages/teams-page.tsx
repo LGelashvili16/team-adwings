@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import {
   createColumnHelper,
@@ -10,18 +10,20 @@ import {
 import {
   IconArrowsSort,
   IconPlus,
-  IconRefresh,
   IconEdit,
   IconEye,
   IconCircleCheck,
   IconArchive,
+  IconSearch,
 } from '@tabler/icons-react'
-import { toast } from 'sonner'
 import { formatGeorgianDateTime } from '#/lib/date-format'
 import { Button } from '#/components/ui/button'
-import { Input } from '#/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import { Badge } from '#/components/ui/badge'
-import { Spinner } from '#/components/ui/spinner'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import {
@@ -47,7 +49,7 @@ import {
   teamSearchSchema,
   teamsPageSize,
 } from '../teams.schemas'
-import { teamsKey, teamsQuery } from '../teams.queries'
+import { teamsQuery } from '../teams.queries'
 import type { TeamSearch } from '../teams.schemas'
 
 type Team = {
@@ -72,22 +74,10 @@ export function TeamsPage({
   search: TeamSearch
   onSearch: (next: TeamSearch, replace?: boolean) => void
 }) {
-  const client = useQueryClient()
   const query = useQuery(teamsQuery(actorId, { ...search, team: undefined }))
   const detail = useQuery({
     ...teamsQuery(actorId, search),
     enabled: Boolean(search.team),
-  })
-  const refresh = useMutation({
-    mutationFn: async () => {
-      await client.invalidateQueries({ queryKey: teamsKey(actorId) })
-      await query.refetch({ throwOnError: true })
-    },
-    onSuccess: () => {
-      toast.success('მონაცემები განახლებულია.')
-    },
-    onError: () => toast.error('განახლება ვერ მოხერხდა. სცადეთ ხელახლა.'),
-    retry: false,
   })
   const [creating, setCreating] = useState(false)
   useEffect(() => {
@@ -224,15 +214,6 @@ export function TeamsPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">გუნდები</h1>
         <Button
-          variant="outline"
-          disabled={refresh.isPending}
-          aria-busy={refresh.isPending}
-          onClick={() => refresh.mutate()}
-        >
-          {refresh.isPending ? <Spinner /> : <IconRefresh aria-hidden="true" />}
-          განახლება
-        </Button>
-        <Button
           onClick={() => {
             setCreating(true)
           }}
@@ -269,18 +250,26 @@ export function TeamsPage({
       </Tabs>
       <searchForm.Field name="q">
         {(field) => (
-          <Field className="max-w-sm">
-            <FieldLabel htmlFor="teams-search">გუნდის ძიება</FieldLabel>
-            <Input
-              id="teams-search"
-              value={draft}
-              maxLength={100}
-              onChange={(e) => {
-                setDraft(e.target.value)
-                field.handleChange(e.target.value)
-              }}
-              aria-invalid={!field.state.meta.isValid}
-            />
+          <Field className="max-w-sm" data-invalid={!field.state.meta.isValid}>
+            <FieldLabel htmlFor="teams-search" className="sr-only">
+              გუნდის ძიება
+            </FieldLabel>
+            <InputGroup>
+              <InputGroupAddon>
+                <IconSearch aria-hidden="true" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="teams-search"
+                placeholder="გუნდის სახელი"
+                value={draft}
+                maxLength={100}
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  field.handleChange(e.target.value)
+                }}
+                aria-invalid={!field.state.meta.isValid}
+              />
+            </InputGroup>
             <FieldError errors={field.state.meta.errors} />
           </Field>
         )}

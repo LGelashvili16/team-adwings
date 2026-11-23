@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes } from 'react'
 import { LoginPage } from './login-page'
@@ -75,6 +76,33 @@ describe('login interactions', () => {
     await waitFor(() =>
       expect(signIn).toHaveBeenCalledWith({
         username: 'worker_01',
+        password: 'example-password-123',
+      }),
+    )
+  })
+  it('uses POST and disables submission during SSR so credentials never leak in the URL', () => {
+    const html = renderToString(<LoginPage />)
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    const form = doc.querySelector('form')
+    const submitButton = doc.querySelector('button[type="submit"]')
+    expect(form?.getAttribute('method')).toBe('post')
+    expect(submitButton?.hasAttribute('disabled')).toBe(true)
+  })
+  it('submits autofilled DOM credentials even if change events fired before hydration', async () => {
+    signIn.mockResolvedValue({ error: null })
+    const { container } = render(<LoginPage />)
+    const identifier = screen.getByLabelText<HTMLInputElement>(
+      'მომხმარებლის სახელი ან ელფოსტა',
+    )
+    const password = screen.getByLabelText<HTMLInputElement>('პაროლი', {
+      exact: true,
+    })
+    identifier.value = 'admin'
+    password.value = 'example-password-123'
+    fireEvent.submit(container.querySelector('form')!)
+    await waitFor(() =>
+      expect(signIn).toHaveBeenCalledWith({
+        username: 'admin',
         password: 'example-password-123',
       }),
     )

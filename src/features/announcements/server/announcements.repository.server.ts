@@ -132,6 +132,7 @@ export async function list(
       ...summary,
       readAt: reading(actorId),
       authorName: user.name,
+      body: announcement.body,
     })
     .from(announcement)
     .innerJoin(user, eq(user.id, announcement.authorId))

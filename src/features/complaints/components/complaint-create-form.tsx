@@ -4,6 +4,7 @@ import { useForm } from '@tanstack/react-form'
 import { useServerFn } from '@tanstack/react-start'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
+import { Card, CardContent, CardFooter } from '#/components/ui/card'
 import { Input } from '#/components/ui/input'
 import { Textarea } from '#/components/ui/textarea'
 import {
@@ -68,97 +69,108 @@ export function ComplaintCreateForm({
     >
       <form.Subscribe selector={(state) => state.isSubmitting}>
         {(pending) => (
-          <FieldGroup className="gap-5">
-            {(['title', 'description'] as const).map((name) => (
-              <form.Field key={name} name={name}>
-                {(field) => (
-                  <Field data-invalid={!field.state.meta.isValid}>
-                    <FieldLabel htmlFor={`complaint-${name}`}>
-                      {name === 'title' ? 'თემა' : 'აღწერა'}{' '}
-                      <span aria-hidden="true">*</span>
-                    </FieldLabel>
-                    {name === 'description' ? (
-                      <Textarea
-                        id={`complaint-${name}`}
-                        required
-                        rows={6}
-                        maxLength={5000}
-                        value={field.state.value}
-                        disabled={pending}
-                        onBlur={field.handleBlur}
-                        onChange={(event) =>
-                          field.handleChange(event.target.value)
-                        }
-                        aria-invalid={!field.state.meta.isValid}
-                        aria-describedby={`complaint-${name}-error`}
-                      />
-                    ) : (
-                      <Input
-                        id={`complaint-${name}`}
-                        required
-                        maxLength={160}
-                        value={field.state.value}
-                        disabled={pending}
-                        onBlur={field.handleBlur}
-                        onChange={(event) =>
-                          field.handleChange(event.target.value)
-                        }
-                        aria-invalid={!field.state.meta.isValid}
-                        aria-describedby={`complaint-${name}-error`}
-                      />
+          <Card>
+            <CardContent>
+              <FieldGroup className="gap-5">
+                {(['title', 'description'] as const).map((name) => (
+                  <form.Field key={name} name={name}>
+                    {(field) => (
+                      <Field data-invalid={!field.state.meta.isValid}>
+                        <FieldLabel htmlFor={`complaint-${name}`}>
+                          {name === 'title' ? 'თემა' : 'აღწერა'}{' '}
+                          <span aria-hidden="true" className="text-destructive">
+                            *
+                          </span>
+                        </FieldLabel>
+                        {name === 'description' ? (
+                          <Textarea
+                            id={`complaint-${name}`}
+                            required
+                            rows={6}
+                            maxLength={5000}
+                            value={field.state.value}
+                            disabled={pending}
+                            onBlur={field.handleBlur}
+                            onChange={(event) =>
+                              field.handleChange(event.target.value)
+                            }
+                            aria-invalid={!field.state.meta.isValid}
+                            aria-describedby={`complaint-${name}-error`}
+                          />
+                        ) : (
+                          <Input
+                            id={`complaint-${name}`}
+                            required
+                            maxLength={160}
+                            value={field.state.value}
+                            disabled={pending}
+                            onBlur={field.handleBlur}
+                            onChange={(event) =>
+                              field.handleChange(event.target.value)
+                            }
+                            aria-invalid={!field.state.meta.isValid}
+                            aria-describedby={`complaint-${name}-error`}
+                          />
+                        )}
+                        <FieldError
+                          id={`complaint-${name}-error`}
+                          errors={field.state.meta.errors}
+                        />
+                      </Field>
                     )}
-                    <FieldError
-                      id={`complaint-${name}-error`}
-                      errors={field.state.meta.errors}
-                    />
-                  </Field>
+                  </form.Field>
+                ))}
+                <form.Field name="category">
+                  {(field) => (
+                    <Field data-invalid={!field.state.meta.isValid}>
+                      <FieldLabel htmlFor="complaint-category">
+                        კატეგორია{' '}
+                        <span aria-hidden="true" className="text-destructive">
+                          *
+                        </span>
+                      </FieldLabel>
+                      <AppSelect
+                        id="complaint-category"
+                        value={field.state.value}
+                        required
+                        disabled={pending}
+                        invalid={!field.state.meta.isValid}
+                        onBlur={field.handleBlur}
+                        onChange={field.handleChange}
+                        items={Object.entries(complaintCategoryLabels).map(
+                          ([value, label]) => ({ value, label }),
+                        )}
+                      />
+                      <FieldError
+                        id="complaint-category-error"
+                        errors={field.state.meta.errors}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+                {error ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : null}
+              </FieldGroup>
+            </CardContent>
+            <CardFooter className="justify-end">
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={pending}
+                aria-busy={pending}
+              >
+                {pending ? (
+                  <Spinner data-icon="inline-start" aria-hidden="true" />
+                ) : (
+                  <IconSend data-icon="inline-start" aria-hidden="true" />
                 )}
-              </form.Field>
-            ))}
-            <form.Field name="category">
-              {(field) => (
-                <Field data-invalid={!field.state.meta.isValid}>
-                  <FieldLabel htmlFor="complaint-category">
-                    კატეგორია <span aria-hidden="true">*</span>
-                  </FieldLabel>
-                  <AppSelect
-                    id="complaint-category"
-                    value={field.state.value}
-                    required
-                    disabled={pending}
-                    invalid={!field.state.meta.isValid}
-                    onBlur={field.handleBlur}
-                    onChange={field.handleChange}
-                    items={Object.entries(complaintCategoryLabels).map(
-                      ([value, label]) => ({ value, label }),
-                    )}
-                  />
-                  <FieldError
-                    id="complaint-category-error"
-                    errors={field.state.meta.errors}
-                  />
-                </Field>
-              )}
-            </form.Field>
-            {error ? (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            ) : null}
-            <Button
-              type="submit"
-              className="self-end w-full sm:w-auto"
-              disabled={pending}
-              aria-busy={pending}
-            >
-              {pending ? (
-                <Spinner data-icon="inline-start" aria-hidden="true" />
-              ) : (
-                <IconSend data-icon="inline-start" aria-hidden="true" />
-              )}
-              საჩივრის გაგზავნა
-            </Button>
-          </FieldGroup>
+                საჩივრის გაგზავნა
+              </Button>
+            </CardFooter>
+          </Card>
         )}
       </form.Subscribe>
     </form>

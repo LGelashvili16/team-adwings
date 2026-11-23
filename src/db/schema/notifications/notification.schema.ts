@@ -53,6 +53,10 @@ export const notification = pgTable(
     createdAt: createdAt(),
     /** Explicit acknowledgement, cleared when the recipient marks the entry unseen again. */
     seenAt: timestamp('seen_at', { withTimezone: true }),
+    /** When set, hides this notification from the bell popup and bell unread dot without removing it from /notifications. */
+    popupDismissedAt: timestamp('popup_dismissed_at', { withTimezone: true }),
+    /** When set, permanently removes this notification from the recipient's inbox without re-triggering deduplicated delivery. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
     uniqueIndex('notification_event_recipient').on(

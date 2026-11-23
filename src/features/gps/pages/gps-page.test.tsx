@@ -78,6 +78,7 @@ const tracker = {
   id: '019abb95-5882-78b2-94c1-83d1093b44ca',
   name: 'სატესტო ტრეკერი',
   reportedId: '009590038494',
+  phone: null as string | null,
   enabled: true,
   version: 1,
   lastContactAt: new Date('2026-11-21T09:02:00Z'),
@@ -349,6 +350,75 @@ it('registers a named tracker with its leading zeroes and refreshes the director
       enabled: true,
       name: tracker.name,
       reportedId: tracker.reportedId,
+      phone: '',
+    },
+  })
+})
+
+it('shows the Georgian search placeholder and clears the search input', async () => {
+  getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
+  const onSearch = vi.fn()
+  const user = userEvent.setup()
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <GpsPage
+        actorId="gps-test"
+        canManage={false}
+        search={gpsSearchSchema.parse({ q: 'ტრეკერი' })}
+        onSearch={onSearch}
+      />
+    </QueryClientProvider>,
+  )
+  const searchbox = screen.getByRole('searchbox', {
+    name: 'მოწყობილობის ძიება',
+  })
+  expect(searchbox).toHaveAttribute('placeholder', 'ძიება')
+  await user.click(screen.getByRole('button', { name: 'ძიების გასუფთავება' }))
+  expect(searchbox).toHaveValue('')
+  expect(onSearch).toHaveBeenCalledWith({ q: '' }, true)
+})
+
+it('validates optional phone numbers when adding and editing a GPS device', async () => {
+  const withPhone = { ...tracker, phone: '+995 555 12 34 56', version: 2 }
+  getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
+  saveDevice.mockReset().mockImplementation(async () => {
+    getMapDevices.mockResolvedValue({ devices: [withPhone], total: 1 })
+    return true
+  })
+  const user = userEvent.setup()
+  showPage(true)
+  await user.click(
+    await screen.findByRole('button', { name: `${tracker.name}: რედაქტირება` }),
+  )
+  const editor = await screen.findByRole('dialog', {
+    name: 'მოწყობილობის რედაქტირება',
+  })
+  const phoneInput = within(editor).getByRole('textbox', {
+    name: 'ტელეფონის ნომერი',
+  })
+  expect(within(editor).getByText('+995')).toBeVisible()
+  await user.type(phoneInput, '123')
+  await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
+  expect(
+    await within(editor).findByText('მიუთითეთ სწორი ტელეფონის ნომერი.'),
+  ).toBeVisible()
+  expect(saveDevice).not.toHaveBeenCalled()
+
+  await user.clear(phoneInput)
+  await user.type(phoneInput, '555 12 34 56')
+  await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
+  expect(await screen.findByText('+995 555 12 34 56')).toBeVisible()
+  expect(saveDevice).toHaveBeenCalledWith({
+    data: {
+      id: tracker.id,
+      version: tracker.version,
+      enabled: true,
+      name: tracker.name,
+      reportedId: tracker.reportedId,
+      phone: '+995 555 12 34 56',
     },
   })
 })

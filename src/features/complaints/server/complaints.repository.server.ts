@@ -308,6 +308,7 @@ export async function latestNotification(
         and(
           eq(notification.recipientId, actorId),
           eq(notification.complaintId, id),
+          isNull(notification.deletedAt),
           isNull(notification.seenAt),
           eq(notification.complaintActivityId, latest),
         ),

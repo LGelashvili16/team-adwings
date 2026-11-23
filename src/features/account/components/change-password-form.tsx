@@ -12,6 +12,7 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { authClient } from '#/lib/auth/auth-client'
+import { useHydrated } from '#/hooks/use-hydrated'
 import { changePasswordFormSchema } from '../account.schemas'
 
 const passwordFields = [
@@ -35,6 +36,7 @@ function failureMessage(error: { status: number; code?: string }) {
 }
 
 export function ChangePasswordForm() {
+  const hydrated = useHydrated()
   const [error, setError] = useState('')
   const form = useForm({
     defaultValues: {
@@ -71,65 +73,70 @@ export function ChangePasswordForm() {
 
   return (
     <form
+      method="post"
       noValidate
-      className="max-w-md"
+      className="w-full"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
       }}
     >
-      <FieldGroup>
-        {passwordFields.map(({ name, label, autoComplete }) => (
-          <form.Field key={name} name={name}>
-            {(field) => {
-              const id = `change-${name}`
-              const invalid = !field.state.meta.isValid
-              return (
-                <Field data-invalid={invalid}>
-                  <FieldLabel htmlFor={id}>{label}</FieldLabel>
-                  <PasswordInput
-                    id={id}
-                    name={name}
-                    label={label}
-                    autoComplete={autoComplete}
-                    value={field.state.value}
-                    invalid={invalid}
-                    onBlur={field.handleBlur}
-                    onChange={field.handleChange}
-                  />
-                  <FieldError
-                    id={`${id}-error`}
-                    errors={field.state.meta.errors}
-                  />
-                </Field>
-              )
-            }}
-          </form.Field>
-        ))}
+      <FieldGroup className="gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          {passwordFields.map(({ name, label, autoComplete }) => (
+            <form.Field key={name} name={name}>
+              {(field) => {
+                const id = `change-${name}`
+                const invalid = !field.state.meta.isValid
+                return (
+                  <Field data-invalid={invalid}>
+                    <FieldLabel htmlFor={id}>{label}</FieldLabel>
+                    <PasswordInput
+                      id={id}
+                      name={name}
+                      label={label}
+                      autoComplete={autoComplete}
+                      value={field.state.value}
+                      invalid={invalid}
+                      onBlur={field.handleBlur}
+                      onChange={field.handleChange}
+                    />
+                    <FieldError
+                      id={`${id}-error`}
+                      errors={field.state.meta.errors}
+                    />
+                  </Field>
+                )
+              }}
+            </form.Field>
+          ))}
+        </div>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         ) : null}
-        <form.Subscribe selector={(state) => state.isSubmitting}>
-          {(pending) => (
-            <Button
-              type="submit"
-              className="w-full sm:w-fit"
-              disabled={pending}
-              aria-busy={pending}
-            >
-              <span className="flex size-4 items-center justify-center">
-                {pending ? (
-                  <Spinner aria-hidden="true" />
-                ) : (
-                  <IconLockPassword aria-hidden="true" />
-                )}
-              </span>
-              პაროლის შეცვლა
-            </Button>
-          )}
-        </form.Subscribe>
+        <div className="pt-1">
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(pending) => (
+              <Button
+                type="submit"
+                className="w-full sm:w-fit"
+                disabled={!hydrated || pending}
+                aria-busy={pending}
+              >
+                <span className="flex size-4 items-center justify-center">
+                  {pending ? (
+                    <Spinner aria-hidden="true" />
+                  ) : (
+                    <IconLockPassword aria-hidden="true" />
+                  )}
+                </span>
+                პაროლის შეცვლა
+              </Button>
+            )}
+          </form.Subscribe>
+        </div>
       </FieldGroup>
     </form>
   )

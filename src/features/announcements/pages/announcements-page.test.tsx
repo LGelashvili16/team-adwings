@@ -43,6 +43,7 @@ vi.mock('../announcements.functions', () => ({
           id: '019aac01-0000-7000-8000-000000000001',
           title: 'კომპანიის სიახლე',
           authorName: 'ანა მაისურაძე',
+          body: 'განცხადების სრული ტექსტი',
           publishedAt: '2026-11-10T09:00:00Z',
           showOnLogin: true,
           readAt: null,
@@ -86,6 +87,8 @@ it('renders the employee table without the delivery column', async () => {
   )
   expect(screen.getByText('სულ: 1. გვერდი 1 / 1')).toBeVisible()
   expect(screen.getByRole('columnheader', { name: 'სტატუსი' })).toBeVisible()
+  expect(screen.getByRole('columnheader', { name: 'შინაარსი' })).toBeVisible()
+  expect(screen.getByText('განცხადების სრული ტექსტი')).toBeVisible()
   expect(
     screen.getByRole('heading', { level: 1, name: 'განცხადებები' }),
   ).toBeVisible()

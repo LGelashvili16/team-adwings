@@ -14,17 +14,18 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardFooter,
   CardTitle,
 } from '#/components/ui/card'
 import { authClient } from '#/lib/auth/auth-client'
+import { useHydrated } from '#/hooks/use-hydrated'
 import { loginSchema } from '../auth.schemas'
 import { authContent } from '../auth.content'
 
 export function LoginPage() {
   const router = useRouter()
+  const hydrated = useHydrated()
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const form = useForm({
@@ -60,19 +61,37 @@ export function LoginPage() {
   })
   return (
     <Card className="w-full shadow-sm">
-      <CardHeader className="gap-3 pb-7">
+      <CardHeader className="pb-5">
         <CardTitle>
           <h1 className="text-3xl font-semibold tracking-tight">
             {authContent.login.title}
           </h1>
         </CardTitle>
-        <CardDescription>{authContent.login.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
+            // Sync browser autofill that populated DOM inputs before hydration attached onChange.
+            const formData = new FormData(event.currentTarget)
+            const identifier = formData.get('identifier')
+            const password = formData.get('password')
+            if (
+              typeof identifier === 'string' &&
+              identifier &&
+              !form.state.values.identifier
+            ) {
+              form.setFieldValue('identifier', identifier)
+            }
+            if (
+              typeof password === 'string' &&
+              password &&
+              !form.state.values.password
+            ) {
+              form.setFieldValue('password', password)
+            }
             void form.handleSubmit()
           }}
         >
@@ -123,6 +142,7 @@ export function LoginPage() {
                       id="password"
                       name={field.name}
                       type={showPassword ? 'text' : 'password'}
+                      placeholder="პაროლი"
                       autoComplete="current-password"
                       value={field.state.value}
                       onBlur={field.handleBlur}
@@ -167,7 +187,7 @@ export function LoginPage() {
                 <Button
                   type="submit"
                   className="h-10 w-full"
-                  disabled={submitting}
+                  disabled={!hydrated || submitting}
                   aria-busy={submitting}
                 >
                   {submitting && <Spinner aria-hidden="true" />}
@@ -178,9 +198,9 @@ export function LoginPage() {
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter className="flex flex-col items-start gap-3 py-5">
+      <CardFooter className="flex flex-col items-center gap-3 py-5 text-center">
         <p className="text-sm text-muted-foreground">
-          პირველი შესვლა?{' '}
+          პირველად შედიხართ?{' '}
           <Link
             to="/auth/register"
             className="font-medium text-foreground underline underline-offset-4"
@@ -188,10 +208,6 @@ export function LoginPage() {
             ანგარიშის გააქტიურება
           </Link>
         </p>
-        {/* <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <IconLock className="size-3.5" aria-hidden="true" />
-          ანგარიშს ქმნის კომპანიის ადმინისტრატორი.
-        </p> */}
       </CardFooter>
     </Card>
   )

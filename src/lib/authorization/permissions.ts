@@ -55,6 +55,11 @@ export const employeeRoleSchema = z.enum(
   ],
   { error: 'თანამშრომლის როლი არასწორია.' },
 )
+export const provisionableRoleSchema = z.enum(
+  [...employeeRoleSchema.options, 'admin'],
+  { error: 'როლი არასწორია.' },
+)
+export type ProvisionableRole = z.infer<typeof provisionableRoleSchema>
 export const roleSchema = z.enum(
   [...employeeRoleSchema.options, 'admin', 'owner'],
   { error: 'როლი არასწორია.' },

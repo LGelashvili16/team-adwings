@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react'
-import { IconSearch, IconChevronLeft, IconX } from '@tabler/icons-react'
+import { IconSearch, IconMinus, IconX } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Field, FieldError, FieldLabel } from '#/components/ui/field'
 import {
@@ -116,13 +116,16 @@ export function JobMapSearch({
                       }
                     }}
                   />
-                  <InputGroupAddon align="inline-end">
+                  <InputGroupAddon
+                    align="inline-end"
+                    className="gap-1.5 pr-1.5 has-[>button]:mr-0"
+                  >
                     {model.value ? (
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="secondary"
                         depth="raised"
-                        size="icon"
+                        size="icon-sm"
                         aria-label="რუკის ძიების გასუფთავება"
                         onClick={() => {
                           field.handleChange('')
@@ -134,9 +137,9 @@ export function JobMapSearch({
                     ) : null}
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="secondary"
                       depth="raised"
-                      size="icon"
+                      size="icon-sm"
                       aria-label="რუკის ძიების ჩაკეცვა"
                       title="ძიების ჩაკეცვა"
                       onClick={() => {
@@ -144,7 +147,7 @@ export function JobMapSearch({
                         model.setMinimized(true)
                       }}
                     >
-                      <IconChevronLeft aria-hidden="true" />
+                      <IconMinus aria-hidden="true" />
                     </Button>
                   </InputGroupAddon>
                 </InputGroup>
@@ -171,7 +174,7 @@ export function JobMapSearch({
         className="w-(--anchor-width) max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-xl p-0"
       >
         <PopoverTitle className="sr-only">რუკის ძიების შედეგები</PopoverTitle>
-        <div className="max-h-[min(28rem,50dvh,var(--available-height))] overflow-y-auto overscroll-contain p-1.5">
+        <div className="app-scrollbar max-h-[min(28rem,50dvh,var(--available-height))] overflow-y-auto overscroll-contain p-2">
           <JobMapSearchResults model={model} onSelect={select} />
         </div>
         {model.jobsTotal > 5 ? (
@@ -189,7 +192,7 @@ export function JobMapSearch({
             </Button>
           </div>
         ) : null}
-        <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
+        <p className="border-t bg-muted/30 px-3.5 py-2 text-xs text-muted-foreground">
           მისამართები:{' '}
           <a
             href="https://www.openstreetmap.org/copyright"

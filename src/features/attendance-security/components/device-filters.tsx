@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useForm } from '@tanstack/react-form'
+import { IconSearch } from '@tabler/icons-react'
 import type { z } from 'zod'
 import {
   securityListSchema,
@@ -11,7 +12,11 @@ import {
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
-import { Input } from '#/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -67,31 +72,40 @@ export function DeviceFilters({
         void form.handleSubmit()
       }}
     >
-      <FieldGroup className="flex-row flex-wrap items-end gap-3">
+      <FieldGroup className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <form.Field name="q">
           {(field) => (
-            <Field className="min-w-56 flex-1">
+            <Field
+              className="w-full min-w-0 sm:max-w-sm"
+              data-invalid={!field.state.meta.isValid}
+            >
               <FieldLabel htmlFor="device-search">ძიება</FieldLabel>
-              <Input
-                id="device-search"
-                value={field.state.value}
-                onChange={(event) => {
-                  const q = event.target.value
-                  field.handleChange(q)
-                  if (timer.current) clearTimeout(timer.current)
-                  timer.current = setTimeout(() => {
-                    const parsed = securityListSchema.safeParse({
-                      ...search,
-                      q,
-                      page: 1,
-                    })
-                    if (parsed.success) onChange(parsed.data)
-                  }, 300)
-                }}
-                aria-describedby="device-search-error"
-                onBlur={field.handleBlur}
-                aria-invalid={!field.state.meta.isValid}
-              />
+              <InputGroup>
+                <InputGroupAddon>
+                  <IconSearch aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="device-search"
+                  placeholder="თანამშრომელი ან მოწყობილობა"
+                  value={field.state.value}
+                  onChange={(event) => {
+                    const q = event.target.value
+                    field.handleChange(q)
+                    if (timer.current) clearTimeout(timer.current)
+                    timer.current = setTimeout(() => {
+                      const parsed = securityListSchema.safeParse({
+                        ...search,
+                        q,
+                        page: 1,
+                      })
+                      if (parsed.success) onChange(parsed.data)
+                    }, 300)
+                  }}
+                  aria-describedby="device-search-error"
+                  onBlur={field.handleBlur}
+                  aria-invalid={!field.state.meta.isValid}
+                />
+              </InputGroup>
               <FieldError
                 id="device-search-error"
                 errors={field.state.meta.errors}
@@ -100,7 +114,7 @@ export function DeviceFilters({
           )}
         </form.Field>
         {showState ? (
-          <Field className="w-52">
+          <Field className="w-full sm:w-48">
             <FieldLabel htmlFor="device-state">სტატუსი</FieldLabel>
             <Select
               value={search.state}
@@ -114,7 +128,7 @@ export function DeviceFilters({
                 if (next.success) onChange(next.data)
               }}
             >
-              <SelectTrigger id="device-state">
+              <SelectTrigger id="device-state" className="w-full">
                 <SelectValue>{stateLabels[search.state]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -129,7 +143,7 @@ export function DeviceFilters({
             </Select>
           </Field>
         ) : null}
-        <Field className="w-52">
+        <Field className="w-full sm:w-48">
           <FieldLabel htmlFor="device-sort">დალაგება</FieldLabel>
           <Select
             value={search.sort}
@@ -143,7 +157,7 @@ export function DeviceFilters({
               if (next.success) onChange(next.data)
             }}
           >
-            <SelectTrigger id="device-sort">
+            <SelectTrigger id="device-sort" className="w-full">
               <SelectValue>
                 {search.sort === 'newest' ? 'ჯერ ახალი' : 'ჯერ ძველი'}
               </SelectValue>

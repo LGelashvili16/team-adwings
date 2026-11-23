@@ -30,14 +30,14 @@ export function AuthWelcome({
               particleSize={2}
               scatter={100}
               idleDrift={0}
-              trigger="hover"
+              trigger="mount"
             />
           </div>
         ) : null}
-        <h2 className="max-w-lg text-4xl font-semibold leading-relaxed tracking-tight xl:text-5xl">
-          თქვენი თანამშრომლები.
+        <h2 className="max-w-lg text-3xl font-semibold leading-snug tracking-tight xl:text-4xl">
+          თანამშრომლების
           <br />
-          ერთ სივრცეში.
+          სამუშაო პორტალი
         </h2>
         <div className="flex flex-wrap justify-center gap-x-6 gap-y-4">
           {highlights.map(({ icon: Icon, label }) => (

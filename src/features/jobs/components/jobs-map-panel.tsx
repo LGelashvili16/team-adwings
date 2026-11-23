@@ -172,49 +172,49 @@ export function JobsMapPanel({
     </div>
   )
   return (
-    <Dialog
-      open={expanded}
-      onOpenChange={(open) => {
-        model.setOpen(false)
-        setExpanded(open)
-      }}
-    >
-      <div
-        ref={inline}
-        tabIndex={-1}
-        className="flex min-w-0 flex-col gap-4 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <>
+      <Dialog
+        open={expanded}
+        onOpenChange={(open) => {
+          model.setOpen(false)
+          setExpanded(open)
+        }}
       >
+        <div
+          ref={inline}
+          tabIndex={-1}
+          className="flex min-w-0 flex-col gap-4 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? (
+            <div className="h-[32rem] rounded-xl border bg-muted lg:h-[min(72dvh,52rem)]" />
+          ) : (
+            content
+          )}
+          <JobsMapLegend showGps={canViewGps} />
+        </div>
         {expanded ? (
-          <div className="h-[32rem] rounded-xl border bg-muted lg:h-[min(72dvh,52rem)]" />
-        ) : (
-          <>
+          <DialogContent
+            className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-3 p-3 sm:max-w-none"
+            finalFocus={() =>
+              inline.current?.querySelector<HTMLButtonElement>(
+                '[data-map-expand]',
+              ) ??
+              inline.current ??
+              false
+            }
+          >
+            <DialogHeader className="pr-10">
+              <DialogTitle>სამუშაოების რუკა</DialogTitle>
+              <DialogDescription className="sr-only">
+                გაშლილი რუკა, მისამართების ძიება და სამუშაოების მართვა.
+              </DialogDescription>
+            </DialogHeader>
             {content}
             {editor}
-          </>
-        )}
-        <JobsMapLegend />
-      </div>
-      {expanded ? (
-        <DialogContent
-          className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-3 p-3 sm:max-w-none"
-          finalFocus={() =>
-            inline.current?.querySelector<HTMLButtonElement>(
-              '[data-map-expand]',
-            ) ??
-            inline.current ??
-            false
-          }
-        >
-          <DialogHeader className="pr-10">
-            <DialogTitle>სამუშაოების რუკა</DialogTitle>
-            <DialogDescription className="sr-only">
-              გაშლილი რუკა, მისამართების ძიება და სამუშაოების მართვა.
-            </DialogDescription>
-          </DialogHeader>
-          {content}
-          {editor}
-        </DialogContent>
-      ) : null}
-    </Dialog>
+          </DialogContent>
+        ) : null}
+      </Dialog>
+      {!expanded ? editor : null}
+    </>
   )
 }

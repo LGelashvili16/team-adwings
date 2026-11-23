@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { notificationsQueryOptions } from '../notifications.queries'
+import type { NotificationItem } from '../notifications.types'
 import {
   useMarkNotificationsSeen,
   useMarkNotificationsUnseen,
@@ -17,14 +18,26 @@ export function NotificationsFeed({
   actorId,
   limit = 5,
   offset = 0,
+  scope = 'all',
+  unreadOnly = false,
+  variant = 'popover',
+  deletingIds,
+  onDelete,
   onNavigate,
 }: {
   actorId: string
   limit?: number
   offset?: number
+  scope?: 'all' | 'popup'
+  unreadOnly?: boolean
+  variant?: 'popover' | 'page'
+  deletingIds?: Array<string>
+  onDelete?: (item: NotificationItem) => void
   onNavigate?: () => void
 }) {
-  const query = useQuery(notificationsQueryOptions(actorId, limit, offset))
+  const query = useQuery(
+    notificationsQueryOptions(actorId, limit, offset, { scope, unreadOnly }),
+  )
   const markSeen = useMarkNotificationsSeen(actorId)
   const markUnseen = useMarkNotificationsUnseen(actorId)
   if (query.isPending) return <NotificationsLoading />
@@ -39,6 +52,7 @@ export function NotificationsFeed({
         </p>
         <Button
           variant="outline"
+          depth="raised"
           disabled={query.isFetching}
           aria-busy={query.isFetching}
           onClick={async () => {
@@ -57,11 +71,14 @@ export function NotificationsFeed({
   return (
     <NotificationList
       actorId={actorId}
+      variant={variant}
       onNavigate={onNavigate}
       items={query.data.items}
       pendingIds={markSeen.pendingIds}
+      deletingIds={deletingIds}
       onMarkSeen={(ids) => markSeen.mutate(ids)}
       onMarkUnseen={(ids) => markUnseen.mutate(ids)}
+      onDelete={onDelete}
     />
   )
 }

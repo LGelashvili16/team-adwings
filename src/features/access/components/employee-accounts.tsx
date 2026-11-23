@@ -15,7 +15,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '#/components/ui/sheet'
-import { hasPermission } from '#/lib/authorization/permissions'
+import {
+  hasEveryPermission,
+  hasPermission,
+} from '#/lib/authorization/permissions'
 import { listAccounts } from '../access.functions'
 import { ProvisionAccountForm } from './provision-account-form'
 import { AccountCodeDialog } from './account-code-dialog'
@@ -70,7 +73,11 @@ export function EmployeeAccounts({
                   setIssuedCode(value)
                 }}
                 onPendingChange={setCreatingBusy}
-                canAssignRoles={hasPermission(actor, 'roles.manage')}
+                canAssignAdmin={hasEveryPermission(actor, [
+                  'admin.access',
+                  'users.manage',
+                  'roles.manage',
+                ])}
                 canConfigureSchedule={hasPermission(
                   actor,
                   'attendance.configure',

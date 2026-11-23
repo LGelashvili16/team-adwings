@@ -43,7 +43,7 @@ export function PasswordInput({
       <Button
         type="button"
         variant="ghost"
-        size="icon"
+        size="icon-sm"
         className="absolute top-1 right-1"
         onClick={() => setVisible((current) => !current)}
         aria-label={`${label}: ${visible ? 'დამალვა' : 'ჩვენება'}`}

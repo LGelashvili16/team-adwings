@@ -48,15 +48,17 @@ export function LeaveListView({
   )
   return (
     <section className="flex min-w-0 flex-col gap-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">
           {review
-            ? 'შვებულებისა და არყოფნის განხილვა'
-            : 'ჩემი შვებულება და არყოფნა'}
+            ? 'შვებულებისა და ბიულეტენის განხილვა'
+            : 'შვებულება & ბიულეტენი'}
         </h1>
         {!review ? (
           <Dialog open={creating} onOpenChange={setCreating}>
-            <DialogTrigger render={<Button />}>ახალი მოთხოვნა</DialogTrigger>
+            <DialogTrigger render={<Button className="w-full sm:w-auto" />}>
+              ახალი მოთხოვნა
+            </DialogTrigger>
             <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>ახალი მოთხოვნა</DialogTitle>
