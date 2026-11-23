@@ -34,13 +34,7 @@ export const navigationItems = [
   {
     to: '/dashboard',
     icon: IconLayoutDashboard,
-    label: 'მთავარი გვერდი',
-    permission: null,
-  },
-  {
-    to: '/attendance',
-    icon: IconClock,
-    label: 'დასწრება',
+    label: 'მთავარი',
     permission: null,
   },
   {
@@ -50,15 +44,21 @@ export const navigationItems = [
     permission: null,
   },
   {
-    to: '/schedule',
-    icon: IconCalendarWeek,
-    label: 'ჩემი განრიგი',
+    to: '/attendance',
+    icon: IconClock,
+    label: 'დასწრება',
     permission: null,
   },
   {
     to: '/leave',
     icon: IconCalendarOff,
     label: 'შვებულება & ბიულეტენი',
+    permission: null,
+  },
+  {
+    to: '/schedule',
+    icon: IconCalendarWeek,
+    label: 'ჩემი განრიგი',
     permission: null,
   },
   {
@@ -118,18 +118,6 @@ export const navigationItems = [
     permission: 'employees.manage',
   },
   {
-    to: '/manage/leave',
-    icon: IconCalendarCheck,
-    label: 'შვებულება & ბიულეტენი',
-    permission: 'leave.review',
-  },
-  {
-    to: '/manage/schedule',
-    icon: IconCalendarCog,
-    label: 'სამუშაო განრიგი',
-    permission: 'attendance.configure',
-  },
-  {
     to: '/manage/teams',
     icon: IconUsers,
     label: 'გუნდები',
@@ -146,6 +134,18 @@ export const navigationItems = [
     icon: IconShieldLock,
     label: 'დასწრების მოწყობილობები',
     permission: 'attendance.devices.manage',
+  },
+  {
+    to: '/manage/leave',
+    icon: IconCalendarCheck,
+    label: 'შვებულება & ბიულეტენი',
+    permission: 'leave.review',
+  },
+  {
+    to: '/manage/schedule',
+    icon: IconCalendarCog,
+    label: 'სამუშაო განრიგი',
+    permission: 'attendance.configure',
   },
   {
     to: '/manage/announcements',

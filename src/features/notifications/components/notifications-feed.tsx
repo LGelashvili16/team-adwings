@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { notificationsQueryOptions } from '../notifications.queries'
+import type { NotificationItem } from '../notifications.types'
 import {
   useMarkNotificationsSeen,
   useMarkNotificationsUnseen,
@@ -20,6 +21,8 @@ export function NotificationsFeed({
   scope = 'all',
   unreadOnly = false,
   variant = 'popover',
+  deletingIds,
+  onDelete,
   onNavigate,
 }: {
   actorId: string
@@ -28,6 +31,8 @@ export function NotificationsFeed({
   scope?: 'all' | 'popup'
   unreadOnly?: boolean
   variant?: 'popover' | 'page'
+  deletingIds?: Array<string>
+  onDelete?: (item: NotificationItem) => void
   onNavigate?: () => void
 }) {
   const query = useQuery(
@@ -70,8 +75,10 @@ export function NotificationsFeed({
       onNavigate={onNavigate}
       items={query.data.items}
       pendingIds={markSeen.pendingIds}
+      deletingIds={deletingIds}
       onMarkSeen={(ids) => markSeen.mutate(ids)}
       onMarkUnseen={(ids) => markUnseen.mutate(ids)}
+      onDelete={onDelete}
     />
   )
 }

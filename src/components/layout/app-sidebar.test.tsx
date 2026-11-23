@@ -103,7 +103,7 @@ describe('workspace navigation', () => {
     expect(screen.queryByText('ადმინისტრირება')).not.toBeInTheDocument()
     expect(screen.queryByText('მართვა')).not.toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'მთავარი გვერდი' }),
+      screen.getByRole('link', { name: 'მთავარი' }),
     ).toBeInTheDocument()
   })
   beforeEach(() => {
@@ -209,17 +209,35 @@ describe('workspace navigation', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
   it.each(['owner'] as const)('shows all workspace sections to %s', (role) => {
-    renderSidebar(role)
+    const { container } = renderSidebar(role)
     const leaveLinks = screen.getAllByRole('link', {
       name: 'შვებულება & ბიულეტენი',
     })
     expect(
       leaveLinks.some((link) => link.getAttribute('href') === '/manage/leave'),
     ).toBe(true)
+    expect(
+      Array.from(
+        container.querySelectorAll(
+          '[data-slot="sidebar-content"] a[href^="/manage/"]',
+        ),
+      ).map((link) => link.textContent?.trim()),
+    ).toEqual([
+      'დასწრებები',
+      'თანამშრომლები',
+      'გუნდები',
+      'GPS მოწყობილობები',
+      'დასწრების მოწყობილობები',
+      'შვებულება & ბიულეტენი',
+      'სამუშაო განრიგი',
+      'განცხადებების მართვა',
+      'საჩივრების მართვა',
+      'რეპორტები',
+    ])
     expect(screen.getByText('ჩემი სივრცე')).toBeInTheDocument()
     expect(screen.getByText('მართვა')).toBeInTheDocument()
     expect(
-      screen.getByRole('link', { name: 'მთავარი გვერდი' }),
+      screen.getByRole('link', { name: 'მთავარი' }),
     ).toHaveAttribute('href', '/dashboard')
     expect(screen.getByText('ადმინისტრირება')).toBeInTheDocument()
     expect(
@@ -229,7 +247,7 @@ describe('workspace navigation', () => {
   it('keeps personal work, team management and platform access for admins', () => {
     renderSidebar('admin')
     expect(
-      screen.getByRole('link', { name: 'მთავარი გვერდი' }),
+      screen.getByRole('link', { name: 'მთავარი' }),
     ).toHaveAttribute('href', '/dashboard')
     expect(screen.getByRole('link', { name: 'დასწრება' })).toBeInTheDocument()
     expect(screen.getByText('ადმინისტრირება')).toBeInTheDocument()
@@ -339,20 +357,24 @@ describe('workspace navigation', () => {
     },
   )
   it('hides administration and management from employees', () => {
-    renderSidebar('employee')
+    const { container } = renderSidebar('employee')
     expect(
       screen.getByRole('link', { name: 'შვებულება & ბიულეტენი' }),
     ).toHaveAttribute('href', '/leave')
-    for (const name of [
-      'მთავარი გვერდი',
-      'დასწრება',
+    expect(
+      Array.from(
+        container.querySelectorAll('[data-slot="sidebar-content"] a'),
+      ).map((link) => link.textContent?.trim()),
+    ).toEqual([
+      'მთავარი',
       'სამუშაოების რუკა',
-      'ჩემი განრიგი',
+      'დასწრება',
       'შვებულება & ბიულეტენი',
+      'ჩემი განრიგი',
       'შეტყობინებები',
-    ]) {
-      expect(screen.getByRole('link', { name })).toBeInTheDocument()
-    }
+      'განცხადებები',
+      'საჩივრები',
+    ])
     for (const name of [
       'დასწრების ისტორია',
       'დროის შესწორებები',

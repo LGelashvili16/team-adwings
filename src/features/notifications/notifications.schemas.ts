@@ -95,3 +95,12 @@ export const markNotificationsSeenSchema = z.object({
     .min(1, 'აირჩიეთ შეტყობინება.')
     .max(50, 'ერთდროულად მაქსიმუმ 50 შეტყობინება მონიშნეთ.'),
 })
+
+export const deleteNotificationSchema = z.strictObject({
+  id: z.uuid({ error: 'შეტყობინების იდენტიფიკატორი არასწორია.' }),
+})
+
+export const deleteAllNotificationsSchema = z.strictObject(
+  {},
+  { error: 'მოთხოვნა არასწორია.' },
+)

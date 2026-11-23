@@ -4,6 +4,7 @@ import {
   IconCheck,
   IconClock,
   IconMail,
+  IconTrash,
 } from '@tabler/icons-react'
 import { cn } from 'cn'
 import { Link } from '@tanstack/react-router'
@@ -17,16 +18,20 @@ import { formatGeorgianDateTime } from '#/lib/date-format'
 export function NotificationList({
   items,
   pendingIds,
+  deletingIds,
   onMarkSeen,
   onMarkUnseen,
+  onDelete,
   onNavigate,
   actorId = '',
   variant = 'popover',
 }: {
   items: Array<NotificationItem>
   pendingIds: Array<string>
+  deletingIds?: Array<string>
   onMarkSeen: (ids: Array<string>) => void
   onMarkUnseen: (ids: Array<string>) => void
+  onDelete?: (item: NotificationItem) => void
   onNavigate?: () => void
   actorId?: string
   variant?: 'popover' | 'page'
@@ -42,6 +47,8 @@ export function NotificationList({
       {items.map((item) => {
         const unseen = item.seenAt === null
         const pending = pendingIds.includes(item.id)
+        const deleting = deletingIds?.includes(item.id) ?? false
+        const rowBusy = pendingIds.length > 0 || (deletingIds?.length ?? 0) > 0
         const linkTarget = resolveNotificationLink(item, actorId)
         return (
           <li
@@ -51,8 +58,7 @@ export function NotificationList({
               variant === 'page'
                 ? 'px-4 py-4 hover:bg-accent/55 focus-within:bg-accent/55 sm:px-6'
                 : 'rounded-xl px-3 py-3 hover:bg-accent/70 focus-within:bg-accent/70',
-              unseen &&
-                (variant === 'page' ? 'bg-muted/20' : 'bg-muted/35'),
+              unseen && (variant === 'page' ? 'bg-muted/20' : 'bg-muted/35'),
             )}
           >
             <div
@@ -107,13 +113,18 @@ export function NotificationList({
               </time>
               {!unseen ? <span className="sr-only">ნანახია</span> : null}
             </div>
-            <div className="relative z-10 flex w-9 shrink-0 items-center justify-center self-center">
+            <div
+              className={cn(
+                'relative z-10 flex shrink-0 items-center justify-center self-center',
+                onDelete ? 'gap-1' : 'w-9',
+              )}
+            >
               {unseen ? (
                 <Button
                   variant="ghost"
                   size="icon-sm"
                   className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
-                  disabled={pendingIds.length > 0}
+                  disabled={rowBusy}
                   aria-busy={pending}
                   aria-label={`ნანახად მონიშვნა: ${item.title}`}
                   title="ნანახად მონიშვნა"
@@ -130,7 +141,7 @@ export function NotificationList({
                   variant="ghost"
                   size="icon-sm"
                   className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
-                  disabled={pendingIds.length > 0}
+                  disabled={rowBusy}
                   aria-busy={pending}
                   aria-label={`წაუკითხავად მონიშვნა: ${item.title}`}
                   title="წაუკითხავად მონიშვნა"
@@ -143,6 +154,24 @@ export function NotificationList({
                   )}
                 </Button>
               )}
+              {onDelete ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  disabled={rowBusy}
+                  aria-busy={deleting}
+                  aria-label={`წაშლა: ${item.title}`}
+                  title="წაშლა"
+                  onClick={() => onDelete(item)}
+                >
+                  {deleting ? (
+                    <Spinner aria-hidden="true" />
+                  ) : (
+                    <IconTrash aria-hidden="true" />
+                  )}
+                </Button>
+              ) : null}
             </div>
           </li>
         )
@@ -190,9 +219,6 @@ export function NotificationsEmpty() {
         <IconBellCheck className="size-7 text-muted-foreground" />
       </div>
       <p className="font-medium">შეტყობინებები ჯერ არ გაქვთ</p>
-      <p className="max-w-64 text-sm leading-6 text-muted-foreground">
-        ახალი შეტყობინებები აქ გამოჩნდება.
-      </p>
     </div>
   )
 }

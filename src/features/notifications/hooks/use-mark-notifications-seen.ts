@@ -9,6 +9,8 @@ import {
   markOwnNotifications,
   markOwnNotificationsAsUnseen,
   markAllOwnNotifications,
+  removeAllOwnNotifications,
+  removeOwnNotification,
 } from '../notifications.functions'
 import { notificationKeys } from '../notifications.queries'
 
@@ -28,6 +30,65 @@ export function useClearNotificationsPopup(actorId: string) {
       })
     },
     onError: () => toast.error('გასუფთავება ვერ მოხერხდა. სცადეთ ხელახლა.'),
+  })
+}
+
+export function useDeleteNotification(actorId: string) {
+  const client = useQueryClient()
+  const pendingIds = useMutationState({
+    filters: {
+      mutationKey: [...notificationKeys.own(actorId), 'delete'],
+      status: 'pending',
+    },
+    select: (mutation) =>
+      typeof mutation.state.variables === 'string'
+        ? [mutation.state.variables]
+        : [],
+  }).flat()
+  const mutation = useMutation({
+    mutationKey: [...notificationKeys.own(actorId), 'delete'],
+    mutationFn: async (id: string) => {
+      const result = await removeOwnNotification({ data: { id } })
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    onSuccess: async () => {
+      toast.success('შეტყობინება წაიშალა.')
+      await client.invalidateQueries({
+        queryKey: notificationKeys.own(actorId),
+      })
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : 'შეტყობინება ვერ წაიშალა. სცადეთ ხელახლა.',
+      ),
+  })
+  return { ...mutation, pendingIds }
+}
+
+export function useDeleteAllNotifications(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationKey: [...notificationKeys.own(actorId), 'delete-all'],
+    mutationFn: async () => {
+      const result = await removeAllOwnNotifications({ data: {} })
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    onSuccess: async () => {
+      toast.success('ყველა შეტყობინება წაიშალა.')
+      await client.invalidateQueries({
+        queryKey: notificationKeys.own(actorId),
+      })
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : 'შეტყობინებები ვერ წაიშალა. სცადეთ ხელახლა.',
+      ),
   })
 }
 

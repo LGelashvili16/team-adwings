@@ -7,6 +7,7 @@ import {
   hasPermission,
 } from '#/lib/authorization/permissions'
 import {
+  deleteNotificationSchema,
   deliverNotificationsSchema,
   markNotificationsSeenSchema,
   notificationListSchema,
@@ -173,4 +174,18 @@ export async function markOwnNotificationsUnseen(
   if (!actor) throw new AuthorizationError()
   const { ids } = markNotificationsSeenSchema.parse(input)
   return repository.markUnseenForRecipient(actor.id, ids)
+}
+
+export async function deleteOwnNotification(
+  actor: Actor | null,
+  input: unknown,
+) {
+  if (!actor) throw new AuthorizationError()
+  const { id } = deleteNotificationSchema.parse(input)
+  return repository.deleteForRecipient(actor.id, id)
+}
+
+export async function deleteAllOwnNotifications(actor: Actor | null) {
+  if (!actor) throw new AuthorizationError()
+  return repository.deleteAllForRecipient(actor.id)
 }

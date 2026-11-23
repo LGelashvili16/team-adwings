@@ -138,6 +138,7 @@ export async function acknowledgeRelated(
     .where(
       and(
         eq(notification.recipientId, actorId),
+        isNull(notification.deletedAt),
         isNull(notification.seenAt),
         'complaintId' in related
           ? eq(notification.complaintId, related.complaintId)
@@ -164,6 +165,7 @@ export async function liveNotification(recipientId: string, id: string) {
       and(
         eq(notification.id, id),
         eq(notification.recipientId, recipientId),
+        isNull(notification.deletedAt),
         sql`(${notification.liveToast} or ${notification.destination} is not null)`,
         isNull(notification.seenAt),
         eq(user.accessState, 'active'),
@@ -186,6 +188,7 @@ export async function listForRecipient(
       // Also hides self-delivery rows from publications created before author exclusion.
       const baseVisible = and(
         eq(notification.recipientId, recipientId),
+        isNull(notification.deletedAt),
         scope === 'popup' ? isNull(notification.popupDismissedAt) : undefined,
         notExists(
           tx
@@ -243,6 +246,7 @@ export async function dismissPopupForRecipient(recipientId: string) {
       .where(
         and(
           eq(notification.recipientId, recipientId),
+          isNull(notification.deletedAt),
           isNull(notification.popupDismissedAt),
         ),
       )
@@ -277,6 +281,7 @@ async function setSeenForRecipient(
       .where(
         and(
           eq(notification.recipientId, recipientId),
+          isNull(notification.deletedAt),
           ids ? inArray(notification.id, ids) : undefined,
           seen ? isNull(notification.seenAt) : isNotNull(notification.seenAt),
         ),
@@ -288,5 +293,52 @@ async function setSeenForRecipient(
     if (updated.some((item) => item.complaintId !== null))
       await signalRealtime(tx, { topic: 'complaints', recipientId })
     return { updatedCount: updated.length }
+  })
+}
+
+export async function deleteForRecipient(recipientId: string, id: string) {
+  return db.transaction(async (tx) => {
+    const deleted = await tx
+      .update(notification)
+      .set({
+        deletedAt: sql`now()`,
+        seenAt: sql`coalesce(${notification.seenAt}, now())`,
+      })
+      .where(
+        and(
+          eq(notification.recipientId, recipientId),
+          eq(notification.id, id),
+          isNull(notification.deletedAt),
+        ),
+      )
+      .returning({ id: notification.id, complaintId: notification.complaintId })
+    if (deleted.length)
+      await signalRealtime(tx, { topic: 'notifications', recipientId })
+    if (deleted.some((item) => item.complaintId !== null))
+      await signalRealtime(tx, { topic: 'complaints', recipientId })
+    return { deletedCount: deleted.length }
+  })
+}
+
+export async function deleteAllForRecipient(recipientId: string) {
+  return db.transaction(async (tx) => {
+    const deleted = await tx
+      .update(notification)
+      .set({
+        deletedAt: sql`now()`,
+        seenAt: sql`coalesce(${notification.seenAt}, now())`,
+      })
+      .where(
+        and(
+          eq(notification.recipientId, recipientId),
+          isNull(notification.deletedAt),
+        ),
+      )
+      .returning({ id: notification.id, complaintId: notification.complaintId })
+    if (deleted.length)
+      await signalRealtime(tx, { topic: 'notifications', recipientId })
+    if (deleted.some((item) => item.complaintId !== null))
+      await signalRealtime(tx, { topic: 'complaints', recipientId })
+    return { deletedCount: deleted.length }
   })
 }
