@@ -14,7 +14,6 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardFooter,
   CardTitle,
@@ -62,13 +61,12 @@ export function LoginPage() {
   })
   return (
     <Card className="w-full shadow-sm">
-      <CardHeader className="gap-3 pb-7">
+      <CardHeader className="pb-5">
         <CardTitle>
           <h1 className="text-3xl font-semibold tracking-tight">
             {authContent.login.title}
           </h1>
         </CardTitle>
-        <CardDescription>{authContent.login.description}</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -144,6 +142,7 @@ export function LoginPage() {
                       id="password"
                       name={field.name}
                       type={showPassword ? 'text' : 'password'}
+                      placeholder="პაროლი"
                       autoComplete="current-password"
                       value={field.state.value}
                       onBlur={field.handleBlur}
@@ -199,9 +198,9 @@ export function LoginPage() {
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter className="flex flex-col items-start gap-3 py-5">
+      <CardFooter className="flex flex-col items-center gap-3 py-5 text-center">
         <p className="text-sm text-muted-foreground">
-          პირველი შესვლა?{' '}
+          პირველად შედიხართ?{' '}
           <Link
             to="/auth/register"
             className="font-medium text-foreground underline underline-offset-4"
@@ -209,10 +208,6 @@ export function LoginPage() {
             ანგარიშის გააქტიურება
           </Link>
         </p>
-        {/* <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <IconLock className="size-3.5" aria-hidden="true" />
-          ანგარიშს ქმნის კომპანიის ადმინისტრატორი.
-        </p> */}
       </CardFooter>
     </Card>
   )

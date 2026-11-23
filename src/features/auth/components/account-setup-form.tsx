@@ -204,7 +204,7 @@ export function AccountSetupForm({
           </FieldGroup>
         </form>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="justify-center">
         <Button
           nativeButton={false}
           role="link"

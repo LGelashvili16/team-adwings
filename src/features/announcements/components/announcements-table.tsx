@@ -141,7 +141,26 @@ export function AnnouncementsTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
+          <TableRow
+            key={row.id}
+            className="cursor-pointer"
+            onMouseEnter={() => onPrefetch?.(row.original.id)}
+            onClick={(event) => {
+              if (
+                event.defaultPrevented ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey ||
+                window.getSelection()?.toString() ||
+                (event.target instanceof Element &&
+                  event.target.closest('button, a, input, select, textarea'))
+              ) {
+                return
+              }
+              onOpen(row.original.id)
+            }}
+          >
             {row.getAllCells().map((cell) => (
               <TableCell key={cell.id} className="px-5 py-4">
                 <table.FlexRender cell={cell} />
