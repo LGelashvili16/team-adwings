@@ -67,9 +67,8 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       name: 'ტესტის მფლობელი',
       contactEmail: '',
     })
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'owner-test', newPassword: password },
       (value) => auth.$context.then((context) => context.password.hash(value)),
     )
     const [record] = await testDatabase()
@@ -96,10 +95,9 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     }
   })
 
-  async function provision(code: string) {
+  async function provision(name = 'ტესტის თანამშრომელი') {
     return service.provisionEmployee(owner, {
-      code,
-      name: 'ტესტის თანამშრომელი',
+      name,
       contactEmail: '',
       role: 'employee',
     })
@@ -110,6 +108,20 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       .from(tables.user)
       .where(eq(tables.user.username, code))
     return record
+  }
+  async function identityById(userId: string) {
+    const [record] = await testDatabase()
+      .select()
+      .from(tables.user)
+      .where(eq(tables.user.id, userId))
+    return record
+  }
+  async function identityForCode(setupCode: string) {
+    const [challenge] = await testDatabase()
+      .select({ userId: tables.accountSetup.userId })
+      .from(tables.accountSetup)
+      .where(eq(tables.accountSetup.codeHash, service.hashSetupCode(setupCode)))
+    return identityById(challenge.userId)
   }
   const hashPassword = (value: string) =>
     auth.$context.then((context) => context.password.hash(value))
@@ -138,18 +150,17 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       .update(tables.dayOffSetting)
       .set({ defaultDays: 7, defaultVacationDays: 30 })
     try {
-      for (const [code, override, expected] of [
+      for (const [label, override, expected] of [
         ['allowance-default', null, 7],
         ['allowance-custom', 2, 2],
       ] as const) {
-        await service.provisionEmployee(owner, {
-          code,
-          name: 'ტესტის თანამშრომელი',
+        const issued = await service.provisionEmployee(owner, {
+          name: label,
           contactEmail: '',
           role: 'employee',
           dayOffAllowance: override,
         })
-        const record = await identity(code)
+        const record = await identityForCode(issued.code)
         const [balance] = await testDatabase()
           .select()
           .from(tables.dayOffBalance)
@@ -173,43 +184,40 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     'sales_manager',
     'production_specialist',
     'hr_manager',
+    'admin',
   ] as const)(
-    'provisions and stores the %s role through the employee workflow',
+    'provisions and stores the %s role through the employee workflow for owner',
     async (role) => {
-      const code = `test-${role}`
-      await service.provisionEmployee(owner, {
-        code,
-        name: 'ტესტის თანამშრომელი',
+      const issued = await service.provisionEmployee(owner, {
+        name: `ტესტის ${role}`,
         contactEmail: '',
         role,
       })
-      const record = await identity(code)
+      const record = await identityForCode(issued.code)
       expect(record.roles).toBe(role)
       expect(record.accessState).toBe('invited')
+      expect(record.username).toBeNull()
     },
   )
-  it('lets HR manage employees while protecting role grants, privileged targets, and revoked access', async () => {
+  it('lets HR manage employees and non-admin roles while protecting admin/owner grants, privileged targets, and revoked access', async () => {
     const issued = await service.provisionEmployee(owner, {
-      code: 'hr-operator',
       name: 'HR',
       contactEmail: '',
       role: 'hr_manager',
     })
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'hr-operator', newPassword: password },
       hashPassword,
     )
     const identityRecord = await identity('hr-operator')
     const hr: Actor = { ...owner, id: identityRecord.id, roles: ['hr_manager'] }
     const input = {
-      code: 'hr-created-worker',
       name: 'ახალი თანამშრომელი',
       contactEmail: '',
       role: 'employee' as const,
     }
     const activation = await service.provisionEmployee(hr, input)
-    const worker = await identity(input.code)
+    const worker = await identityForCode(activation.code)
     expect(
       (await service.listEmployeeAccounts(hr, { page: 1 })).records.some(
         (record) => record.userId === worker.id,
@@ -218,7 +226,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     expect(
       (await service.readEmployeeAccount(hr, { userId: worker.id }))?.record
         .code,
-    ).toBe(input.code)
+    ).toBeNull()
     await service.editEmployeeDetails(hr, {
       userId: worker.id,
       name: 'განახლებული თანამშრომელი',
@@ -226,11 +234,27 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       jobTitle: 'სპეციალისტი',
       phone: '',
     })
-    await service.completeEmployeeSetup(
-      { code: activation.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      {
+        code: activation.code,
+        username: 'hr-created-worker',
+        newPassword: password,
+      },
       hashPassword,
     )
+    expect(
+      (await service.readEmployeeAccount(hr, { userId: worker.id }))?.record
+        .code,
+    ).toBe('hr-created-worker')
+    await service.editEmployeeDetails(hr, {
+      userId: worker.id,
+      code: 'hr-renamed-worker',
+      name: 'განახლებული თანამშრომელი',
+      contactEmail: '',
+      jobTitle: 'სპეციალისტი',
+      phone: '',
+    })
+    expect((await identityById(worker.id)).username).toBe('hr-renamed-worker')
     expect(
       await service.manageEmployeeAccount(hr, {
         userId: worker.id,
@@ -266,11 +290,15 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
         }),
       ).rejects.toThrow()
     }
+    const hrSupervisor = await service.provisionEmployee(hr, {
+      ...input,
+      role: 'supervisor',
+    })
+    expect((await identityForCode(hrSupervisor.code)).roles).toBe('supervisor')
     await expect(
       service.provisionEmployee(hr, {
         ...input,
-        code: 'hr-role-grant',
-        role: 'hr_manager',
+        role: 'admin',
       }),
     ).rejects.toThrow()
     // Mutation authority comes from the locked current account, not the caller's stale role projection.
@@ -278,19 +306,19 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       .update(tables.user)
       .set({ roles: 'employee' })
       .where(eq(tables.user.id, hr.id))
-    await expect(
-      service.provisionEmployee(hr, { ...input, code: 'revoked-actor' }),
-    ).rejects.toThrow()
+    await expect(service.provisionEmployee(hr, input)).rejects.toThrow()
   })
   it('creates an email-optional account, stores only a code hash, and blocks invited login', async () => {
     const issued = await provision('worker-one')
-    const record = await identity('worker-one')
+    const record = await identityForCode(issued.code)
     expect(record.accessState).toBe('invited')
+    expect(record.username).toBeNull()
     const [person] = await testDatabase()
       .select()
       .from(tables.employee)
       .where(eq(tables.employee.userId, record.id))
     expect(person.contactEmail).toBeNull()
+    expect(person.username).toBeNull()
     const [creationAudit] = await testDatabase()
       .select({
         actorId: tables.accessAudit.actorId,
@@ -315,22 +343,47 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     expect(challenge.codeHash).toBe(service.hashSetupCode(issued.code))
     expect((await service.getLoginAccess(record.id)).allowed).toBe(false)
     await expect(
-      auth.api.signInUsername({ body: { username: 'worker-one', password } }),
-    ).rejects.toThrow()
+      service.completeEmployeeActivation(
+        { code: issued.code, username: 'owner-test', newPassword: password },
+        hashPassword,
+      ),
+    ).rejects.toThrow(/უკვე დაკავებულია/)
+    // Duplicate username leaves the one-time code intact so the user can retry with an available username.
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'worker-one', newPassword: password },
+      hashPassword,
+    )
+    expect((await identity('worker-one')).accessState).toBe('active')
   })
 
-  it('edits employee details without a reason and audits the trusted actor and time', async () => {
-    await service.provisionEmployee(owner, {
-      code: 'edit-worker',
+  it('edits employee details and username without a reason and audits the trusted actor and time', async () => {
+    const editWorkerCode = await service.provisionEmployee(owner, {
       name: 'რედაქტირების თანამშრომელი',
       contactEmail: 'edit-worker@example.com',
       role: 'employee',
     })
-    await provision('edit-plain')
+    await service.completeEmployeeActivation(
+      {
+        code: editWorkerCode.code,
+        username: 'edit-worker',
+        newPassword: password,
+      },
+      hashPassword,
+    )
+    const editPlainCode = await provision('edit-plain')
+    await service.completeEmployeeActivation(
+      {
+        code: editPlainCode.code,
+        username: 'edit-plain',
+        newPassword: password,
+      },
+      hashPassword,
+    )
     const record = await identity('edit-worker')
     const edit = (userId: string, overrides: Record<string, string> = {}) =>
       service.editEmployeeDetails(owner, {
         userId,
+        code: 'edit-worker-updated',
         name: 'ახალი სახელი',
         contactEmail: 'moved@example.com',
         jobTitle: 'მენეჯერი',
@@ -338,16 +391,18 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
         ...overrides,
       })
     await edit(record.id)
-    const updated = await identity('edit-worker')
+    const updated = await identity('edit-worker-updated')
     expect(updated).toMatchObject({
       name: 'ახალი სახელი',
       email: 'moved@example.com',
+      username: 'edit-worker-updated',
     })
     const [person] = await testDatabase()
       .select()
       .from(tables.employee)
       .where(eq(tables.employee.userId, record.id))
     expect(person).toMatchObject({
+      username: 'edit-worker-updated',
       fullName: 'ახალი სახელი',
       contactEmail: 'moved@example.com',
       jobTitle: 'მენეჯერი',
@@ -369,14 +424,23 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     expect(audit.reason).toBe('თანამშრომლის მონაცემების განახლება.')
     expect(audit.actorId).toBe(owner.id)
     expect(audit.createdAt).toBeInstanceOf(Date)
-    await expect(edit(record.id, { contactEmail: '' })).rejects.toThrow(
+    await expect(edit(record.id, { code: '' })).rejects.toThrow(
       /წაშლა შეუძლებელია/,
     )
+    await expect(edit(record.id, { code: 'edit-plain' })).rejects.toThrow(
+      /უკვე დაკავებულია/,
+    )
+    await expect(
+      edit(record.id, { code: 'edit-worker-updated', contactEmail: '' }),
+    ).rejects.toThrow(/წაშლა შეუძლებელია/)
     const plain = await identity('edit-plain')
     await expect(
-      edit(plain.id, { contactEmail: 'moved@example.com' }),
+      edit(plain.id, { code: 'edit-plain', contactEmail: 'moved@example.com' }),
     ).rejects.toThrow(/უკვე უკავია/)
-    await edit(plain.id, { contactEmail: 'plain@example.com' })
+    await edit(plain.id, {
+      code: 'edit-plain',
+      contactEmail: 'plain@example.com',
+    })
     expect((await identity('edit-plain')).email).toMatch(
       /@accounts\.teamwork\.invalid$/,
     )
@@ -385,9 +449,8 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
 
   it('lets an active employee change only their own phone number', async () => {
     const issued = await provision('phone-worker')
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'phone-worker', newPassword: password },
       hashPassword,
     )
     const record = await identity('phone-worker')
@@ -410,21 +473,22 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     ).rejects.toThrow()
   })
 
-  it('rejects duplicate employees under concurrent creation without orphan accounts', async () => {
-    const before = (
-      await testDatabase().select({ count: count() }).from(tables.user)
-    )[0].count
+  it('rejects duplicate usernames under concurrent activation without orphan accounts', async () => {
+    const first = await provision('worker-race-1')
+    const second = await provision('worker-race-2')
     const results = await Promise.allSettled([
-      provision('worker-race'),
-      provision('worker-race'),
+      service.completeEmployeeActivation(
+        { code: first.code, username: 'worker-race', newPassword: password },
+        hashPassword,
+      ),
+      service.completeEmployeeActivation(
+        { code: second.code, username: 'worker-race', newPassword: password },
+        hashPassword,
+      ),
     ])
     expect(
       results.filter((result) => result.status === 'fulfilled'),
     ).toHaveLength(1)
-    expect(
-      (await testDatabase().select({ count: count() }).from(tables.user))[0]
-        .count,
-    ).toBe(before + 1)
     const record = await identity('worker-race')
     await expect(
       testDatabase().insert(tables.employee).values({
@@ -437,21 +501,19 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
 
   it('stores optional profile details and signs in using either email or username after activation', async () => {
     const issued = await service.provisionEmployee(owner, {
-      code: 'email-worker',
       name: 'ელფოსტის თანამშრომელი',
       contactEmail: '  Worker@Example.com  ',
       role: 'employee',
       jobTitle: 'დიზაინერი',
       phone: '+995 555 12 34 56',
     })
-    const record = await identity('email-worker')
+    const record = await identityForCode(issued.code)
     expect(record.email).toBe('worker@example.com')
     await expect(
       auth.api.signInEmail({ body: { email: 'worker@example.com', password } }),
     ).rejects.toThrow()
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'email-worker', newPassword: password },
       hashPassword,
     )
     const byEmail = await auth.api.signInEmail({
@@ -478,7 +540,6 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     )[0].count
     await expect(
       service.provisionEmployee(owner, {
-        code: 'email-duplicate',
         name: 'დუბლიკატი',
         contactEmail: 'WORKER@example.com',
         role: 'employee',
@@ -511,13 +572,20 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       weekday: index + 1,
       hours: index < 5 ? { start: '09:00', end: '18:00' } : null,
     }))
-    await service.provisionEmployee(owner, {
-      code: 'office-week',
+    const officeIssued = await service.provisionEmployee(owner, {
       name: 'ოფისის თანამშრომელი',
       contactEmail: '',
       role: 'employee',
       workingWeek: days,
     })
+    await service.completeEmployeeActivation(
+      {
+        code: officeIssued.code,
+        username: 'office-week',
+        newPassword: password,
+      },
+      hashPassword,
+    )
     const record = await identity('office-week')
     const person = (
       await testDatabase()
@@ -537,7 +605,6 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     )[0].count
     await expect(
       service.provisionEmployee(owner, {
-        code: 'invalid-week',
         name: 'არასწორი კვირა',
         contactEmail: '',
         role: 'employee',
@@ -622,9 +689,12 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await provision('worker-active')
     const outcomes = await Promise.allSettled(
       [1, 2].map(() =>
-        service.completeEmployeeSetup(
-          { code: issued.code, newPassword: password },
-          'activation',
+        service.completeEmployeeActivation(
+          {
+            code: issued.code,
+            username: 'worker-active',
+            newPassword: password,
+          },
           hashPassword,
         ),
       ),
@@ -653,22 +723,19 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     })
     if (!first || !second) throw new Error('Expected reset codes')
     await expect(
-      service.completeEmployeeSetup(
+      service.completeEmployeeReset(
         { code: first.code, newPassword: password },
-        'reset',
         hashPassword,
       ),
     ).rejects.toThrow()
     await expect(
-      service.completeEmployeeSetup(
-        { code: second.code, newPassword: password },
-        'activation',
+      service.completeEmployeeActivation(
+        { code: second.code, username: 'worker-active', newPassword: password },
         hashPassword,
       ),
     ).rejects.toThrow()
-    await service.completeEmployeeSetup(
+    await service.completeEmployeeReset(
       { code: second.code, newPassword: `${password}new` },
-      'reset',
       hashPassword,
     )
     expect(
@@ -695,7 +762,6 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const forged = { ...owner, id: employee.id }
     await expect(
       service.provisionEmployee(forged, {
-        code: 'forbidden',
         name: 'ტესტი',
         contactEmail: '',
         role: 'employee',
@@ -738,9 +804,8 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       }),
     ).rejects.toThrow()
     await expect(
-      service.completeEmployeeSetup(
+      service.completeEmployeeReset(
         { code: issued.code, newPassword: password },
-        'reset',
         hashPassword,
       ),
     ).rejects.toThrow()
@@ -755,15 +820,18 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
 
   it('rejects expired activation and records lifecycle changes without secrets', async () => {
     const issued = await provision('worker-expired')
-    const record = await identity('worker-expired')
+    const record = await identityForCode(issued.code)
     await testDatabase()
       .update(tables.accountSetup)
       .set({ expiresAt: new Date(0) })
       .where(eq(tables.accountSetup.userId, record.id))
     await expect(
-      service.completeEmployeeSetup(
-        { code: issued.code, newPassword: password },
-        'activation',
+      service.completeEmployeeActivation(
+        {
+          code: issued.code,
+          username: 'worker-expired',
+          newPassword: password,
+        },
         hashPassword,
       ),
     ).rejects.toThrow()
@@ -782,7 +850,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
   it('validates native activation requests, origin protection, and request throttling', async () => {
     const issued = await provision('worker-http')
     const base = process.env.BETTER_AUTH_URL ?? 'http://localhost:3005'
-    const request = (code: string, origin: string) =>
+    const request = (code: string, origin: string, username = 'worker-http') =>
       new Request(`${base}/api/auth/employee-activate`, {
         method: 'POST',
         headers: {
@@ -790,12 +858,16 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
           Origin: origin,
           'x-forwarded-for': '127.0.0.81',
         },
-        body: JSON.stringify({ code, newPassword: password }),
+        body: JSON.stringify({ code, username, newPassword: password }),
       })
     const forbidden = await auth.handler(
       request(issued.code, 'https://untrusted.example'),
     )
     expect(forbidden.status).toBe(403)
+    const duplicate = await auth.handler(
+      request(issued.code, base, 'owner-test'),
+    )
+    expect(duplicate.status).toBe(409)
     const activated = await auth.handler(request(issued.code, base))
     expect(activated.status).toBe(200)
     const replay = await auth.handler(request(issued.code, base))
@@ -811,9 +883,8 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       reason: 'მფლობელის პირადობა გადამოწმებულია.',
     })
     expect(issued.purpose).toBe('reset')
-    await service.completeEmployeeSetup(
+    await service.completeEmployeeReset(
       { code: issued.code, newPassword: password },
-      'reset',
       hashPassword,
     )
     expect((await identity('owner-test')).id).toBe(owner.id)
@@ -852,22 +923,22 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
   })
   it('administers every non-owner account, including identities without employee records, and protects self and owner access', async () => {
     const issued = await service.provisionEmployee(owner, {
-      code: 'access-admin',
       name: 'წვდომის ადმინისტრატორი',
       contactEmail: '',
-      role: 'employee',
+      role: 'admin',
     })
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      { code: issued.code, username: 'access-admin', newPassword: password },
       hashPassword,
     )
     const adminRecord = await identity('access-admin')
-    await testDatabase()
-      .update(tables.user)
-      .set({ roles: 'admin' })
-      .where(eq(tables.user.id, adminRecord.id))
     const adminActor: Actor = { ...owner, id: adminRecord.id, roles: ['admin'] }
+    const createdByAdmin = await service.provisionEmployee(adminActor, {
+      name: 'ადმინის შექმნილი ადმინი',
+      contactEmail: '',
+      role: 'admin',
+    })
+    expect((await identityForCode(createdByAdmin.code)).roles).toBe('admin')
     await testDatabase().insert(tables.user).values({
       id: 'orphan-admin',
       name: 'ცალკე ადმინისტრატორი',
@@ -979,14 +1050,16 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
   })
   it('persists permission exceptions, revokes sessions, rejects stale edits, and rechecks exceptions in domain services', async () => {
     const issued = await service.provisionEmployee(owner, {
-      code: 'override-worker',
       name: 'უფლებების ტესტი',
       contactEmail: '',
       role: 'employee',
     })
-    await service.completeEmployeeSetup(
-      { code: issued.code, newPassword: password },
-      'activation',
+    await service.completeEmployeeActivation(
+      {
+        code: issued.code,
+        username: 'override-worker',
+        newPassword: password,
+      },
       hashPassword,
     )
     const worker = await identity('override-worker')

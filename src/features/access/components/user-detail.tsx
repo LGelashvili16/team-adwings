@@ -7,13 +7,12 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
-import { hasPermission } from '#/lib/authorization/permissions'
+import { hasEveryPermission, hasPermission } from '#/lib/authorization/permissions'
 import { getEmployeeAccount } from '../access.functions'
 import { availableAccountActions, canManageAccount } from '../access.actions'
 import { AccountActionDialog } from './account-action-dialog'
 import { AccountCodeDialog } from './account-code-dialog'
 import { EmployeeDetailsSheet } from './employee-details-sheet'
-import { UserAccessCard } from './user-access-card'
 import { UserProfileCard } from './user-profile-card'
 import { UserProfileHeader } from './user-profile-header'
 import { UserScheduleCard } from './user-schedule-card'
@@ -92,20 +91,25 @@ export function UserDetail({
 
   const { record, companyWeek } = detail
   const manageable = canManageAccount(record, actor)
+  const actions = manageable ? availableAccountActions(record) : []
+  const canAssignAdmin = hasEveryPermission(actor, [
+    'admin.access',
+    'users.manage',
+    'roles.manage',
+  ])
   return (
-    <div className="flex w-full flex-col gap-6">
+    <div className="flex w-full flex-col gap-4">
       <BackLink />
       <UserProfileHeader
         record={record}
         canEdit={manageable}
         onEdit={() => setEditing(true)}
+        actions={actions}
+        onAction={setAction}
       />
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="flex min-w-0 flex-col gap-6">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_25rem]">
+        <div className="flex min-w-0 flex-col gap-4">
           <UserProfileCard record={record} />
-          {actor.id !== userId && hasPermission(actor, 'security.configure') ? (
-            <EmployeeNetworkCard actorId={actor.id} userId={userId} />
-          ) : null}
           <UserScheduleCard
             week={record.workingWeek}
             companyWeek={companyWeek}
@@ -116,7 +120,7 @@ export function UserDetail({
             userId={record.userId}
           />
         </div>
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-4">
           {hasPermission(actor, 'employees.manage') ? (
             <EmployeeDayOffBalanceCard
               actorId={actor.id}
@@ -124,10 +128,9 @@ export function UserDetail({
               canEdit={actor.id !== record.userId}
             />
           ) : null}
-          <UserAccessCard
-            actions={manageable ? availableAccountActions(record) : []}
-            onAction={setAction}
-          />
+          {actor.id !== userId && hasPermission(actor, 'security.configure') ? (
+            <EmployeeNetworkCard actorId={actor.id} userId={userId} />
+          ) : null}
         </div>
       </div>
       {action ? (
@@ -142,6 +145,7 @@ export function UserDetail({
       <EmployeeDetailsSheet
         open={editing}
         target={record}
+        canAssignAdmin={canAssignAdmin}
         canConfigureSchedule={hasPermission(actor, 'attendance.configure')}
         onClose={() => setEditing(false)}
       />

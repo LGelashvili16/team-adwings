@@ -94,66 +94,66 @@ export function EmployeeDayOffBalanceCard({
   const query = useQuery(employeeDayOffBalanceQuery(actorId, userId))
   const [editing, setEditing] = useState(false)
   return (
-    <Card className="rounded-2xl py-5 sm:py-6">
-      <CardHeader className="px-5 sm:px-6">
+    <Card className="rounded-2xl py-4 sm:py-5">
+      <CardHeader className="px-4 sm:px-5">
         <CardTitle className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <IconCalendarPause className="size-5" aria-hidden="true" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/70 text-muted-foreground">
+            <IconCalendarPause className="size-4" aria-hidden="true" />
           </span>
           <h2>დასვენება და შვებულება</h2>
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4 px-5 sm:px-6">
+      <CardContent className="flex flex-col gap-3 px-4 sm:px-5">
         {query.isPending ? (
           <div role="status" aria-busy="true" aria-label="ბალანსი იტვირთება">
             <div className="flex flex-col gap-3" aria-hidden="true">
-              <Skeleton className="h-36 rounded-xl" />
-              <Skeleton className="h-32 rounded-xl" />
-              {canEdit ? <Skeleton className="h-8 rounded-lg" /> : null}
+              <div className="grid grid-cols-2 gap-3">
+                <Skeleton className="h-28 rounded-xl" />
+                <Skeleton className="h-28 rounded-xl" />
+              </div>
+              {canEdit ? <Skeleton className="h-9 rounded-lg" /> : null}
             </div>
           </div>
         ) : !query.data ? (
           <BalanceError />
         ) : (
           <>
-            <dl className="grid gap-3">
-              <div className="rounded-xl bg-badge-blue/40 p-4">
-                <dt className="flex items-center gap-2 text-sm font-medium text-badge-blue-foreground">
-                  <IconCalendarPause className="size-4" aria-hidden="true" />
+            <dl className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-badge-blue-foreground/15 bg-badge-blue/40 p-3.5">
+                <dt className="flex items-center gap-1.5 text-xs font-medium text-badge-blue-foreground">
+                  <IconCalendarPause className="size-3.5 shrink-0" aria-hidden="true" />
                   დასვენების დღეები
                 </dt>
-                <dd className="mt-3 flex items-baseline gap-2 text-badge-blue-foreground">
-                  <span className="text-4xl font-semibold tracking-tight tabular-nums">
+                <dd className="mt-2 flex items-baseline gap-1.5 text-badge-blue-foreground">
+                  <span className="text-3xl font-semibold tracking-tight tabular-nums">
                     {query.data.remainingDays}
                   </span>
-                  <span className="text-sm">დღე</span>
+                  <span className="text-xs">დღე</span>
                 </dd>
-                <dd className="mt-3 text-xs leading-5 text-muted-foreground">
-                  წლიური ლიმიტი: {query.data.annualDays}.{' '}
-                  {query.data.resetYearly
-                    ? 'ბალანსი განახლდება 1 იანვარს.'
-                    : 'წლიური განახლება გამორთულია.'}
+                <dd className="mt-2 text-xs leading-4 text-muted-foreground">
+                  წლიური ლიმიტი: {query.data.annualDays}
                 </dd>
               </div>
-              <div className="rounded-xl bg-badge-purple/40 p-4">
-                <dt className="flex items-center gap-2 text-sm font-medium text-badge-purple-foreground">
-                  <IconSun className="size-4" aria-hidden="true" />
+              <div className="rounded-xl border border-badge-purple-foreground/15 bg-badge-purple/40 p-3.5">
+                <dt className="flex items-center gap-1.5 text-xs font-medium text-badge-purple-foreground">
+                  <IconSun className="size-3.5 shrink-0" aria-hidden="true" />
                   შვებულება
                 </dt>
-                <dd className="mt-3 flex items-baseline gap-2 text-badge-purple-foreground">
-                  <span className="text-4xl font-semibold tracking-tight tabular-nums">
+                <dd className="mt-2 flex items-baseline gap-1.5 text-badge-purple-foreground">
+                  <span className="text-3xl font-semibold tracking-tight tabular-nums">
                     {query.data.vacationRemainingDays}
                   </span>
-                  <span className="text-sm">სამუშაო დღე</span>
+                  <span className="text-xs">დღე</span>
                 </dd>
-                <dd className="mt-3 text-xs leading-5 text-muted-foreground">
-                  წლიური დამატება: {query.data.vacationAnnualDays} დღე
+                <dd className="mt-2 text-xs leading-4 text-muted-foreground">
+                  წლიური დამატება: {query.data.vacationAnnualDays}
                 </dd>
               </div>
             </dl>
             {canEdit ? (
               <Button
                 variant="outline"
+                depth="raised"
                 className="w-full"
                 onClick={() => setEditing(true)}
               >

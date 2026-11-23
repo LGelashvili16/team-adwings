@@ -66,7 +66,7 @@ export function SecurityPagination({
         total={total}
         pageSize={20}
         renderLink={(next) => (
-          <Button variant="ghost" size="icon" onClick={() => onPage(next)} />
+          <button type="button" onClick={() => onPage(next)} />
         )}
       />
     </div>

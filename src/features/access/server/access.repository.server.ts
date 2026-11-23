@@ -60,7 +60,7 @@ export async function queryAccounts(page: number) {
       .select(accountSummaryColumns)
       .from(employee)
       .innerJoin(user, eq(employee.userId, user.id))
-      .orderBy(asc(employee.username))
+      .orderBy(asc(employee.fullName), asc(employee.id))
       .limit(20)
       .offset((page - 1) * 20),
     db.select({ count: count() }).from(employee),
@@ -133,6 +133,9 @@ export async function setEmployment(
   status: 'active' | 'inactive',
 ) {
   await tx.update(employee).set({ status }).where(eq(employee.userId, userId))
+}
+export async function revokeSessions(tx: AccessTransaction, userId: string) {
+  await tx.delete(session).where(eq(session.userId, userId))
 }
 export async function revokeAccess(tx: AccessTransaction, userId: string) {
   await tx.delete(session).where(eq(session.userId, userId))
@@ -219,6 +222,38 @@ export async function emailInUse(
     .where(and(eq(user.email, email), ne(user.id, exceptUserId)))
     .limit(1)
   return rows.length > 0
+}
+export async function usernameInUse(
+  tx: AccessTransaction,
+  username: string,
+  exceptUserId: string,
+) {
+  const [inUser, inEmployee] = await Promise.all([
+    tx
+      .select({ id: user.id })
+      .from(user)
+      .where(and(eq(user.username, username), ne(user.id, exceptUserId)))
+      .limit(1),
+    tx
+      .select({ id: employee.id })
+      .from(employee)
+      .where(
+        and(eq(employee.username, username), ne(employee.userId, exceptUserId)),
+      )
+      .limit(1),
+  ])
+  return inUser.length > 0 || inEmployee.length > 0
+}
+export async function setAccountUsername(
+  tx: AccessTransaction,
+  userId: string,
+  username: string,
+) {
+  await tx
+    .update(employee)
+    .set({ username })
+    .where(eq(employee.userId, userId))
+  await tx.update(user).set({ username }).where(eq(user.id, userId))
 }
 export async function updateEmployeeDetails(
   tx: AccessTransaction,

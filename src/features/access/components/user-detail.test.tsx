@@ -86,7 +86,7 @@ function renderDetail(
     ok: true,
     value: { record: { ...record, ...overrides }, companyWeek },
   })
-  render(
+  return render(
     <QueryClientProvider client={new QueryClient()}>
       <UserDetail userId="employee" actor={currentActor} />
     </QueryClientProvider>,
@@ -96,7 +96,13 @@ function renderDetail(
 describe('single account page', () => {
   it('starts the sheet opening transition when editing is requested', async () => {
     // Hold the first animation frame so the opening state can be observed reliably.
-    const frame = vi.spyOn(window, 'requestAnimationFrame').mockReturnValue(1)
+    const callbacks: Array<FrameRequestCallback> = []
+    const frame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb) => {
+        callbacks.push(cb)
+        return callbacks.length
+      })
     try {
       const user = userEvent.setup()
       renderDetail()
@@ -108,6 +114,7 @@ describe('single account page', () => {
       ).toHaveAttribute('data-starting-style')
     } finally {
       frame.mockRestore()
+      for (const cb of callbacks) cb(performance.now())
     }
   })
   it('saves employee edits without requesting or submitting a reason', async () => {
@@ -122,17 +129,36 @@ describe('single account page', () => {
     const name = screen.getByRole('textbox', { name: 'სახელი და გვარი' })
     await user.clear(name)
     await user.type(name, 'განახლებული სახელი')
+    const username = screen.getByRole('textbox', {
+      name: 'მომხმარებლის სახელი',
+    })
+    await user.clear(username)
+    await user.type(username, 'worker-updated')
+    await user.click(screen.getByRole('combobox'))
+    expect(
+      (await screen.findAllByRole('option')).map((opt) => opt.textContent),
+    ).toEqual([
+      'თანამშრომელი',
+      'წარმოების სპეციალისტი',
+      'წარმოების უფროსი',
+      'გაყიდვების მენეჯერი',
+      'HR',
+      'ადმინისტრატორი',
+    ])
+    await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
     await user.click(screen.getByRole('button', { name: 'შენახვა' }))
     expect(updateEmployeeDetails).toHaveBeenCalledOnce()
     expect(updateEmployeeDetails.mock.calls[0][0].data).toMatchObject({
       name: 'განახლებული სახელი',
+      code: 'worker-updated',
+      role: 'admin',
       userId: 'employee',
     })
     expect(updateEmployeeDetails.mock.calls[0][0].data).not.toHaveProperty(
       'reason',
     )
   })
-  it('lets HR edit employees and their schedules from management', async () => {
+  it('lets HR edit employees, non-admin roles, and schedules from management', async () => {
     const user = userEvent.setup()
     renderDetail({}, { ...actor, roles: ['hr_manager'] })
     await screen.findByRole('heading', { name: 'ანა მაისურაძე' })
@@ -141,6 +167,16 @@ describe('single account page', () => {
     ).toHaveAttribute('href', '/manage/employees?page=1')
     await user.click(await screen.findByRole('button', { name: 'რედაქტირება' }))
     expect(await screen.findByRole('dialog')).toBeVisible()
+    await user.click(screen.getByRole('combobox'))
+    expect(
+      (await screen.findAllByRole('option')).map((opt) => opt.textContent),
+    ).toEqual([
+      'თანამშრომელი',
+      'წარმოების სპეციალისტი',
+      'წარმოების უფროსი',
+      'გაყიდვების მენეჯერი',
+      'HR',
+    ])
     expect(
       screen.getByRole('switch', { name: 'კომპანიის განრიგის გამოყენება' }),
     ).toBeInTheDocument()
@@ -223,9 +259,10 @@ describe('single account page', () => {
     renderDetail({ userId: 'administrator' })
     await screen.findByRole('heading', { name: 'ანა მაისურაძე' })
     expect(screen.queryByRole('button', { name: 'რედაქტირება' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'შეჩერება' })).toBeNull()
     expect(
-      screen.getByText('ამ ანგარიშზე ამჟამად ხელმისაწვდომი მოქმედება არ არის.'),
-    ).toBeVisible()
+      screen.queryByRole('button', { name: 'აღდგენის კოდის გაცემა' }),
+    ).toBeNull()
   })
 
   it('reports a missing account', async () => {

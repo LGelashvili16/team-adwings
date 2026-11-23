@@ -4,7 +4,10 @@ import { Link } from '@tanstack/react-router'
 import { IconArrowRight, IconCheck } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { authClient } from '#/lib/auth/auth-client'
-import { accountSetupFormSchema } from '#/features/access/access.schemas'
+import {
+  accountSetupFormSchema,
+  activateAccountFormSchema,
+} from '#/features/access/access.schemas'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { Input } from '#/components/ui/input'
@@ -26,7 +29,14 @@ import { PasswordInput } from '#/components/common/password-input'
 import { useHydrated } from '#/hooks/use-hydrated'
 import { authContent } from '../auth.content'
 
-const setupFields = [
+const activationFields = [
+  { name: 'code', label: 'ერთჯერადი კოდი' },
+  { name: 'username', label: 'მომხმარებლის სახელი' },
+  { name: 'newPassword', label: 'ახალი პაროლი' },
+  { name: 'confirmPassword', label: 'პაროლის გამეორება' },
+] as const
+
+const resetFields = [
   { name: 'code', label: 'ერთჯერადი კოდი' },
   { name: 'newPassword', label: 'ახალი პაროლი' },
   { name: 'confirmPassword', label: 'პაროლის გამეორება' },
@@ -40,35 +50,64 @@ export function AccountSetupForm({
   const hydrated = useHydrated()
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
-  const content =
-    purpose === 'activation' ? authContent.register : authContent.resetPassword
+  const isActivation = purpose === 'activation'
+  const fields = isActivation ? activationFields : resetFields
+  const content = isActivation ? authContent.register : authContent.resetPassword
   const form = useForm({
-    defaultValues: { code: '', newPassword: '', confirmPassword: '' },
-    validators: { onSubmit: accountSetupFormSchema },
+    defaultValues: {
+      code: '',
+      username: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+    validators: {
+      onSubmit: ({ value }) => {
+        const result = isActivation
+          ? activateAccountFormSchema.safeParse(value)
+          : accountSetupFormSchema.safeParse(value)
+        if (result.success) return undefined
+        const fieldErrors: Partial<Record<string, { message: string }>> = {}
+        for (const issue of result.error.issues) {
+          const key = issue.path[0]
+          if (typeof key === 'string' && !fieldErrors[key]) {
+            fieldErrors[key] = { message: issue.message }
+          }
+        }
+        return { fields: fieldErrors }
+      },
+    },
     onSubmit: async ({ value }) => {
       setError('')
       try {
         const result = await authClient.$fetch<{ status: boolean }>(
-          purpose === 'activation' ? '/employee-activate' : '/employee-reset',
+          isActivation ? '/employee-activate' : '/employee-reset',
           {
             method: 'POST',
-            body: { code: value.code.trim(), newPassword: value.newPassword },
+            body: isActivation
+              ? {
+                  code: value.code.trim(),
+                  username: value.username.trim().toLowerCase(),
+                  newPassword: value.newPassword,
+                }
+              : { code: value.code.trim(), newPassword: value.newPassword },
           },
         )
         if (result.error || !result.data.status) {
           setError(
             result.error?.status === 429
               ? 'ძალიან ბევრი მცდელობაა. სცადეთ მოგვიანებით.'
-              : result.error?.status === 400 || result.error?.status === 403
-                ? 'კოდი არასწორია, ვადაგასულია ან უკვე გამოყენებულია. მიმართეთ ადმინისტრატორს.'
-                : 'მოქმედება ვერ შესრულდა. შეამოწმეთ კავშირი და სცადეთ მოგვიანებით.',
+              : result.error?.status === 409
+                ? 'ეს მომხმარებლის სახელი უკვე დაკავებულია. აირჩიეთ სხვა სახელი.'
+                : result.error?.status === 400 || result.error?.status === 403
+                  ? 'კოდი არასწორია, ვადაგასულია ან უკვე გამოყენებულია. მიმართეთ ადმინისტრატორს.'
+                  : 'მოქმედება ვერ შესრულდა. შეამოწმეთ კავშირი და სცადეთ მოგვიანებით.',
           )
           return
         }
         form.reset()
         setComplete(true)
         toast.success(
-          purpose === 'activation'
+          isActivation
             ? 'ანგარიში გააქტიურებულია.'
             : 'პაროლი წარმატებით შეიცვალა.',
         )
@@ -134,18 +173,24 @@ export function AccountSetupForm({
           }}
         >
           <FieldGroup>
-            {setupFields.map(({ name, label }) => (
+            {fields.map(({ name, label }) => (
               <form.Field name={name} key={name}>
                 {(field) => {
                   const id = `setup-${name}`
                   const invalid = !field.state.meta.isValid
                   return (
                     <Field data-invalid={invalid}>
-                      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+                      <FieldLabel htmlFor={id}>
+                        {label}
+                        <span aria-hidden="true" className="text-destructive">
+                          *
+                        </span>
+                      </FieldLabel>
                       {name === 'code' ? (
                         <Input
                           id={id}
                           name={name}
+                          required
                           autoComplete="off"
                           spellCheck={false}
                           autoCapitalize="none"
@@ -158,6 +203,24 @@ export function AccountSetupForm({
                           aria-describedby={`${id}-error`}
                           className="h-10 font-mono uppercase tracking-wider"
                           placeholder="XXXX-XXXX-XXXX"
+                        />
+                      ) : name === 'username' ? (
+                        <Input
+                          id={id}
+                          name={name}
+                          required
+                          autoComplete="username"
+                          spellCheck={false}
+                          autoCapitalize="none"
+                          value={field.state.value}
+                          onBlur={field.handleBlur}
+                          onChange={(event) =>
+                            field.handleChange(event.target.value)
+                          }
+                          aria-invalid={invalid}
+                          aria-describedby={`${id}-error`}
+                          className="h-10"
+                          placeholder="მაგ: giorgi.beridze"
                         />
                       ) : (
                         <PasswordInput

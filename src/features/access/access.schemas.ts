@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { employeeRoleSchema } from '#/lib/authorization/permissions'
+import {
+  employeeRoleSchema,
+  provisionableRoleSchema,
+} from '#/lib/authorization/permissions'
 import { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
 import { dayOffDaysSchema } from '#/features/leave/day-off-allowance.schemas'
 import {
@@ -10,7 +13,7 @@ import {
   setupCodeLength,
 } from './access.rules'
 
-export { employeeRoleSchema }
+export { employeeRoleSchema, provisionableRoleSchema }
 
 export const employeeCodeSchema = z
   .string()
@@ -61,19 +64,30 @@ export const phoneSchema = z
     'მიუთითეთ სწორი ტელეფონის ნომერი.',
   )
   .default('')
+export const editableEmployeeCodeSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .pipe(z.union([z.literal(''), employeeCodeSchema]))
 export const provisionAccountSchema = z.object({
-  code: employeeCodeSchema,
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
   jobTitle: jobTitleSchema,
   phone: phoneSchema,
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
-  role: employeeRoleSchema,
+  role: provisionableRoleSchema,
 })
-/** Administrative correction of an existing employee's personal details; username and role stay fixed. */
+export const bootstrapOwnerSchema = z.object({
+  code: employeeCodeSchema,
+  name: fullNameSchema,
+  contactEmail: contactEmailSchema,
+})
+/** Administrative update of an existing employee's details, username, and single role. */
 export const employeeDetailsSchema = z.object({
   userId: accountIdSchema,
+  code: editableEmployeeCodeSchema.optional(),
+  role: provisionableRoleSchema.optional(),
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
   jobTitle: jobTitleSchema,
@@ -131,7 +145,16 @@ export const completeAccountSchema = z.object({
   code: accountCodeSchema,
   newPassword: accountPasswordSchema,
 })
+export const activateAccountSchema = completeAccountSchema.extend({
+  username: employeeCodeSchema,
+})
 export const accountSetupFormSchema = completeAccountSchema
+  .extend({ confirmPassword: z.string().min(1, 'გაიმეორეთ პაროლი.') })
+  .refine((value) => value.newPassword === value.confirmPassword, {
+    path: ['confirmPassword'],
+    message: 'პაროლები ერთმანეთს არ ემთხვევა.',
+  })
+export const activateAccountFormSchema = activateAccountSchema
   .extend({ confirmPassword: z.string().min(1, 'გაიმეორეთ პაროლი.') })
   .refine((value) => value.newPassword === value.confirmPassword, {
     path: ['confirmPassword'],

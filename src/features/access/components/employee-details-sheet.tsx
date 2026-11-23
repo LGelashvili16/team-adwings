@@ -13,6 +13,14 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
+import {
   Sheet,
   SheetClose,
   SheetContent,
@@ -21,14 +29,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from '#/components/ui/sheet'
+import { parseRoles, roleLabels } from '#/lib/authorization/permissions'
 import { updateEmployeeDetails } from '../access.functions'
-import { employeeDetailsSchema } from '../access.schemas'
+import {
+  employeeDetailsSchema,
+  employeeRoleSchema,
+  provisionableRoleSchema,
+} from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
 import type { z } from 'zod'
 import type { EmployeeAccountRecord } from '../access.types'
 
 const detailFields = [
   { name: 'name', label: 'სახელი და გვარი', autoComplete: 'off' },
+  { name: 'code', label: 'მომხმარებლის სახელი', autoComplete: 'off' },
   { name: 'contactEmail', label: 'ელფოსტა', autoComplete: 'off' },
   { name: 'jobTitle', label: 'თანამდებობა', autoComplete: 'off' },
   { name: 'phone', label: 'ტელეფონის ნომერი', autoComplete: 'off' },
@@ -37,11 +51,14 @@ const detailFields = [
 export function EmployeeDetailsSheet({
   open,
   target,
+  canAssignAdmin = false,
   canConfigureSchedule,
   onClose,
 }: {
   open: boolean
   target: EmployeeAccountRecord
+  /** Assigning or editing the admin role requires admin.access, users.manage, and roles.manage. */
+  canAssignAdmin?: boolean
   /** Editing the working week additionally requires the attendance.configure permission. */
   canConfigureSchedule: boolean
   onClose: () => void
@@ -54,8 +71,20 @@ export function EmployeeDetailsSheet({
     retry: false,
     gcTime: 0,
   })
+  const targetRoles = parseRoles(target.roles)
+  const singleRole =
+    targetRoles.length === 1 ? provisionableRoleSchema.safeParse(targetRoles[0]) : null
+  const editableRole = singleRole?.success ? singleRole.data : undefined
+  const availableRoles = canAssignAdmin
+    ? provisionableRoleSchema.options
+    : employeeRoleSchema.options
+  const allowedRoleSchema = canAssignAdmin
+    ? provisionableRoleSchema
+    : employeeRoleSchema
   const defaultValues: z.input<typeof employeeDetailsSchema> = {
     userId: target.userId,
+    code: target.code ?? '',
+    role: editableRole,
     name: target.name,
     contactEmail: target.contactEmail ?? '',
     jobTitle: target.jobTitle ?? '',
@@ -120,44 +149,99 @@ export function EmployeeDetailsSheet({
         >
           <FieldGroup className="gap-4">
             <SheetDescription>
-              მომხმარებლის სახელი ({target.code}) და როლი უცვლელია. ელფოსტის
-              შეცვლა ცვლის შესვლის ელფოსტასაც, თუ ანგარიში მას იყენებს.
+              მომხმარებლის სახელის ან შესვლის ელფოსტის შეცვლა მაშინვე აისახება
+              ანგარიშზე. როლის შეცვლისას მიმდინარე სესიები გაუქმდება.
             </SheetDescription>
             {detailFields.map(({ name, label, autoComplete }) => (
               <form.Field key={name} name={name}>
+                {(field) => {
+                  const required =
+                    name === 'name' || (name === 'code' && Boolean(target.code))
+                  return (
+                    <Field data-invalid={!field.state.meta.isValid}>
+                      <FieldLabel htmlFor={`details-${name}`}>
+                        {label}
+                        {required ? (
+                          <span aria-hidden="true" className="text-destructive">
+                            *
+                          </span>
+                        ) : null}
+                      </FieldLabel>
+                      <Input
+                        id={`details-${name}`}
+                        name={name}
+                        type={name === 'contactEmail' ? 'email' : 'text'}
+                        autoComplete={autoComplete}
+                        autoCapitalize={name === 'code' ? 'none' : undefined}
+                        spellCheck={name === 'code' ? false : undefined}
+                        required={required}
+                        disabled={mutation.isPending}
+                        value={field.state.value ?? ''}
+                        onBlur={field.handleBlur}
+                        onChange={(event) =>
+                          field.handleChange(event.target.value)
+                        }
+                        aria-invalid={!field.state.meta.isValid}
+                        aria-describedby={`details-${name}-error`}
+                      />
+                      <FieldError
+                        id={`details-${name}-error`}
+                        errors={field.state.meta.errors}
+                      />
+                    </Field>
+                  )
+                }}
+              </form.Field>
+            ))}
+            {editableRole ? (
+              <form.Field name="role">
                 {(field) => (
                   <Field data-invalid={!field.state.meta.isValid}>
-                    <FieldLabel htmlFor={`details-${name}`}>
-                      {label}
-                      {name === 'name' ? (
-                        <span aria-hidden="true" className="text-destructive">
-                          *
-                        </span>
-                      ) : null}
+                    <FieldLabel htmlFor="details-role">
+                      როლი{' '}
+                      <span aria-hidden="true" className="text-destructive">
+                        *
+                      </span>
                     </FieldLabel>
-                    <Input
-                      id={`details-${name}`}
-                      name={name}
-                      type={name === 'contactEmail' ? 'email' : 'text'}
-                      autoComplete={autoComplete}
-                      required={name === 'name'}
+                    <Select
+                      required
+                      value={field.state.value ?? editableRole}
                       disabled={mutation.isPending}
-                      value={field.state.value ?? ''}
-                      onBlur={field.handleBlur}
-                      onChange={(event) =>
-                        field.handleChange(event.target.value)
-                      }
-                      aria-invalid={!field.state.meta.isValid}
-                      aria-describedby={`details-${name}-error`}
-                    />
-                    <FieldError
-                      id={`details-${name}-error`}
-                      errors={field.state.meta.errors}
-                    />
+                      onValueChange={(value) => {
+                        const parsed = allowedRoleSchema.safeParse(value)
+                        if (parsed.success) field.handleChange(parsed.data)
+                      }}
+                    >
+                      <SelectTrigger
+                        id="details-role"
+                        className="w-full"
+                        aria-required="true"
+                        aria-invalid={!field.state.meta.isValid}
+                      >
+                        <SelectValue>
+                          {roleLabels[field.state.value ?? editableRole]}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {availableRoles.map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {roleLabels[role]}
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-            ))}
+            ) : (
+              <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+                ამ ანგარიშის როლი ({targetRoles.map((r) => roleLabels[r]).join(', ')})
+                იმართება წვდომის მართვის გვერდიდან.
+              </p>
+            )}
             {canConfigureSchedule ? (
               <form.Field name="workingWeek">
                 {(field) => (

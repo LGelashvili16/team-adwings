@@ -14,11 +14,11 @@ export function UserScheduleCard({
 }) {
   const days = week ?? companyWeek
   return (
-    <Card className="rounded-2xl py-5 sm:py-6">
-      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-5 sm:px-6">
+    <Card className="rounded-2xl py-4 sm:py-5">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 px-4 sm:px-5">
         <CardTitle className="flex items-center gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-            <IconCalendarWeek className="size-5" aria-hidden="true" />
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/70 text-muted-foreground">
+            <IconCalendarWeek className="size-4" aria-hidden="true" />
           </span>
           <h2>სამუშაო განრიგი</h2>
         </CardTitle>
@@ -26,7 +26,7 @@ export function UserScheduleCard({
           {week ? 'ინდივიდუალური' : 'კომპანიის განრიგი'}
         </Badge>
       </CardHeader>
-      <CardContent className="px-5 sm:px-6">
+      <CardContent className="px-4 sm:px-5">
         {days ? (
           <WeekStrip days={days} density="comfortable" />
         ) : (

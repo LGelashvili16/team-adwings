@@ -1,0 +1,3 @@
+ALTER TABLE "employee" DROP CONSTRAINT "employee_username_normalized";--> statement-breakpoint
+ALTER TABLE "employee" ALTER COLUMN "username" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "employee" ADD CONSTRAINT "employee_username_normalized" CHECK ("employee"."username" is null or ("employee"."username" = lower("employee"."username") and "employee"."username" ~ '^[a-z0-9][a-z0-9._-]{2,31}$'));

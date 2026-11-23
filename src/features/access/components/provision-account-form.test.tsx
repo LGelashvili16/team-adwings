@@ -31,13 +31,16 @@ beforeEach(() => {
 })
 
 describe('administrative account provisioning', () => {
-  it('offers the five employee roles in order without privileged or retired roles', async () => {
+  it('offers the five non-admin employee roles for HR without a username field', async () => {
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ProvisionAccountForm onCode={vi.fn()} canAssignRoles />
+        <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin={false} />
       </QueryClientProvider>,
     )
+    expect(
+      screen.queryByRole('textbox', { name: 'მომხმარებლის სახელი' }),
+    ).not.toBeInTheDocument()
     await user.click(screen.getByRole('combobox'))
     expect(
       (await screen.findAllByRole('option')).map(
@@ -57,15 +60,47 @@ describe('administrative account provisioning', () => {
       'გაყიდვების მენეჯერი',
     )
   })
-  it('keeps restricted provisioning on the employee role without requesting schedule settings', async () => {
+  it('adds the admin role option for owners and admins without exposing owner', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ProvisionAccountForm onCode={vi.fn()} canAssignRoles={false} />
+        <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin />
       </QueryClientProvider>,
     )
-    expect(screen.getByRole('combobox')).toBeDisabled()
+    await user.click(screen.getByRole('combobox'))
+    expect(
+      (await screen.findAllByRole('option')).map(
+        (option) => option.textContent,
+      ),
+    ).toEqual([
+      'თანამშრომელი',
+      'წარმოების სპეციალისტი',
+      'წარმოების უფროსი',
+      'გაყიდვების მენეჯერი',
+      'HR',
+      'ადმინისტრატორი',
+    ])
+    await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
+    await user.type(
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
+      'ანა მაისურაძე',
+    )
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ role: 'admin', workingWeek: null }),
+      }),
+    )
+  })
+  it('omits schedule settings when the actor cannot configure schedules', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin={false} />
+      </QueryClientProvider>,
+    )
     expect(
       screen.queryByRole('switch', { name: 'კომპანიის განრიგის გამოყენება' }),
     ).not.toBeInTheDocument()
@@ -73,10 +108,6 @@ describe('administrative account provisioning', () => {
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
       'ანა მაისურაძე',
-    )
-    await user.type(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-      'hr-worker',
     )
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() =>
@@ -97,7 +128,7 @@ describe('administrative account provisioning', () => {
       <QueryClientProvider client={new QueryClient()}>
         <ProvisionAccountForm
           onCode={vi.fn()}
-          canAssignRoles={false}
+          canAssignAdmin={false}
           canConfigureSchedule
         />
       </QueryClientProvider>,
@@ -105,10 +136,6 @@ describe('administrative account provisioning', () => {
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
       'ანა მაისურაძე',
-    )
-    await user.type(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-      'office-01',
     )
     await user.type(
       screen.getByRole('textbox', { name: 'თანამდებობა' }),
@@ -149,12 +176,8 @@ describe('administrative account provisioning', () => {
     create.mockResolvedValue({ ok: true, value: secret })
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ProvisionAccountForm onCode={onCode} canAssignRoles={false} />
+        <ProvisionAccountForm onCode={onCode} canAssignAdmin={false} />
       </QueryClientProvider>,
-    )
-    await user.type(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-      'worker-01',
     )
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
@@ -164,15 +187,11 @@ describe('administrative account provisioning', () => {
     expect(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
     ).toBeRequired()
-    expect(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-    ).toBeRequired()
     expect(screen.getByRole('textbox', { name: 'ელფოსტა' })).not.toBeRequired()
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() => expect(create).toHaveBeenCalledOnce())
     expect(create).toHaveBeenCalledWith({
       data: {
-        code: 'worker-01',
         name: 'ანა მაისურაძე',
         contactEmail: '',
         role: 'employee',
@@ -187,7 +206,7 @@ describe('administrative account provisioning', () => {
       'თანამშრომლის ანგარიში შექმნილია.',
     )
     expect(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
     ).toHaveValue('')
   })
 
@@ -195,12 +214,8 @@ describe('administrative account provisioning', () => {
     const user = userEvent.setup()
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ProvisionAccountForm onCode={vi.fn()} canAssignRoles={false} />
+        <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin={false} />
       </QueryClientProvider>,
-    )
-    await user.type(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-      'worker-02',
     )
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
@@ -213,16 +228,16 @@ describe('administrative account provisioning', () => {
     expect(error).not.toHaveBeenCalled()
   })
 
-  it('requires a name and employee code without exposing creation codes on failure', async () => {
+  it('requires a name without exposing creation codes on failure', async () => {
     const user = userEvent.setup()
     const onCode = vi.fn()
     create.mockResolvedValue({
       ok: false,
-      message: 'მომხმარებლის სახელი უკვე გამოიყენება.',
+      message: 'ელფოსტა უკვე გამოიყენება.',
     })
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <ProvisionAccountForm onCode={onCode} canAssignRoles={false} />
+        <ProvisionAccountForm onCode={onCode} canAssignAdmin={false} />
       </QueryClientProvider>,
     )
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
@@ -232,18 +247,12 @@ describe('administrative account provisioning', () => {
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
       'ანა მაისურაძე',
     )
-    await user.type(
-      screen.getByRole('textbox', { name: 'მომხმარებლის სახელი' }),
-      'worker-01',
-    )
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'მომხმარებლის სახელი უკვე გამოიყენება.',
+      'ელფოსტა უკვე გამოიყენება.',
     )
     expect(onCode).not.toHaveBeenCalled()
-    expect(error).toHaveBeenCalledExactlyOnceWith(
-      'მომხმარებლის სახელი უკვე გამოიყენება.',
-    )
+    expect(error).toHaveBeenCalledExactlyOnceWith('ელფოსტა უკვე გამოიყენება.')
     expect(success).not.toHaveBeenCalled()
   })
 })

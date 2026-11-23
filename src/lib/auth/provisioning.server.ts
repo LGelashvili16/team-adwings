@@ -11,7 +11,7 @@ import type { AccessTransaction } from '#/features/access/server/access.reposito
 export async function provisionIdentity(
   tx: AccessTransaction,
   name: string,
-  code: string,
+  code: string | null,
   contactEmail: string,
 ) {
   const provisioning = betterAuth({
@@ -37,7 +37,7 @@ export async function provisionIdentity(
       email:
         contactEmail ||
         `employee-${randomBytes(16).toString('hex')}${syntheticAuthEmailSuffix}`,
-      username: code,
+      ...(code ? { username: code } : {}),
       password: randomBytes(48).toString('base64url'),
     },
   })

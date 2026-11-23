@@ -330,6 +330,13 @@
       "when": 1795424361330,
       "tag": "0046_gps_device_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795431332330,
+      "tag": "0047_nullable_employee_username",
+      "breakpoints": true
     }
   ]
 }

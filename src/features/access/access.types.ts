@@ -6,7 +6,7 @@ export interface IssuedAccountCode {
   purpose: 'activation' | 'reset'
 }
 export interface OwnEmployeeProfile {
-  code: string
+  code: string | null
   jobTitle: string | null
   phone: string | null
 }
@@ -14,7 +14,7 @@ export interface OwnEmployeeProfile {
 export interface EmployeeAccountSummary {
   userId: string
   name: string
-  code: string
+  code: string | null
   jobTitle: string | null
   roles: string
   state: string

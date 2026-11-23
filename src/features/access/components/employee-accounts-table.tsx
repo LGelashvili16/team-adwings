@@ -59,8 +59,14 @@ export function EmployeeAccountsTable({
                         <Badge variant="secondary">თქვენ</Badge>
                       ) : null}
                     </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {record.code}
+                    <span
+                      className={
+                        record.code
+                          ? 'font-mono text-xs text-muted-foreground'
+                          : 'text-xs text-muted-foreground'
+                      }
+                    >
+                      {record.code ?? 'მომხმარებლის სახელი ჯერ არ არის არჩეული'}
                     </span>
                   </div>
                 </div>

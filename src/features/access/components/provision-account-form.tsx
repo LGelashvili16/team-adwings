@@ -25,13 +25,16 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { roleLabels } from '#/lib/authorization/permissions'
 import { createEmployeeAccount } from '../access.functions'
-import { employeeRoleSchema, provisionAccountSchema } from '../access.schemas'
+import {
+  employeeRoleSchema,
+  provisionableRoleSchema,
+  provisionAccountSchema,
+} from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
 import type { z } from 'zod'
 import type { IssuedAccountCode } from '../access.types'
 
 const defaults: z.input<typeof provisionAccountSchema> = {
-  code: '',
   name: '',
   contactEmail: '',
   role: 'employee',
@@ -46,12 +49,6 @@ const textFields = [
     label: 'სახელი და გვარი',
     required: true,
     autoComplete: 'name',
-  },
-  {
-    name: 'code',
-    label: 'მომხმარებლის სახელი',
-    required: true,
-    autoComplete: 'off',
   },
   {
     name: 'contactEmail',
@@ -75,17 +72,23 @@ const textFields = [
 
 export function ProvisionAccountForm({
   onCode,
-  canAssignRoles,
+  canAssignAdmin = false,
   canConfigureSchedule = false,
   framed = true,
   onPendingChange,
 }: {
   onCode: (value: IssuedAccountCode) => void
-  canAssignRoles: boolean
+  canAssignAdmin?: boolean
   canConfigureSchedule?: boolean
   framed?: boolean
   onPendingChange?: (pending: boolean) => void
 }) {
+  const availableRoles = canAssignAdmin
+    ? provisionableRoleSchema.options
+    : employeeRoleSchema.options
+  const allowedRoleSchema = canAssignAdmin
+    ? provisionableRoleSchema
+    : employeeRoleSchema
   const settings = useQuery(dayOffSettingsQuery())
   const client = useQueryClient()
   const [error, setError] = useState('')
@@ -156,8 +159,6 @@ export function ProvisionAccountForm({
                         : 'text'
                   }
                   required={required}
-                  autoCapitalize={name === 'code' ? 'none' : undefined}
-                  spellCheck={name === 'code' ? false : undefined}
                   value={field.state.value ?? ''}
                   onBlur={field.handleBlur}
                   onChange={(event) => field.handleChange(event.target.value)}
@@ -184,9 +185,9 @@ export function ProvisionAccountForm({
               <Select
                 required
                 value={field.state.value}
-                disabled={!canAssignRoles}
+                disabled={mutation.isPending}
                 onValueChange={(value) => {
-                  const parsed = employeeRoleSchema.safeParse(value)
+                  const parsed = allowedRoleSchema.safeParse(value)
                   if (parsed.success) field.handleChange(parsed.data)
                 }}
               >
@@ -200,7 +201,7 @@ export function ProvisionAccountForm({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {employeeRoleSchema.options.map((role) => (
+                    {availableRoles.map((role) => (
                       <SelectItem key={role} value={role}>
                         {roleLabels[role]}
                       </SelectItem>
