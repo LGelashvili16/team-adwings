@@ -119,10 +119,15 @@ export async function listOwnNotifications(
   input: unknown,
 ): Promise<NotificationList> {
   if (!actor) throw new AuthorizationError()
-  const { limit, offset } = notificationListSchema.parse(input)
-  const result = await repository.listForRecipient(actor.id, limit, offset)
+  const { limit, offset, scope, unreadOnly } =
+    notificationListSchema.parse(input)
+  const result = await repository.listForRecipient(actor.id, limit, offset, {
+    scope,
+    unreadOnly,
+  })
   return {
     unseenCount: result.unseenCount,
+    totalCount: result.totalCount,
     hasMore: result.items.length > limit,
     items: result.items.slice(0, limit).map((item) => ({
       ...item,
@@ -140,6 +145,11 @@ export async function listOwnNotifications(
       seenAt: item.seenAt?.toISOString() ?? null,
     })),
   }
+}
+
+export async function clearOwnNotificationPopup(actor: Actor | null) {
+  if (!actor) throw new AuthorizationError()
+  return repository.dismissPopupForRecipient(actor.id)
 }
 
 export async function markOwnNotificationsSeen(

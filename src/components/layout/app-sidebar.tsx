@@ -37,12 +37,14 @@ export function AppSidebar({
   footer,
   hasUnreadAnnouncements = false,
   hasUnreadComplaints = false,
+  hasUnreadNotifications = false,
 }: {
   actor: Actor
   inset?: boolean
   footer?: ReactNode
   hasUnreadAnnouncements?: boolean
   hasUnreadComplaints?: boolean
+  hasUnreadNotifications?: boolean
 }) {
   const pathname = useLocation({ select: (location) => location.pathname })
   const { setOpenMobile, isMobile } = useSidebar()
@@ -164,6 +166,19 @@ export function AppSidebar({
                           />
                           <span className="sr-only">
                             , წაუკითხავი საჩივრები
+                          </span>
+                        </>
+                      ) : null}
+                      {item.to === '/notifications' &&
+                      hasUnreadNotifications ? (
+                        <>
+                          <span
+                            aria-hidden="true"
+                            data-slot="notification-sidebar-unread-dot"
+                            className="ml-auto size-2 shrink-0 rounded-full bg-destructive"
+                          />
+                          <span className="sr-only">
+                            , წაუკითხავი შეტყობინებები
                           </span>
                         </>
                       ) : null}

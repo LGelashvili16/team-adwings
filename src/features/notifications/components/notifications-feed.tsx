@@ -17,14 +17,22 @@ export function NotificationsFeed({
   actorId,
   limit = 5,
   offset = 0,
+  scope = 'all',
+  unreadOnly = false,
+  variant = 'popover',
   onNavigate,
 }: {
   actorId: string
   limit?: number
   offset?: number
+  scope?: 'all' | 'popup'
+  unreadOnly?: boolean
+  variant?: 'popover' | 'page'
   onNavigate?: () => void
 }) {
-  const query = useQuery(notificationsQueryOptions(actorId, limit, offset))
+  const query = useQuery(
+    notificationsQueryOptions(actorId, limit, offset, { scope, unreadOnly }),
+  )
   const markSeen = useMarkNotificationsSeen(actorId)
   const markUnseen = useMarkNotificationsUnseen(actorId)
   if (query.isPending) return <NotificationsLoading />
@@ -39,6 +47,7 @@ export function NotificationsFeed({
         </p>
         <Button
           variant="outline"
+          depth="raised"
           disabled={query.isFetching}
           aria-busy={query.isFetching}
           onClick={async () => {
@@ -57,6 +66,7 @@ export function NotificationsFeed({
   return (
     <NotificationList
       actorId={actorId}
+      variant={variant}
       onNavigate={onNavigate}
       items={query.data.items}
       pendingIds={markSeen.pendingIds}

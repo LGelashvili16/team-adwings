@@ -7,6 +7,7 @@ import {
   notificationListSchema,
 } from './notifications.schemas'
 import {
+  clearOwnNotificationPopup,
   listOwnNotifications,
   markOwnNotificationsSeen,
   markOwnNotificationsUnseen,
@@ -81,6 +82,24 @@ export const markAllOwnNotifications = createServerFn({ method: 'POST' })
       return {
         ok: false as const,
         message: 'მონიშვნა ვერ მოხერხდა. სცადეთ ხელახლა.',
+      }
+    }
+  })
+
+export const clearOwnNotificationsPopup = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(markAllNotificationsSeenSchema)
+  .handler(async ({ context }) => {
+    setResponseHeader('Cache-Control', 'private, no-store')
+    try {
+      return {
+        ok: true as const,
+        value: await clearOwnNotificationPopup(context.actor),
+      }
+    } catch {
+      return {
+        ok: false as const,
+        message: 'გასუფთავება ვერ მოხერხდა. სცადეთ ხელახლა.',
       }
     }
   })

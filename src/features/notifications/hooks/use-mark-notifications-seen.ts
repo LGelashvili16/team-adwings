@@ -5,11 +5,31 @@ import {
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
+  clearOwnNotificationsPopup,
   markOwnNotifications,
   markOwnNotificationsAsUnseen,
   markAllOwnNotifications,
 } from '../notifications.functions'
 import { notificationKeys } from '../notifications.queries'
+
+export function useClearNotificationsPopup(actorId: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationKey: [...notificationKeys.own(actorId), 'clear-popup'],
+    mutationFn: async () => {
+      const result = await clearOwnNotificationsPopup({ data: {} })
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    onSuccess: async () => {
+      toast.success('შეტყობინებები გასუფთავდა.')
+      await client.invalidateQueries({
+        queryKey: notificationKeys.own(actorId),
+      })
+    },
+    onError: () => toast.error('გასუფთავება ვერ მოხერხდა. სცადეთ ხელახლა.'),
+  })
+}
 
 export function useMarkNotificationsSeen(actorId: string) {
   return useNotificationSeenState(actorId, true)

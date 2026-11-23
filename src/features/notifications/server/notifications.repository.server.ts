@@ -177,12 +177,16 @@ export async function listForRecipient(
   recipientId: string,
   limit: number,
   offset: number,
+  options?: { scope?: 'all' | 'popup'; unreadOnly?: boolean },
 ) {
+  const scope = options?.scope ?? 'all'
+  const unreadOnly = options?.unreadOnly ?? false
   return db.transaction(
     async (tx) => {
       // Also hides self-delivery rows from publications created before author exclusion.
-      const visible = and(
+      const baseVisible = and(
         eq(notification.recipientId, recipientId),
+        scope === 'popup' ? isNull(notification.popupDismissedAt) : undefined,
         notExists(
           tx
             .select({ id: announcement.id })
@@ -195,6 +199,9 @@ export async function listForRecipient(
             ),
         ),
       )
+      const listFilter = unreadOnly
+        ? and(baseVisible, isNull(notification.seenAt))
+        : baseVisible
       const items = await tx
         .select({
           id: notification.id,
@@ -207,18 +214,43 @@ export async function listForRecipient(
           seenAt: notification.seenAt,
         })
         .from(notification)
-        .where(visible)
+        .where(listFilter)
         .orderBy(desc(notification.createdAt), desc(notification.id))
         .limit(limit + 1)
         .offset(offset)
-      const [summary] = await tx
-        .select({ value: count() })
-        .from(notification)
-        .where(and(visible, isNull(notification.seenAt)))
-      return { items, unseenCount: summary.value }
+      const [unseenSummary, totalSummary] = await Promise.all([
+        tx
+          .select({ value: count() })
+          .from(notification)
+          .where(and(baseVisible, isNull(notification.seenAt))),
+        tx.select({ value: count() }).from(notification).where(listFilter),
+      ])
+      return {
+        items,
+        unseenCount: unseenSummary[0].value,
+        totalCount: totalSummary[0].value,
+      }
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
+}
+
+export async function dismissPopupForRecipient(recipientId: string) {
+  return db.transaction(async (tx) => {
+    const updated = await tx
+      .update(notification)
+      .set({ popupDismissedAt: sql`now()` })
+      .where(
+        and(
+          eq(notification.recipientId, recipientId),
+          isNull(notification.popupDismissedAt),
+        ),
+      )
+      .returning({ id: notification.id })
+    if (updated.length)
+      await signalRealtime(tx, { topic: 'notifications', recipientId })
+    return { clearedCount: updated.length }
+  })
 }
 
 export function markSeenForRecipient(recipientId: string, ids: Array<string>) {

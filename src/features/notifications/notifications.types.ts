@@ -15,5 +15,6 @@ export type NotificationItem = {
 export type NotificationList = {
   items: Array<NotificationItem>
   unseenCount: number
+  totalCount: number
   hasMore: boolean
 }

@@ -25,6 +25,9 @@ export const notificationDestinationSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal('job'), jobId: z.uuid() }).strict(),
   z.object({ kind: z.literal('jobs') }).strict(),
+  z.object({ kind: z.literal('devices') }).strict(),
+  z.object({ kind: z.literal('security') }).strict(),
+  z.object({ kind: z.literal('attendance_clock') }).strict(),
 ])
 export const deliverNotificationsSchema = z
   .object({
@@ -70,6 +73,18 @@ export const notificationListSchema = z.object({
     .int({ error: 'გვერდი არასწორია.' })
     .min(0, 'გვერდი არასწორია.')
     .max(100000, 'გვერდების ზღვარი მიღწეულია.'),
+  scope: z.enum(['all', 'popup']).optional(),
+  unreadOnly: z.boolean().optional(),
+})
+
+export const notificationPageSearchSchema = z.object({
+  page: z.coerce
+    .number()
+    .int('გვერდი არასწორია.')
+    .min(1, 'გვერდი არასწორია.')
+    .max(5000, 'გვერდი არასწორია.')
+    .default(1),
+  filter: z.enum(['all', 'unread']).default('all'),
 })
 
 export const markNotificationsSeenSchema = z.object({

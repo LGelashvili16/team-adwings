@@ -337,6 +337,13 @@
       "when": 1795431332330,
       "tag": "0047_nullable_employee_username",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795434597841,
+      "tag": "0048_notification_popup_dismissed",
+      "breakpoints": true
     }
   ]
 }

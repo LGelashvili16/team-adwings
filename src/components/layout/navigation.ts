@@ -30,18 +30,7 @@ import {
 import type { Permission } from '#/lib/authorization/permissions'
 
 export const navigationItems = [
-  {
-    to: '/manage/devices',
-    icon: IconShieldLock,
-    label: 'დასწრების მოწყობილობები',
-    permission: 'attendance.devices.manage',
-  },
-  {
-    to: '/admin/access',
-    icon: IconUserShield,
-    label: 'მომხმარებლების წვდომა',
-    permission: 'users.manage',
-  },
+  // Personal workspace (high priority first)
   {
     to: '/dashboard',
     icon: IconLayoutDashboard,
@@ -55,10 +44,9 @@ export const navigationItems = [
     permission: null,
   },
   {
-    to: '/timesheets',
-    secondary: true,
-    icon: IconCalendarStats,
-    label: 'სამუშაო საათები',
+    to: '/jobs',
+    icon: IconMapPin,
+    label: 'სამუშაოების რუკა',
     permission: null,
   },
   {
@@ -68,18 +56,17 @@ export const navigationItems = [
     permission: null,
   },
   {
-    to: '/jobs',
-    icon: IconMapPin,
-    label: 'სამუშაოების რუკა',
-    permission: null,
-  },
-  {
     to: '/leave',
     icon: IconCalendarOff,
     label: 'შვებულება & ბიულეტენი',
     permission: null,
   },
-
+  {
+    to: '/notifications',
+    icon: IconBell,
+    label: 'შეტყობინებები',
+    permission: null,
+  },
   {
     to: '/announcements',
     icon: IconSpeakerphone,
@@ -93,10 +80,10 @@ export const navigationItems = [
     permission: null,
   },
   {
-    to: '/notifications',
+    to: '/timesheets',
     secondary: true,
-    icon: IconBell,
-    label: 'შეტყობინებები',
+    icon: IconCalendarStats,
+    label: 'სამუშაო საათები',
     permission: null,
   },
   {
@@ -113,23 +100,16 @@ export const navigationItems = [
     label: 'ანგარიშის უსაფრთხოება',
     permission: null,
   },
+  // Management (high priority first)
   {
-    to: '/manage/schedule',
-    icon: IconCalendarCog,
-    label: 'სამუშაო განრიგი',
-    permission: 'attendance.configure',
-  },
-  {
-    to: '/manage/gps',
-    icon: IconGps,
-    label: 'GPS მოწყობილობები',
-    permission: 'gps.read',
-  },
-  {
-    to: '/manage/teams',
-    icon: IconUsers,
-    label: 'გუნდები',
-    permission: 'teams.manage',
+    to: '/manage/attendance',
+    icon: IconClock,
+    label: 'დასწრებები',
+    permission: [
+      'attendance.read.all',
+      'attendance.read.team',
+      'timesheets.review.team',
+    ],
   },
   {
     to: '/manage/employees',
@@ -143,7 +123,30 @@ export const navigationItems = [
     label: 'შვებულება & ბიულეტენი',
     permission: 'leave.review',
   },
-
+  {
+    to: '/manage/schedule',
+    icon: IconCalendarCog,
+    label: 'სამუშაო განრიგი',
+    permission: 'attendance.configure',
+  },
+  {
+    to: '/manage/teams',
+    icon: IconUsers,
+    label: 'გუნდები',
+    permission: 'teams.manage',
+  },
+  {
+    to: '/manage/gps',
+    icon: IconGps,
+    label: 'GPS მოწყობილობები',
+    permission: 'gps.read',
+  },
+  {
+    to: '/manage/devices',
+    icon: IconShieldLock,
+    label: 'დასწრების მოწყობილობები',
+    permission: 'attendance.devices.manage',
+  },
   {
     to: '/manage/announcements',
     icon: IconSpeakerphone,
@@ -162,11 +165,12 @@ export const navigationItems = [
     label: 'რეპორტები',
     permission: 'reports.read',
   },
+  // Administration (high priority first)
   {
-    to: '/admin/invitations',
-    icon: IconMailPlus,
-    label: 'მოწვევები',
-    permission: 'invitations.manage',
+    to: '/admin/access',
+    icon: IconUserShield,
+    label: 'მომხმარებლების წვდომა',
+    permission: 'users.manage',
   },
   {
     to: '/admin/roles',
@@ -175,20 +179,40 @@ export const navigationItems = [
     permission: 'roles.manage',
   },
   {
+    to: '/admin/settings/security',
+    icon: IconShieldLock,
+    label: 'უსაფრთხოების პოლიტიკა',
+    permission: 'security.configure',
+  },
+  {
     to: '/admin/settings/company',
     icon: IconBuildingCommunity,
     label: 'კომპანიის პარამეტრები',
     permission: 'company.configure',
   },
   {
-    to: '/manage/attendance',
-    icon: IconClock,
-    label: 'დასწრებები',
-    permission: [
-      'attendance.read.all',
-      'attendance.read.team',
-      'timesheets.review.team',
-    ],
+    to: '/admin/settings/notifications',
+    icon: IconBellCog,
+    label: 'შეტყობინებების პარამეტრები',
+    permission: 'notifications.configure',
+  },
+  {
+    to: '/admin/integrations',
+    icon: IconPlugConnected,
+    label: 'ინტეგრაციები',
+    permission: 'integrations.manage',
+  },
+  {
+    to: '/admin/audit-log',
+    icon: IconFileSearch,
+    label: 'მოქმედებების ჟურნალი',
+    permission: 'audit.read',
+  },
+  {
+    to: '/admin/invitations',
+    icon: IconMailPlus,
+    label: 'მოწვევები',
+    permission: 'invitations.manage',
   },
   {
     to: '/admin/settings/approvals',
@@ -203,34 +227,10 @@ export const navigationItems = [
     permission: 'leave.configure',
   },
   {
-    to: '/admin/settings/security',
-    icon: IconShieldLock,
-    label: 'უსაფრთხოების პოლიტიკა',
-    permission: 'security.configure',
-  },
-  {
-    to: '/admin/settings/notifications',
-    icon: IconBellCog,
-    label: 'შეტყობინებების პარამეტრები',
-    permission: 'notifications.configure',
-  },
-  {
     to: '/admin/locations',
     icon: IconMapPin,
     label: 'სამუშაო ადგილები',
     permission: 'locations.manage',
-  },
-  {
-    to: '/admin/integrations',
-    icon: IconPlugConnected,
-    label: 'ინტეგრაციები',
-    permission: 'integrations.manage',
-  },
-  {
-    to: '/admin/audit-log',
-    icon: IconFileSearch,
-    label: 'მოქმედებების ჟურნალი',
-    permission: 'audit.read',
   },
 ] as const satisfies ReadonlyArray<{
   to: string

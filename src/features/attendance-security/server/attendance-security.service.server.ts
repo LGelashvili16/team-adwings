@@ -164,6 +164,7 @@ async function notifyReviewers(
       actorId,
       title: 'მოწყობილობის დადასტურება',
       body: 'თანამშრომლის დასწრების მოწყობილობა დასადასტურებელია.',
+      destination: { kind: 'devices' },
     })
 }
 async function enforceDeviceCapacity(

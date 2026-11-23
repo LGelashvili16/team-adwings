@@ -29,6 +29,7 @@ function renderSidebar(
   permissionOverrides?: PermissionOverrides,
   hasUnreadAnnouncements = false,
   hasUnreadComplaints = false,
+  hasUnreadNotifications = false,
 ) {
   return render(
     <SidebarProvider>
@@ -36,6 +37,7 @@ function renderSidebar(
       <AppSidebar
         hasUnreadAnnouncements={hasUnreadAnnouncements}
         hasUnreadComplaints={hasUnreadComplaints}
+        hasUnreadNotifications={hasUnreadNotifications}
         inset={inset}
         actor={{
           id: 'test',
@@ -51,6 +53,24 @@ function renderSidebar(
 }
 
 describe('workspace navigation', () => {
+  it('labels the notification unread dot accessibly on the sidebar link', () => {
+    const { container } = renderSidebar(
+      'employee',
+      false,
+      undefined,
+      false,
+      false,
+      true,
+    )
+    expect(
+      screen.getByRole('link', {
+        name: /შეტყობინებები.*წაუკითხავი შეტყობინებები/,
+      }),
+    ).toHaveAttribute('href', '/notifications')
+    expect(
+      container.querySelector('[data-slot="notification-sidebar-unread-dot"]'),
+    ).toHaveAttribute('aria-hidden', 'true')
+  })
   it('labels the announcement unread dot accessibly without adding another header icon', () => {
     const { container } = renderSidebar('employee', false, undefined, true)
     expect(
@@ -326,9 +346,10 @@ describe('workspace navigation', () => {
     for (const name of [
       'მთავარი გვერდი',
       'დასწრება',
-      'ჩემი განრიგი',
       'სამუშაოების რუკა',
+      'ჩემი განრიგი',
       'შვებულება & ბიულეტენი',
+      'შეტყობინებები',
     ]) {
       expect(screen.getByRole('link', { name })).toBeInTheDocument()
     }
@@ -336,7 +357,6 @@ describe('workspace navigation', () => {
       'დასწრების ისტორია',
       'დროის შესწორებები',
       'სამუშაო საათები',
-      'შეტყობინებები',
       'ჩემი პროფილი',
       'ანგარიშის უსაფრთხოება',
       'სამუშაო სივრცეში დაწყება',
