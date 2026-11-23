@@ -1,8 +1,14 @@
 import { useEffect } from 'react'
 import { useForm } from '@tanstack/react-form'
+import { IconSearch, IconX } from '@tabler/icons-react'
 import { z } from 'zod'
 import { Field, FieldError, FieldLabel } from '#/components/ui/field'
-import { Input } from '#/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import { gpsSearchText } from '../gps.schemas'
 import type { GpsSearch } from '../gps.schemas'
 
@@ -56,16 +62,40 @@ function SearchInput({
     return () => clearTimeout(timer)
   }, [value, onCommit])
   return (
-    <Field className="max-w-sm">
-      <FieldLabel htmlFor="gps-search">მოწყობილობის ძიება</FieldLabel>
-      <Input
-        id="gps-search"
-        value={value}
-        onChange={(e) => onValue(e.target.value)}
-        maxLength={80}
-        aria-invalid={errors.length > 0}
-      />
-      <FieldError errors={errors} />
+    <Field className="max-w-sm" data-invalid={errors.length > 0}>
+      <FieldLabel htmlFor="gps-search" className="sr-only">
+        მოწყობილობის ძიება
+      </FieldLabel>
+      <InputGroup>
+        <InputGroupAddon>
+          <IconSearch aria-hidden="true" />
+        </InputGroupAddon>
+        <InputGroupInput
+          id="gps-search"
+          type="search"
+          placeholder="ძიება"
+          value={value}
+          onChange={(e) => onValue(e.target.value)}
+          maxLength={80}
+          aria-invalid={errors.length > 0}
+          aria-describedby="gps-search-error"
+        />
+        {value ? (
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton
+              size="icon-xs"
+              aria-label="ძიების გასუფთავება"
+              onClick={() => {
+                onValue('')
+                onCommit('')
+              }}
+            >
+              <IconX aria-hidden="true" />
+            </InputGroupButton>
+          </InputGroupAddon>
+        ) : null}
+      </InputGroup>
+      <FieldError id="gps-search-error" errors={errors} />
     </Field>
   )
 }

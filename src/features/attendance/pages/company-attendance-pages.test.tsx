@@ -293,14 +293,13 @@ describe('company attendance navigation', () => {
       'datetime',
       '2026-11-02',
     )
-    expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'თვე' })).toHaveAttribute(
-      'aria-current',
+    expect(screen.getByRole('tab', { name: 'თვე' })).toHaveAttribute(
+      'aria-selected',
       'true',
     )
     expect(
       screen.getByRole('button', { name: 'სამუშაო თვის არჩევა' }),
-    ).toHaveTextContent('ნოემბერი 2026')
+    ).toHaveTextContent('ნოე 2026')
     expect(calls.detail).toHaveBeenCalledWith({
       data: { userId: 'worker', date: '2026-11-15', period: 'month' },
     })
@@ -377,7 +376,7 @@ describe('company attendance navigation', () => {
     expect(screen.getAllByRole('table')).toHaveLength(1)
     expect(
       screen.getByRole('button', { name: 'სამუშაო კვირის არჩევა' }),
-    ).toHaveTextContent('2 ნოემბერი 2026 - 8 ნოემბერი 2026')
+    ).toHaveTextContent('2 ნოე 2026 - 8 ნოე 2026')
     expect(screen.getByRole('button', { name: 'შემდეგი კვირა' })).toBeDisabled()
     expect(
       screen.getByRole('button', { name: 'მიმდინარე კვირა' }),
@@ -415,7 +414,7 @@ describe('company attendance navigation', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: 'სამუშაო კვირის არჩევა' }),
-    ).toHaveTextContent('2 ნოემბერი 2026 - 8 ნოემბერი 2026')
+    ).toHaveTextContent('2 ნოე 2026 - 8 ნოე 2026')
   })
 })
 

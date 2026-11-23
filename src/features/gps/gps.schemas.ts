@@ -54,6 +54,29 @@ export const gpsHistorySearch = z
   })
 export type GpsHistorySearch = z.output<typeof gpsHistorySearch>
 
+export const GPS_PHONE_PREFIX = '+995'
+
+export function stripGpsPhonePrefix(value: string) {
+  return value.trimStart().replace(/^\+995[\s-]*/, '')
+}
+
+export const gpsPhoneSchema = z
+  .string()
+  .trim()
+  .max(32, 'ტელეფონის ნომერი ძალიან გრძელია.')
+  .transform((value) => {
+    const local = stripGpsPhonePrefix(value).trim()
+    return local ? `${GPS_PHONE_PREFIX} ${local}` : ''
+  })
+  .refine((value) => {
+    if (value === '') return true
+    if (value.length > 32) return false
+    if (!/^\+995 [0-9][0-9 ()-]{4,25}[0-9]$/.test(value)) return false
+    const localDigits = value.slice(GPS_PHONE_PREFIX.length).replace(/\D/g, '')
+    return localDigits.length === 9
+  }, 'მიუთითეთ სწორი ტელეფონის ნომერი.')
+  .default('')
+
 export const gpsDeviceSchema = z.object({
   name: z
     .string()
@@ -67,6 +90,7 @@ export const gpsDeviceSchema = z.object({
       /^(?=[0-9]*[1-9])[0-9]{5,20}$/,
       'მიუთითეთ მოწყობილობის 5-დან 20-მდე ციფრიანი იდენტიფიკატორი.',
     ),
+  phone: gpsPhoneSchema,
   enabled: z.boolean({ error: 'მიუთითეთ მოწყობილობის სტატუსი.' }),
 })
 export const gpsSaveSchema = z.union(

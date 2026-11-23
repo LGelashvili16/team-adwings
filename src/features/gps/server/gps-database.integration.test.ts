@@ -28,7 +28,12 @@ const owner: Actor = {
   roles: ['owner'],
 }
 const reportedId = '009590038494'
-const settings = { name: 'საცდელი მოწყობილობა', reportedId, enabled: true }
+const settings = {
+  name: 'საცდელი მოწყობილობა',
+  reportedId,
+  phone: '',
+  enabled: true,
+}
 const all = (input: { q?: string } = {}) =>
   gpsMapSchema.parse({ ...input, includeDisabled: true })
 
@@ -54,6 +59,7 @@ beforeAll(async () => {
   await client.query(
     readFileSync('drizzle/0045_gps_telemetry_diagnostics.sql', 'utf8'),
   )
+  await client.query(readFileSync('drizzle/0046_gps_device_phone.sql', 'utf8'))
 })
 
 afterAll(async () => {

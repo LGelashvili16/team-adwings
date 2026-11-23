@@ -12,6 +12,7 @@ import {
   IconCopy,
   IconCrosshair,
   IconGps,
+  IconPhone,
   IconRoute,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
@@ -344,6 +345,16 @@ export function GpsHistoryPage({
                   </Button>
                 </span>
                 <Badge variant="outline">JT808</Badge>
+                {history.device.phone && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                    <IconPhone
+                      className="size-3.5 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="sr-only">ტელეფონის ნომერი:</span>
+                    {history.device.phone}
+                  </span>
+                )}
               </>
             )}
           </div>

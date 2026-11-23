@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChangePasswordForm } from './change-password-form'
 
@@ -49,5 +50,14 @@ describe('change password form', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'მიმდინარე პაროლი არასწორია.',
     )
+  })
+
+  it('uses POST and disables submission during SSR to prevent password URL exposure', () => {
+    const html = renderToString(<ChangePasswordForm />)
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('form')?.getAttribute('method')).toBe('post')
+    expect(
+      doc.querySelector('button[type="submit"]')?.hasAttribute('disabled'),
+    ).toBe(true)
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useForm } from '@tanstack/react-form'
+import { IconSearch } from '@tabler/icons-react'
 import type { z } from 'zod'
 import {
   securityListSchema,
@@ -11,7 +12,11 @@ import {
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
-import { Input } from '#/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -70,28 +75,37 @@ export function DeviceFilters({
       <FieldGroup className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <form.Field name="q">
           {(field) => (
-            <Field className="w-full min-w-0 sm:max-w-sm">
+            <Field
+              className="w-full min-w-0 sm:max-w-sm"
+              data-invalid={!field.state.meta.isValid}
+            >
               <FieldLabel htmlFor="device-search">ძიება</FieldLabel>
-              <Input
-                id="device-search"
-                value={field.state.value}
-                onChange={(event) => {
-                  const q = event.target.value
-                  field.handleChange(q)
-                  if (timer.current) clearTimeout(timer.current)
-                  timer.current = setTimeout(() => {
-                    const parsed = securityListSchema.safeParse({
-                      ...search,
-                      q,
-                      page: 1,
-                    })
-                    if (parsed.success) onChange(parsed.data)
-                  }, 300)
-                }}
-                aria-describedby="device-search-error"
-                onBlur={field.handleBlur}
-                aria-invalid={!field.state.meta.isValid}
-              />
+              <InputGroup>
+                <InputGroupAddon>
+                  <IconSearch aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="device-search"
+                  placeholder="თანამშრომელი ან მოწყობილობა"
+                  value={field.state.value}
+                  onChange={(event) => {
+                    const q = event.target.value
+                    field.handleChange(q)
+                    if (timer.current) clearTimeout(timer.current)
+                    timer.current = setTimeout(() => {
+                      const parsed = securityListSchema.safeParse({
+                        ...search,
+                        q,
+                        page: 1,
+                      })
+                      if (parsed.success) onChange(parsed.data)
+                    }, 300)
+                  }}
+                  aria-describedby="device-search-error"
+                  onBlur={field.handleBlur}
+                  aria-invalid={!field.state.meta.isValid}
+                />
+              </InputGroup>
               <FieldError
                 id="device-search-error"
                 errors={field.state.meta.errors}

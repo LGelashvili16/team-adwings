@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
-import { Input } from '#/components/ui/input'
+import { IconSearch } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import {
   Field,
@@ -8,6 +8,11 @@ import {
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import { leaveSearchSchema, leaveFilterSchema } from '../leave.schemas'
 import type { LeaveSearch as Search } from '../leave.schemas'
 import { LeaveSelect } from './leave-select'
@@ -107,21 +112,26 @@ export function LeaveSearch({
         <form.Field name="q">
           {(field) => (
             <Field
-              className="min-w-0 flex-1"
+              className="min-w-0 flex-1 sm:max-w-sm"
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel htmlFor="leave-search" className="sr-only">
                 მოთხოვნების ძიება
               </FieldLabel>
-              <Input
-                id="leave-search"
-                placeholder="სახელი ან კომენტარი"
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-                onBlur={field.handleBlur}
-                aria-invalid={!field.state.meta.isValid}
-                aria-describedby="leave-search-error"
-              />
+              <InputGroup>
+                <InputGroupAddon>
+                  <IconSearch aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="leave-search"
+                  placeholder="სახელი ან კომენტარი"
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  aria-invalid={!field.state.meta.isValid}
+                  aria-describedby="leave-search-error"
+                />
+              </InputGroup>
               <FieldError
                 id="leave-search-error"
                 errors={field.state.meta.errors}

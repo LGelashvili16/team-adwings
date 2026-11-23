@@ -320,24 +320,59 @@ export function TeamEditor({
                     }}
                   />
                 )}
-                {initial?.active && (
-                  <section className="border-t pt-4">
-                    <Button
-                      type="button"
-                      variant={draft.active ? 'destructive' : 'outline'}
-                      disabled={mutation.isPending || draft.members.length > 0}
-                      onClick={() =>
-                        form.setFieldValue('active', !draft.active)
-                      }
-                    >
-                      <IconArchive
-                        data-icon="inline-start"
-                        aria-hidden="true"
-                      />
-                      {draft.active ? 'გუნდის გაუქმება' : 'გაუქმების მოხსნა'}
-                    </Button>
-                    {!draft.active && (
-                      <Alert className="mt-3">
+                {initial && (
+                  <section className="flex flex-col gap-3 border-t pt-4">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {initial.active ? (
+                        <Button
+                          type="button"
+                          variant={draft.active ? 'warning' : 'outline'}
+                          disabled={
+                            mutation.isPending || draft.members.length > 0
+                          }
+                          onClick={() =>
+                            form.setFieldValue('active', !draft.active)
+                          }
+                        >
+                          <IconArchive
+                            data-icon="inline-start"
+                            aria-hidden="true"
+                          />
+                          {draft.active
+                            ? 'გუნდის გაუქმება'
+                            : 'გაუქმების მოხსნა'}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={availabilityPending}
+                          onClick={() => {
+                            void changeAvailability('restore')
+                          }}
+                        >
+                          <IconRestore
+                            data-icon="inline-start"
+                            aria-hidden="true"
+                          />
+                          გუნდის აღდგენა
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={availabilityPending || mutation.isPending}
+                        onClick={() => setConfirmDelete(true)}
+                      >
+                        <IconTrash
+                          data-icon="inline-start"
+                          aria-hidden="true"
+                        />
+                        გუნდის სამუდამოდ წაშლა
+                      </Button>
+                    </div>
+                    {initial.active && !draft.active && (
+                      <Alert>
                         <AlertDescription>
                           გუნდი გაუქმდება ცვლილებების შენახვისას.
                         </AlertDescription>
@@ -348,32 +383,6 @@ export function TeamEditor({
               </>
             )}
           </form.Subscribe>
-          {initial && (
-            <section className="flex flex-wrap items-center gap-3 border-t pt-4">
-              {!initial.active && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={availabilityPending}
-                  onClick={() => {
-                    void changeAvailability('restore')
-                  }}
-                >
-                  <IconRestore data-icon="inline-start" aria-hidden="true" />
-                  გუნდის აღდგენა
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="destructive"
-                disabled={availabilityPending || mutation.isPending}
-                onClick={() => setConfirmDelete(true)}
-              >
-                <IconTrash data-icon="inline-start" aria-hidden="true" />
-                გუნდის სამუდამოდ წაშლა
-              </Button>
-            </section>
-          )}
           {initial && (
             <Card>
               <CardContent>

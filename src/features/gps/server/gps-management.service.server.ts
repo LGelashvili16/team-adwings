@@ -71,6 +71,7 @@ export async function readGpsHistory(
         .select({
           name: gpsDevice.name,
           reportedId: gpsDevice.reportedId,
+          phone: gpsDevice.phone,
           enabled: gpsDevice.enabled,
           lastContactAt: gpsDevice.lastContactAt,
         })
@@ -150,6 +151,7 @@ function searchFilter(q: string) {
   return or(
     ilike(gpsDevice.name, pattern),
     ilike(gpsDevice.reportedId, pattern),
+    ilike(gpsDevice.phone, pattern),
   )
 }
 
@@ -214,6 +216,7 @@ export async function readGpsMapDevices(
         id: gpsDevice.id,
         name: gpsDevice.name,
         reportedId: gpsDevice.reportedId,
+        phone: gpsDevice.phone,
         enabled: gpsDevice.enabled,
         version: gpsDevice.version,
         lastContactAt: gpsDevice.lastContactAt,
@@ -250,6 +253,7 @@ export async function saveGpsDevice(
       name: input.name,
       enabled: input.enabled,
       reportedId: input.reportedId,
+      phone: input.phone || null,
     }
     if (input.id === null) {
       const created = (
@@ -273,6 +277,7 @@ export async function saveGpsDevice(
           name: gpsDevice.name,
           enabled: gpsDevice.enabled,
           reportedId: gpsDevice.reportedId,
+          phone: gpsDevice.phone,
         })
         .from(gpsDevice)
         .where(
@@ -287,6 +292,7 @@ export async function saveGpsDevice(
       .set({
         name: fields.name,
         enabled: fields.enabled,
+        phone: fields.phone,
         version: input.version + 1,
       })
       .where(eq(gpsDevice.id, input.id))

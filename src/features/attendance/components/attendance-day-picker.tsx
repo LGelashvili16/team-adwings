@@ -121,7 +121,7 @@ export function AttendanceDayPicker({
                     depth="raised"
                     className={
                       weekly
-                        ? 'h-auto min-h-8 max-w-full whitespace-normal'
+                        ? 'h-auto min-h-10 max-w-full whitespace-normal'
                         : undefined
                     }
                   />
@@ -129,10 +129,10 @@ export function AttendanceDayPicker({
               >
                 <IconCalendar data-icon="inline-start" aria-hidden="true" />
                 {monthly
-                  ? format(civilDate(anchor), 'LLLL yyyy', { locale: ka })
+                  ? format(civilDate(anchor), 'LLL yyyy', { locale: ka })
                   : weekly
-                    ? `${format(civilDate(week.start), 'd MMMM yyyy', { locale: ka })} - ${format(civilDate(week.end), 'd MMMM yyyy', { locale: ka })}`
-                    : format(civilDate(date), 'd MMMM yyyy', { locale: ka })}
+                    ? `${format(civilDate(week.start), 'd MMM yyyy', { locale: ka })} - ${format(civilDate(week.end), 'd MMM yyyy', { locale: ka })}`
+                    : format(civilDate(date), 'd MMM yyyy', { locale: ka })}
               </PopoverTrigger>
               <PopoverContent align="start" className="w-72 p-0">
                 <Calendar

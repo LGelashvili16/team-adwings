@@ -1,12 +1,17 @@
 import { useEffect, useRef } from 'react'
 import { useForm } from '@tanstack/react-form'
-import { Input } from '#/components/ui/input'
+import { IconSearch } from '@tabler/icons-react'
 import {
   Field,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from '#/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -73,27 +78,32 @@ export function AnnouncementFilters({
         <form.Field name="q">
           {(field) => (
             <Field
-              className="w-full min-w-0 sm:max-w-md"
+              className="w-full min-w-0 sm:max-w-sm"
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel htmlFor="announcements-search" className="sr-only">
                 განცხადების ძიება
               </FieldLabel>
-              <Input
-                id="announcements-search"
-                placeholder="განცხადების ძიება"
-                value={field.state.value}
-                onBlur={field.handleBlur}
-                aria-invalid={!field.state.meta.isValid}
-                aria-describedby="announcements-search-error"
-                onChange={(event) => {
-                  field.handleChange(event.target.value)
-                  if (timer.current) clearTimeout(timer.current)
-                  timer.current = setTimeout(() => {
-                    void form.handleSubmit()
-                  }, 300)
-                }}
-              />
+              <InputGroup>
+                <InputGroupAddon>
+                  <IconSearch aria-hidden="true" />
+                </InputGroupAddon>
+                <InputGroupInput
+                  id="announcements-search"
+                  placeholder="სათაური ან ტექსტი"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  aria-invalid={!field.state.meta.isValid}
+                  aria-describedby="announcements-search-error"
+                  onChange={(event) => {
+                    field.handleChange(event.target.value)
+                    if (timer.current) clearTimeout(timer.current)
+                    timer.current = setTimeout(() => {
+                      void form.handleSubmit()
+                    }, 300)
+                  }}
+                />
+              </InputGroup>
               <FieldError
                 id="announcements-search-error"
                 errors={field.state.meta.errors}

@@ -67,16 +67,22 @@ export function OwnDevices({
         }),
         helper.accessor('hasPasskey', {
           header: 'Passkey',
-          cell: ({ row }) =>
-            row.original.hasPasskey ? 'დამატებულია' : 'არ არის დამატებული',
+          cell: ({ row }) => (
+            <Badge variant={row.original.hasPasskey ? 'green' : 'secondary'}>
+              {row.original.hasPasskey ? 'დამატებულია' : 'არ არის დამატებული'}
+            </Badge>
+          ),
         }),
         helper.accessor('createdAt', {
           header: 'რეგისტრაცია',
-          cell: ({ row }) =>
-            formatAttendanceDateTime(
-              row.original.createdAt,
-              result?.timezone ?? 'Asia/Tbilisi',
-            ),
+          cell: ({ row }) => (
+            <span className="tabular-nums text-muted-foreground">
+              {formatAttendanceDateTime(
+                row.original.createdAt,
+                result?.timezone ?? 'Asia/Tbilisi',
+              )}
+            </span>
+          ),
         }),
         helper.accessor('state', {
           header: 'სტატუსი',
@@ -93,16 +99,15 @@ export function OwnDevices({
   })
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-3">
-          <IconDevices
-            className="size-5 text-muted-foreground"
-            aria-hidden="true"
-          />
+      <CardHeader className="border-b pb-4">
+        <CardTitle className="flex items-center gap-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <IconDevices className="size-4" aria-hidden="true" />
+          </span>
           დასწრების მოწყობილობები
         </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-5 pt-6">
         {query.isPending ? (
           <div
             role="status"
@@ -126,20 +131,25 @@ export function OwnDevices({
           <>
             <CurrentDeviceSetup actorId={actorId} status={result} />
             <Separator />
-            <h2 className="text-sm font-semibold">
-              რეგისტრირებული მოწყობილობები
-            </h2>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-sm font-semibold">
+                რეგისტრირებული მოწყობილობები
+              </h2>
+              <Badge variant="secondary" className="tabular-nums">
+                {result.total}
+              </Badge>
+            </div>
             <DeviceFilters search={search} onChange={onSearch} />
             <div
-              className="min-w-0 overflow-hidden rounded-xl border"
+              className="min-w-0 overflow-hidden rounded-xl border bg-card"
               aria-busy={query.isFetching}
             >
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-muted/40">
                   {table.getHeaderGroups().map((group) => (
                     <TableRow key={group.id}>
                       {group.headers.map((header) => (
-                        <TableHead key={header.id} className="px-4">
+                        <TableHead key={header.id} className="h-11 px-4">
                           <table.FlexRender header={header} />
                         </TableHead>
                       ))}
@@ -150,7 +160,7 @@ export function OwnDevices({
                   {table.getRowModel().rows.map((row) => (
                     <TableRow key={row.id}>
                       {row.getAllCells().map((cell) => (
-                        <TableCell key={cell.id} className="px-4 py-4">
+                        <TableCell key={cell.id} className="px-4 py-3.5">
                           <table.FlexRender cell={cell} />
                         </TableCell>
                       ))}

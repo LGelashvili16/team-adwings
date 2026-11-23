@@ -20,11 +20,13 @@ import {
   CardTitle,
 } from '#/components/ui/card'
 import { authClient } from '#/lib/auth/auth-client'
+import { useHydrated } from '#/hooks/use-hydrated'
 import { loginSchema } from '../auth.schemas'
 import { authContent } from '../auth.content'
 
 export function LoginPage() {
   const router = useRouter()
+  const hydrated = useHydrated()
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const form = useForm({
@@ -70,9 +72,28 @@ export function LoginPage() {
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
+            // Sync browser autofill that populated DOM inputs before hydration attached onChange.
+            const formData = new FormData(event.currentTarget)
+            const identifier = formData.get('identifier')
+            const password = formData.get('password')
+            if (
+              typeof identifier === 'string' &&
+              identifier &&
+              !form.state.values.identifier
+            ) {
+              form.setFieldValue('identifier', identifier)
+            }
+            if (
+              typeof password === 'string' &&
+              password &&
+              !form.state.values.password
+            ) {
+              form.setFieldValue('password', password)
+            }
             void form.handleSubmit()
           }}
         >
@@ -167,7 +188,7 @@ export function LoginPage() {
                 <Button
                   type="submit"
                   className="h-10 w-full"
-                  disabled={submitting}
+                  disabled={!hydrated || submitting}
                   aria-busy={submitting}
                 >
                   {submitting && <Spinner aria-hidden="true" />}

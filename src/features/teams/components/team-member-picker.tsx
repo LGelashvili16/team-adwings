@@ -10,13 +10,7 @@ import {
   IconX,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from '#/components/ui/card'
+import { Card, CardHeader, CardTitle, CardContent } from '#/components/ui/card'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -163,7 +157,6 @@ export function TeamMemberPicker({
     <Card>
       <CardHeader>
         <CardTitle>თანამშრომლები</CardTitle>
-        <CardDescription>მოქმედი თანამშრომლები არჩეული როლებით</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <FieldGroup className="gap-3">
@@ -219,7 +212,6 @@ export function TeamMemberPicker({
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
                     disabled={disabled}
                     aria-label={`როლების ფილტრი, არჩეულია ${draft.roles.length}`}
                   />
@@ -423,11 +415,7 @@ export function TeamMemberPicker({
                         ) : (
                           <IconPlus aria-hidden="true" />
                         )}
-                        {picked
-                          ? 'არჩეულია'
-                          : person.teamId
-                            ? 'გადმოყვანის დამატება'
-                            : 'დამატება'}
+                        {picked ? 'არჩეულია' : 'დამატება'}
                       </Button>
                     </li>
                   )

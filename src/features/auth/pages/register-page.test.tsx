@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnchorHTMLAttributes } from 'react'
 import { RegisterPage } from './register-page'
@@ -134,5 +135,14 @@ describe('employee account activation', () => {
       screen.queryByText('ანგარიში გააქტიურებულია'),
     ).not.toBeInTheDocument()
     expect(submit).toHaveBeenCalledWith('/employee-reset', expect.anything())
+  })
+
+  it('uses POST and disables submission during SSR to prevent code or password URL exposure', () => {
+    const html = renderToString(<RegisterPage />)
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('form')?.getAttribute('method')).toBe('post')
+    expect(
+      doc.querySelector('button[type="submit"]')?.hasAttribute('disabled'),
+    ).toBe(true)
   })
 })

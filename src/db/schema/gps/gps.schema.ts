@@ -24,6 +24,8 @@ export const gpsDevice = pgTable(
     canonicalId: text('canonical_id').generatedAlwaysAs(
       sql`ltrim("reported_id", '0')`,
     ),
+    /** Optional SIM or tracker contact phone number; null when not provided. */
+    phone: text('phone'),
     enabled: boolean('enabled').notNull().default(true),
     version: integer('version').notNull().default(1),
     /** Receipt time of the newest authenticated, supported packet. */
@@ -38,6 +40,10 @@ export const gpsDevice = pgTable(
     check(
       'gps_device_id_valid',
       sql`${t.reportedId} ~ '^[0-9]{5,20}$' and ${t.reportedId} ~ '[1-9]'`,
+    ),
+    check(
+      'gps_device_phone_valid',
+      sql`${t.phone} is null or (length(${t.phone}) <= 32 and ${t.phone} ~ '^\\+?[0-9][0-9 ()-]{5,30}[0-9]$')`,
     ),
   ],
 )

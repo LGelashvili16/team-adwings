@@ -23,6 +23,7 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import { PasswordInput } from '#/components/common/password-input'
+import { useHydrated } from '#/hooks/use-hydrated'
 import { authContent } from '../auth.content'
 
 const setupFields = [
@@ -36,6 +37,7 @@ export function AccountSetupForm({
 }: {
   purpose: 'activation' | 'reset'
 }) {
+  const hydrated = useHydrated()
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
   const content =
@@ -124,6 +126,7 @@ export function AccountSetupForm({
       </CardHeader>
       <CardContent>
         <form
+          method="post"
           noValidate
           onSubmit={(event) => {
             event.preventDefault()
@@ -185,7 +188,7 @@ export function AccountSetupForm({
               {(pending) => (
                 <Button
                   type="submit"
-                  disabled={pending}
+                  disabled={!hydrated || pending}
                   aria-busy={pending}
                   className="h-10 w-full"
                 >
