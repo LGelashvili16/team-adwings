@@ -221,7 +221,7 @@ describe('workspace navigation', () => {
         container.querySelectorAll(
           '[data-slot="sidebar-content"] a[href^="/manage/"]',
         ),
-      ).map((link) => link.textContent?.trim()),
+      ).map((link) => link.textContent.trim()),
     ).toEqual([
       'დასწრებები',
       'თანამშრომლები',
@@ -364,7 +364,7 @@ describe('workspace navigation', () => {
     expect(
       Array.from(
         container.querySelectorAll('[data-slot="sidebar-content"] a'),
-      ).map((link) => link.textContent?.trim()),
+      ).map((link) => link.textContent.trim()),
     ).toEqual([
       'მთავარი',
       'სამუშაოების რუკა',
