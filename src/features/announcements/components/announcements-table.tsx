@@ -29,6 +29,7 @@ export function AnnouncementsTable({
   showDelivery = false,
   showAuthor = false,
   showStatus = true,
+  showContent = false,
 }: {
   items: Array<AnnouncementListItem>
   sort: 'newest' | 'oldest'
@@ -38,6 +39,7 @@ export function AnnouncementsTable({
   showDelivery?: boolean
   showAuthor?: boolean
   showStatus?: boolean
+  showContent?: boolean
 }) {
   const columns = useMemo(
     () =>
@@ -56,6 +58,18 @@ export function AnnouncementsTable({
             </Button>
           ),
         }),
+        ...(showContent
+          ? [
+              helper.accessor('body', {
+                header: 'შინაარსი',
+                cell: ({ row }) => (
+                  <span className="block w-64 truncate text-muted-foreground lg:w-96">
+                    {row.original.body}
+                  </span>
+                ),
+              }),
+            ]
+          : []),
         ...(showAuthor
           ? [
               helper.accessor('authorName', {
@@ -108,7 +122,15 @@ export function AnnouncementsTable({
             ]
           : []),
       ]),
-    [onOpen, onPrefetch, onSort, showDelivery, showAuthor, showStatus],
+    [
+      onOpen,
+      onPrefetch,
+      onSort,
+      showDelivery,
+      showAuthor,
+      showStatus,
+      showContent,
+    ],
   )
   const table = useTable({
     features,

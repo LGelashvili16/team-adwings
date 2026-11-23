@@ -9,4 +9,7 @@ export type AnnouncementDetail = AnnouncementSummary & {
   body: string
   isRecipient?: boolean
 }
-export type AnnouncementListItem = AnnouncementSummary & { authorName: string }
+export type AnnouncementListItem = AnnouncementSummary & {
+  authorName: string
+  body: string
+}

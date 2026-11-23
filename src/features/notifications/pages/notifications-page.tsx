@@ -174,12 +174,12 @@ export function NotificationsPage() {
           }
         }}
       >
-        <TabsList>
-          <TabsTrigger value="all">
+        <TabsList className="gap-1 group-data-horizontal/tabs:h-auto">
+          <TabsTrigger value="all" className="h-9 px-4">
             <IconBell aria-hidden="true" />
             ყველა
           </TabsTrigger>
-          <TabsTrigger value="unread">
+          <TabsTrigger value="unread" className="h-9 px-4">
             <IconBellRinging aria-hidden="true" />
             წაუკითხავი
           </TabsTrigger>
@@ -206,10 +206,7 @@ export function NotificationsPage() {
               total={totalCount}
               pageSize={pageSize}
               renderLink={(nextPage) => (
-                <Link
-                  to="/notifications"
-                  search={{ page: nextPage, filter }}
-                />
+                <Link to="/notifications" search={{ page: nextPage, filter }} />
               )}
             />
           </div>

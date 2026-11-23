@@ -119,6 +119,7 @@ export function AnnouncementsPage({
               showDelivery={manage}
               showAuthor={manage}
               showStatus={!manage}
+              showContent={!manage}
               items={query.data.items}
               sort={search.sort}
               onSort={changeSort}
