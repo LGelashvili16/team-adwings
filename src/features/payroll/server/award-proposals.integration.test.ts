@@ -1,0 +1,544 @@
+// @vitest-environment node
+import 'dotenv/config'
+import { randomBytes, randomUUID } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
+import pg from 'pg'
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
+import type * as Service from './award-proposals.service.server'
+import type * as Jobs from '#/features/jobs/server/job-award-evidence.service.server'
+import type { db as Database } from '#/db'
+import type { Actor } from '#/lib/authorization/actor'
+
+vi.mock('@tanstack/react-start/server-only', () => ({}))
+const originalUrl = process.env.DATABASE_URL,
+  databaseName = `team_adwings_award_test_${randomBytes(8).toString('hex')}`
+let admin: pg.Client | undefined,
+  connection: pg.Client | undefined,
+  applicationDatabase: typeof Database | undefined,
+  service: typeof Service,
+  jobs: typeof Jobs,
+  created = false,
+  ruleId: string,
+  employeeId: string
+const actor: Actor = {
+  id: 'award-accountant',
+  name: 'ბუღალტერი',
+  roles: ['accountant'],
+  email: null,
+  emailVerified: false,
+}
+function sql() {
+  if (!connection) throw new Error('Isolated local database required')
+  return connection
+}
+const input = (extra = {}) => ({
+  proposalId: null,
+  expectedVersion: 0,
+  requestId: randomUUID(),
+  userId: 'award-worker',
+  ruleId,
+  expectedRuleVersion: 1,
+  workDate: '2026-11-25',
+  jobId: null,
+  reference: 'ACT-001',
+  quantityMilli: 1250,
+  evidence: 'დადასტურებული დამატებითი სამუშაო',
+  reason: 'განაცხადის მომზადება',
+  ...extra,
+})
+const detail = (proposalId: string, extra = {}) =>
+  service.readAwardProposal(actor, { proposalId, ...extra })
+async function rate(calculation = 'additional_work', kind = 'bonus') {
+  const id = randomUUID()
+  await sql().query('insert into payroll_bonus_rule(id) values ($1)', [id])
+  await sql().query(
+    `insert into payroll_bonus_rule_version(rule_id,version,effective_from,name,kind,calculation,unit_label,qualification,amount_minor,amount_basis,currency,enabled,actor_id,request_id,reason) values ($1,1,'2026-11-01','დამატებითი სამუშაო',$2,$3,$4,'დადასტურებული სამუშაო',12345,'gross','GEL',true,$5,$6,'დადასტურებული ტარიფი')`,
+    [
+      id,
+      kind,
+      calculation,
+      calculation === 'additional_work' ? 'მეტრი' : '',
+      actor.id,
+      randomUUID(),
+    ],
+  )
+  return id
+}
+async function completedJob() {
+  const id = randomUUID()
+  await sql().query(
+    `insert into job(id,title,kind,status,assignee_id,created_by,request_id) values ($1,'მონტაჟი','installation','completed','award-worker','award-admin',$2)`,
+    [id, randomUUID()],
+  )
+  await sql().query(
+    `insert into job_event(job_id,actor_id,action,status,created_at) values ($1,'award-worker','status_changed','completed','2026-11-25T06:00:00Z')`,
+    [id],
+  )
+  return id
+}
+describe.runIf(process.env.RUN_AWARD_DB_TESTS === '1')(
+  'individual award proposals against PostgreSQL',
+  () => {
+    beforeAll(async () => {
+      if (!originalUrl) throw new Error('Local database required')
+      const target = new URL(originalUrl)
+      if (!['localhost', '127.0.0.1', '[::1]'].includes(target.hostname))
+        throw new Error('Local database required')
+      admin = new pg.Client({
+        connectionString: originalUrl,
+        connectionTimeoutMillis: 3000,
+      })
+      await admin.connect()
+      await admin.query(`CREATE DATABASE "${databaseName}"`)
+      created = true
+      target.pathname = `/${databaseName}`
+      connection = new pg.Client({ connectionString: target.toString() })
+      await connection.connect()
+      for (const file of readdirSync('drizzle')
+        .filter((name) => /^\d+.*\.sql$/.test(name))
+        .sort())
+        await sql().query(
+          readFileSync(`drizzle/${file}`, 'utf8').replaceAll(
+            '--> statement-breakpoint',
+            '',
+          ),
+        )
+      for (const role of [
+        'accountant',
+        'admin',
+        'hr_manager',
+        'worker',
+        'other',
+      ]) {
+        const id = `award-${role}`
+        await sql().query(
+          'insert into "user"(id,name,email,roles,access_state) values ($1,$1,$2,$3,\'active\')',
+          [
+            id,
+            `${id}@example.invalid`,
+            ['worker', 'other'].includes(role) ? 'employee' : role,
+          ],
+        )
+        const person = await sql().query(
+          'insert into employee(user_id,full_name,username,employment_revision) values ($1,$1,$1,1) returning id',
+          [id],
+        )
+        if (role === 'worker') employeeId = person.rows[0].id
+      }
+      await sql().query(
+        "insert into company_schedule(effective_from,timezone,late_grace_minutes,early_departure_grace_minutes) values ('2026-01-01','Asia/Tbilisi',0,0)",
+      )
+      process.env.DATABASE_URL = target.toString()
+      vi.resetModules()
+      applicationDatabase = (await import('#/db')).db
+      service = await import('./award-proposals.service.server')
+      jobs =
+        await import('#/features/jobs/server/job-award-evidence.service.server')
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-11-25T12:00:00+04:00'))
+    }, 30000)
+    beforeEach(async () => {
+      await sql().query(
+        'truncate payroll_award_proposal_version,payroll_award_proposal,payroll_bonus_rule_version,payroll_bonus_rule,employee_employment_audit,employee_employment_period,job_event,job cascade',
+      )
+      await sql().query(
+        "update employee set status='active',employment_revision=1",
+      )
+      await sql().query(
+        `update "user" set access_state='active',permission_overrides='{"allow":[],"deny":[]}',roles=case when id='award-admin' then 'admin' when id='award-accountant' then 'accountant' when id='award-hr_manager' then 'hr_manager' else 'employee' end`,
+      )
+      await sql().query(
+        "insert into employee_employment_period(employee_id,start_date) select id,'2026-11-01' from employee",
+      )
+      ruleId = await rate()
+    })
+    afterAll(async () => {
+      vi.useRealTimers()
+      await applicationDatabase?.$client.end()
+      await connection?.end()
+      process.env.DATABASE_URL = originalUrl
+      if (admin) {
+        if (created)
+          await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`)
+        await admin.end()
+      }
+    })
+    it('retains beneficiary, exact quantity, applicable rate, evidence and trusted author without posting salary', async () => {
+      const saved = await service.saveAwardProposal(actor, input()),
+        record = await detail(saved.proposalId)
+      expect(record).toMatchObject({
+        userId: 'award-worker',
+        current: {
+          quantityMilli: 1250,
+          amountMinor: 15431,
+          status: 'proposed',
+          rule: { version: 1, amountMinor: 12345 },
+          actorName: actor.id,
+          sourceSnapshot: { employmentRevision: 1, timezone: 'Asia/Tbilisi' },
+        },
+      })
+      expect(JSON.stringify(record)).not.toMatch(/commandHash|requestId/)
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from employee_salary_term',
+          )
+        ).rows[0].total,
+      ).toBe(0)
+    })
+    it('retries commands exactly once and rejects changed retries or fresh duplicate source claims', async () => {
+      const payload = input(),
+        results = await Promise.all([
+          service.saveAwardProposal(actor, payload),
+          service.saveAwardProposal(actor, payload),
+        ])
+      expect(results[0]).toEqual(results[1])
+      expect(
+        await service.saveAwardProposal(actor, {
+          ...payload,
+          requestId: payload.requestId.toUpperCase(),
+          ruleId: payload.ruleId.toUpperCase(),
+        }),
+      ).toEqual(results[0])
+      expect((await detail(results[0].proposalId)).total).toBe(1)
+      await expect(
+        service.saveAwardProposal(actor, { ...payload, quantityMilli: 2000 }),
+      ).rejects.toThrow('მოთხოვნის მონაცემები შეიცვალა')
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({ reference: '  act-００１  ' }),
+        ),
+      ).rejects.toThrow('უკვე არსებობს')
+    })
+    it('prevents duplicate concurrent claims even with different command identities', async () => {
+      const results = await Promise.allSettled([
+        service.saveAwardProposal(actor, input()),
+        service.saveAwardProposal(actor, input()),
+      ])
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      expect((await service.readAwardProposals(actor, {})).total).toBe(1)
+    })
+    it('retains corrections, withdrawal and resubmission without releasing the source identity', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      await service.saveAwardProposal(
+        actor,
+        input({
+          proposalId: saved.proposalId,
+          expectedVersion: 1,
+          quantityMilli: 2000,
+        }),
+      )
+      await service.withdrawAwardProposal(actor, {
+        proposalId: saved.proposalId,
+        expectedVersion: 2,
+        requestId: randomUUID(),
+        reason: 'დამატებითი გადამოწმება',
+      })
+      expect((await detail(saved.proposalId)).current.status).toBe('withdrawn')
+      await expect(service.saveAwardProposal(actor, input())).rejects.toThrow(
+        'უკვე არსებობს',
+      )
+      await service.saveAwardProposal(
+        actor,
+        input({ proposalId: saved.proposalId, expectedVersion: 3 }),
+      )
+      expect(await detail(saved.proposalId)).toMatchObject({
+        total: 4,
+        current: { version: 4, status: 'proposed' },
+      })
+      expect((await detail(saved.proposalId, { q: 'დამატებითი' })).total).toBe(
+        1,
+      )
+      expect((await detail(saved.proposalId, { q: '%' })).total).toBe(0)
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({
+            proposalId: saved.proposalId,
+            expectedVersion: 4,
+            reference: 'OTHER',
+          }),
+        ),
+      ).rejects.toThrow('უცვლელია')
+    })
+    it('rejects stale corrections and snapshots previous rule versions after later changes', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      await sql().query(
+        `insert into payroll_bonus_rule_version(rule_id,version,effective_from,name,kind,calculation,unit_label,qualification,amount_minor,amount_basis,currency,enabled,actor_id,request_id,reason) select rule_id,2,effective_from,name,kind,calculation,unit_label,qualification,20000,amount_basis,currency,enabled,actor_id,$2,reason from payroll_bonus_rule_version where rule_id=$1`,
+        [ruleId, randomUUID()],
+      )
+      expect((await detail(saved.proposalId)).current.rule.amountMinor).toBe(
+        12345,
+      )
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({ proposalId: saved.proposalId, expectedVersion: 1 }),
+        ),
+      ).rejects.toThrow('წესი არ მოქმედებს ან შეიცვალა')
+      const results = await Promise.allSettled(
+        [1, 2].map((n) =>
+          service.saveAwardProposal(
+            actor,
+            input({
+              proposalId: saved.proposalId,
+              expectedVersion: 1,
+              expectedRuleVersion: 2,
+              quantityMilli: n * 1000,
+            }),
+          ),
+        ),
+      )
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      expect((await detail(saved.proposalId)).total).toBe(2)
+    })
+    it('independently verifies job completion and assigned beneficiary through the jobs contract', async () => {
+      const jobId = await completedJob(),
+        jobRate = await rate('job')
+      const saved = await service.saveAwardProposal(
+        actor,
+        input({ ruleId: jobRate, jobId, reference: '', quantityMilli: 1000 }),
+      )
+      expect((await detail(saved.proposalId)).current).toMatchObject({
+        completionEventId: expect.any(String),
+        sourceSnapshot: {
+          jobTitle: 'მონტაჟი',
+          jobVersion: 1,
+          completedBy: 'award-worker',
+        },
+      })
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({
+            ruleId: jobRate,
+            jobId,
+            userId: 'award-other',
+            reference: '',
+            quantityMilli: 1000,
+          }),
+        ),
+      ).rejects.toThrow('შემსრულებლად')
+      await expect(
+        applicationDatabase!.transaction((tx) =>
+          jobs.getCompletedJobAwardEvidence(
+            tx,
+            { ...actor, id: 'award-worker' },
+            { jobId, userId: 'award-worker' },
+          ),
+        ),
+      ).rejects.toThrow()
+      const choices = await service.lookupAwardInputs(actor, {
+        kind: 'job',
+        workDate: '2026-11-25',
+        userId: 'award-worker',
+      })
+      expect(choices.records[0].id).toBe(jobId)
+      expect(
+        (
+          await service.lookupAwardInputs(actor, {
+            kind: 'job',
+            workDate: '2026-11-24',
+            userId: 'award-worker',
+          })
+        ).records,
+      ).toEqual([])
+    })
+    it('does not create another claim after reopening and completing the same job again', async () => {
+      const jobId = await completedJob(),
+        jobRate = await rate('job'),
+        payload = input({
+          ruleId: jobRate,
+          jobId,
+          reference: '',
+          quantityMilli: 1000,
+        })
+      const saved = await service.saveAwardProposal(actor, payload),
+        first = (await detail(saved.proposalId)).current.completionEventId
+      await sql().query(
+        "update job set status='pending',assignee_id=null,version=2 where id=$1",
+        [jobId],
+      )
+      expect(
+        (
+          await service.lookupAwardInputs(actor, {
+            kind: 'job',
+            workDate: '2026-11-25',
+            userId: 'award-worker',
+          })
+        ).records,
+      ).toEqual([])
+      await sql().query(
+        "update job set status='completed',assignee_id='award-worker',version=3 where id=$1",
+        [jobId],
+      )
+      await sql().query(
+        "insert into job_event(job_id,actor_id,action,status,created_at) values ($1,'award-worker','status_changed','completed','2026-11-25T07:00:00Z')",
+        [jobId],
+      )
+      await expect(
+        service.saveAwardProposal(actor, {
+          ...payload,
+          requestId: randomUUID(),
+        }),
+      ).rejects.toThrow('უკვე არსებობს')
+      await service.saveAwardProposal(actor, {
+        ...payload,
+        proposalId: saved.proposalId,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+      })
+      expect(
+        (await detail(saved.proposalId)).current.completionEventId,
+      ).not.toBe(first)
+      expect((await service.readAwardProposals(actor, {})).total).toBe(1)
+    })
+    it('requires confirmed eligible dates, applicable active rules and non-future work', async () => {
+      await sql().query(
+        'delete from employee_employment_period where employee_id=$1',
+        [employeeId],
+      )
+      await expect(service.saveAwardProposal(actor, input())).rejects.toThrow(
+        'დასაქმების პერიოდი',
+      )
+      await expect(
+        service.saveAwardProposal(actor, input({ workDate: '2026-11-26' })),
+      ).rejects.toThrow('მომავალში')
+      await sql().query(
+        'update payroll_bonus_rule_version set enabled=false where rule_id=$1',
+        [ruleId],
+      )
+      expect(
+        (
+          await service.lookupAwardInputs(actor, {
+            kind: 'rule',
+            workDate: '2026-11-25',
+          })
+        ).records,
+      ).toEqual([])
+      await expect(service.saveAwardProposal(actor, input())).rejects.toThrow(
+        'წესი არ მოქმედებს',
+      )
+    })
+    it('supports fixed premiums and whole task quantities while rejecting fractional task counts', async () => {
+      const premium = await rate('fixed', 'premium'),
+        task = await rate('task')
+      expect(
+        (
+          await detail(
+            (
+              await service.saveAwardProposal(
+                actor,
+                input({ ruleId: premium, quantityMilli: 1000 }),
+              )
+            ).proposalId,
+          )
+        ).current.rule.kind,
+      ).toBe('premium')
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({ ruleId: task, quantityMilli: 1500 }),
+        ),
+      ).rejects.toThrow('მთელი რიცხვი')
+      expect(
+        (
+          await detail(
+            (
+              await service.saveAwardProposal(
+                actor,
+                input({ ruleId: task, quantityMilli: 2000 }),
+              )
+            ).proposalId,
+          )
+        ).current.amountMinor,
+      ).toBe(24690)
+    })
+    it('enforces fresh read/proposal permissions, inactive accounts and self-proposal denial', async () => {
+      await expect(service.readAwardProposals(null, {})).rejects.toThrow()
+      await expect(
+        service.saveAwardProposal(
+          { ...actor, id: 'award-hr_manager' },
+          input(),
+        ),
+      ).rejects.toThrow()
+      await expect(
+        service.saveAwardProposal(actor, input({ userId: actor.id })),
+      ).rejects.toThrow('საკუთარი')
+      const payload = input()
+      await service.saveAwardProposal(actor, payload)
+      await sql().query(
+        `update "user" set permission_overrides='{"allow":[],"deny":["payroll.awards.propose"]}' where id=$1`,
+        [actor.id],
+      )
+      expect((await service.readAwardProposals(actor, {})).total).toBe(1)
+      await expect(service.saveAwardProposal(actor, payload)).rejects.toThrow()
+      await expect(
+        service.lookupAwardInputs(actor, {
+          kind: 'employee',
+          workDate: '2026-11-25',
+        }),
+      ).rejects.toThrow()
+      await sql().query(
+        'update "user" set access_state=\'suspended\' where id=$1',
+        [actor.id],
+      )
+      await expect(service.readAwardProposals(actor, {})).rejects.toThrow()
+    })
+    it('bounds and searches proposal lists without exposing internal command fields', async () => {
+      for (let n = 0; n < 21; n++)
+        await service.saveAwardProposal(actor, input({ reference: `ACT-${n}` }))
+      expect((await service.readAwardProposals(actor, {})).items).toHaveLength(
+        20,
+      )
+      expect(
+        (await service.readAwardProposals(actor, { page: 2 })).items,
+      ).toHaveLength(1)
+      expect((await service.readAwardProposals(actor, { q: '%' })).total).toBe(
+        0,
+      )
+      expect(
+        (
+          await service.lookupAwardInputs(actor, {
+            kind: 'employee',
+            workDate: '2026-11-25',
+          })
+        ).records.some((r) => r.id === actor.id),
+      ).toBe(false)
+    })
+    it('rolls back source claims when the immutable audit write fails', async () => {
+      await sql().query(
+        "create function reject_award_version() returns trigger language plpgsql as $$ begin raise exception 'test'; end $$",
+      )
+      await sql().query(
+        'create trigger reject_award_version before insert on payroll_award_proposal_version for each row execute function reject_award_version()',
+      )
+      try {
+        await expect(
+          service.saveAwardProposal(actor, input()),
+        ).rejects.toThrow()
+      } finally {
+        await sql().query(
+          'drop trigger reject_award_version on payroll_award_proposal_version',
+        )
+        await sql().query('drop function reject_award_version()')
+      }
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from payroll_award_proposal',
+          )
+        ).rows[0].total,
+      ).toBe(0)
+    })
+  },
+)

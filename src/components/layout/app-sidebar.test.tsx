@@ -55,6 +55,35 @@ function renderSidebar(
 }
 
 describe('workspace navigation', () => {
+  it('gives accountants payroll settings without account administration', () => {
+    renderSidebar('accountant')
+    expect(screen.getByRole('link', { name: 'ხელფასი' })).toHaveAttribute(
+      'href',
+      '/payroll',
+    )
+    expect(screen.getByRole('link', { name: 'ხელფასები' })).toHaveAttribute(
+      'href',
+      '/manage/payroll',
+    )
+    expect(
+      screen.getByRole('link', { name: 'ხელფასების პარამეტრები' }),
+    ).toHaveAttribute('href', '/manage/payroll/settings')
+    expect(
+      screen.queryByRole('link', { name: 'მომხმარებლების წვდომა' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'თანამშრომლები' }),
+    ).not.toBeInTheDocument()
+  })
+  it('hides payroll settings from HR', () => {
+    renderSidebar('hr_manager')
+    expect(
+      screen.queryByRole('link', { name: 'ხელფასები' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'ხელფასების პარამეტრები' }),
+    ).not.toBeInTheDocument()
+  })
   it('shows an accessible jobs dot only when this account has unread jobs', () => {
     const view = renderSidebar(
       'employee',
@@ -245,6 +274,7 @@ describe('workspace navigation', () => {
         ),
       ).map((link) => link.textContent.trim()),
     ).toEqual([
+      'ხელფასები',
       'დასწრებები',
       'თანამშრომლები',
       'გუნდები',
@@ -252,6 +282,7 @@ describe('workspace navigation', () => {
       'დასწრების მოწყობილობები',
       'შვებულება & ბიულეტენი',
       'სამუშაო განრიგი',
+      'ხელფასების პარამეტრები',
       'განცხადებების მართვა',
       'საჩივრების მართვა',
       'რეპორტები',
@@ -393,6 +424,7 @@ describe('workspace navigation', () => {
       'მთავარი',
       'სამუშაოების რუკა',
       'დასწრება',
+      'ხელფასი',
       'შვებულება & ბიულეტენი',
       'ჩემი განრიგი',
       'შეტყობინებები',

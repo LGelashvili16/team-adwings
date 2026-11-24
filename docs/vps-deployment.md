@@ -1,5 +1,8 @@
 # Team Adwings VPS layout and GPS releases
 
+See the [VPS production reference](vps-production-reference.md) for the host
+layout, environment templates, database roles, and fresh database setup.
+
 The deployment account is `team-adwings-deploy`. The deployment root observed on
 this VPS is `/var/www/team-adwings`. Switch accounts with
 `sudo -iu team-adwings-deploy` if logged in as an administrator.

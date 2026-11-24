@@ -11,10 +11,54 @@ import {
   employeeRoleSchema,
   roleSchema,
   roleLabels,
+  provisionableRoleSchema,
 } from './permissions'
 import type { Actor } from './actor'
 
 describe('role and permission boundaries', () => {
+  it('grants employment confirmation only to HR and platform administrators by default', () => {
+    for (const role of roleSchema.options)
+      expect(hasPermission([role], 'employees.employment.manage')).toBe(
+        ['hr_manager', 'admin', 'owner'].includes(role),
+      )
+  })
+  it('limits accountants to payroll configuration, salary agreements and management navigation', () => {
+    expect(provisionableRoleSchema.safeParse('accountant').success).toBe(true)
+    expect(employeeRoleSchema.safeParse('accountant').success).toBe(false)
+    expect(parseRoles('employee,accountant')).toEqual([
+      'employee',
+      'accountant',
+    ])
+    for (const permission of permissionSchema.options)
+      expect(hasPermission(['accountant'], permission)).toBe(
+        [
+          'manage.access',
+          'payroll.configure',
+          'payroll.read.all',
+          'payroll.terms.manage',
+          'payroll.awards.propose',
+        ].includes(permission),
+      )
+    for (const role of roleSchema.options)
+      for (const permission of [
+        'payroll.configure',
+        'payroll.read.all',
+        'payroll.terms.manage',
+        'payroll.awards.propose',
+      ] as const)
+        expect(hasPermission([role], permission)).toBe(
+          ['accountant', 'admin', 'owner'].includes(role),
+        )
+    expect(
+      hasPermission(
+        {
+          roles: ['accountant'],
+          permissionOverrides: { allow: [], deny: ['payroll.configure'] },
+        },
+        'payroll.configure',
+      ),
+    ).toBe(false)
+  })
   it('grants announcement publishing only to HR and platform administrators by default', () => {
     for (const role of roleSchema.options)
       expect(hasPermission([role], 'announcements.manage')).toBe(
@@ -148,6 +192,7 @@ describe('role and permission boundaries', () => {
       'manage.access',
       'employees.read',
       'employees.manage',
+      'employees.employment.manage',
       'jobs.claim',
       'jobs.complete.manage',
       'jobs.edit.all',
@@ -161,6 +206,10 @@ describe('role and permission boundaries', () => {
       'attendance.configure',
       'approvals.configure',
       'leave.configure',
+      'payroll.configure',
+      'payroll.read.all',
+      'payroll.terms.manage',
+      'payroll.awards.propose',
       'leave.review',
       'security.configure',
       'notifications.configure',

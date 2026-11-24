@@ -26,6 +26,7 @@ export const permissionSchema = z.enum(
     'complaints.read.confidential',
     'employees.read',
     'employees.manage',
+    'employees.employment.manage',
     'leave.review',
     'reports.read',
     'admin.access',
@@ -39,6 +40,10 @@ export const permissionSchema = z.enum(
     'attendance.clock.assist',
     'approvals.configure',
     'leave.configure',
+    'payroll.configure',
+    'payroll.read.all',
+    'payroll.terms.manage',
+    'payroll.awards.propose',
     'security.configure',
     'notifications.configure',
     'locations.manage',
@@ -59,12 +64,12 @@ export const employeeRoleSchema = z.enum(
   { error: 'თანამშრომლის როლი არასწორია.' },
 )
 export const provisionableRoleSchema = z.enum(
-  [...employeeRoleSchema.options, 'admin'],
+  [...employeeRoleSchema.options, 'accountant', 'admin'],
   { error: 'როლი არასწორია.' },
 )
 export type ProvisionableRole = z.infer<typeof provisionableRoleSchema>
 export const roleSchema = z.enum(
-  [...employeeRoleSchema.options, 'admin', 'owner'],
+  [...employeeRoleSchema.options, 'accountant', 'admin', 'owner'],
   { error: 'როლი არასწორია.' },
 )
 export type Role = z.infer<typeof roleSchema>
@@ -124,6 +129,7 @@ const administrationPermissions = [
   'manage.access',
   'employees.read',
   'employees.manage',
+  'employees.employment.manage',
   'jobs.claim',
   'jobs.complete.manage',
   'jobs.edit.all',
@@ -137,6 +143,10 @@ const administrationPermissions = [
   'attendance.configure',
   'approvals.configure',
   'leave.configure',
+  'payroll.configure',
+  'payroll.read.all',
+  'payroll.terms.manage',
+  'payroll.awards.propose',
   'leave.review',
   'security.configure',
   'notifications.configure',
@@ -178,6 +188,7 @@ const managementPermissions: Record<
     'timesheets.review.team',
     'employees.read',
     'employees.manage',
+    'employees.employment.manage',
     'leave.review',
     'leave.configure',
     'reports.read',
@@ -189,6 +200,7 @@ export const roleLabels: Record<Role, string> = {
   supervisor: 'წარმოების უფროსი',
   sales_manager: 'გაყიდვების მენეჯერი',
   hr_manager: 'HR',
+  accountant: 'ბუღალტერი',
   admin: 'ადმინისტრატორი',
   owner: 'კომპანიის მფლობელი',
 }
@@ -219,6 +231,15 @@ export const roles = {
   }),
   hr_manager: accessControl.newRole({
     'team-adwings': managementPermissions.hr_manager,
+  }),
+  accountant: accessControl.newRole({
+    'team-adwings': [
+      'manage.access',
+      'payroll.configure',
+      'payroll.read.all',
+      'payroll.terms.manage',
+      'payroll.awards.propose',
+    ],
   }),
   // Employee account management is explicit; attendance review and job management remain separate.
   admin: accessControl.newRole({ 'team-adwings': administrationPermissions }),

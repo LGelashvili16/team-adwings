@@ -44,7 +44,7 @@ This is a single-company employee tracking, time and attendance, scheduling, and
 
 ## Implementation Workflow
 
-- For VPS deployment work, read [the current VPS layout and GPS release runbook](docs/vps-deployment.md). The web release and GPS receiver use separate Compose projects. Confirm current host settings with the read-only checks in that runbook before relying on historical port or network values.
+- For VPS deployment work, read [the VPS production reference](docs/vps-production-reference.md) and [the GPS release runbook](docs/vps-deployment.md). The web release and GPS receiver use separate Compose projects. Confirm live host settings with their read-only checks before relying on documented port or network values.
 
 - Remove application files made obsolete by a change after verifying they have no remaining imports, configuration references, dynamic references, or framework/task entry-point role. Clean up their exclusively unused dependencies too. Preserve unrelated user changes, migrations, operational scripts, tests, and reusable shared UI primitives; do not treat a missing static import alone as proof that a file is unused.
 
@@ -59,7 +59,8 @@ This is a single-company employee tracking, time and attendance, scheduling, and
 
 - The application name is **Team Adwings**, with this exact spelling and capitalization in every locale. Use `APP_NAME` from `src/lib/app.ts` for app branding and document-title suffixes. Keep surrounding interface copy Georgian; the product name is a proper name and is not translated.
 - Prefer clear sentences without decorative hyphens. Do not use em dashes or en dashes in authored UI copy, comments, documentation, or agent responses. If a dash is necessary, use the short ASCII hyphen `-`. Preserve required hyphens in identifiers, URLs, commands, code operators, and other machine-readable syntax; do not rewrite third-party source snapshots solely for this style rule.
-- Payroll, salaries, finance, CRM, sales, customers, opportunities, and quotes are out of scope. Do not add their routes, navigation, modules, permissions, tables, integrations, or reports unless the user explicitly changes this scope.
+- Payroll and salaries are authorized product scope. Deliver incrementally through the payroll feature, beginning with dated company configuration and the accountant role; see `docs/payroll.md`. Finance beyond employee compensation, CRM, sales, customers, opportunities, and quotes remain out of scope unless explicitly requested.
+- Before continuing payroll implementation, read `docs/payroll-implementation-plan.md`. Keep its verified completion checkboxes and evidence current, implement the next unchecked step in dependency order, and keep `docs/payroll.md` aligned with actual behavior.
 - Preserve attendance, timesheets, scheduling, jobs, leave, employee management, notifications, account settings, and platform administration. Timesheets remain attendance records and are not a payroll feature.
 - Teams, team creation, and team memberships are currently outside product scope. Management navigation is employee-focused. Attendance review uses direct employee-to-reviewer assignments; do not add team routes, permissions, or membership workflows unless explicitly requested.
 - The route/module foundation is documented in [the application route inventory](docs/application-routes.md). Page shells must clearly distinguish unavailable workflows from working features; never simulate successful writes or fabricate employee records.

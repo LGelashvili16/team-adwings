@@ -46,7 +46,7 @@ it('loads the selected roles and saves only after explicit confirmation', async 
     name: 'წარმოების უფროსი',
   })
   expect(control).toBeChecked()
-  expect(screen.getAllByRole('checkbox')).toHaveLength(7)
+  expect(screen.getAllByRole('checkbox')).toHaveLength(8)
   expect(
     screen.getByRole('checkbox', { name: 'თანამშრომელი' }),
   ).not.toBeChecked()

@@ -127,6 +127,21 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     auth.$context.then((context) => context.password.hash(value))
 
   it('bootstraps exactly one privileged owner and keeps public signup closed', async () => {
+    const opening = await testDatabase()
+      .select({
+        source: tables.employeeScheduleVersion.source,
+        actorId: tables.employeeScheduleVersion.actorId,
+        days: tables.employeeScheduleVersion.days,
+      })
+      .from(tables.employeeScheduleVersion)
+      .innerJoin(
+        tables.employee,
+        eq(tables.employee.id, tables.employeeScheduleVersion.employeeId),
+      )
+      .where(eq(tables.employee.userId, owner.id))
+    expect(opening).toEqual([
+      { source: 'provisioned', actorId: null, days: null },
+    ])
     await expect(
       service.bootstrapOwner({
         code: 'second-owner',
@@ -184,6 +199,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     'sales_manager',
     'production_specialist',
     'hr_manager',
+    'accountant',
     'admin',
   ] as const)(
     'provisions and stores the %s role through the employee workflow for owner',
@@ -295,6 +311,29 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       role: 'supervisor',
     })
     expect((await identityForCode(hrSupervisor.code)).roles).toBe('supervisor')
+    await expect(
+      service.provisionEmployee(hr, { ...input, role: 'accountant' }),
+    ).rejects.toThrow()
+    await expect(
+      service.editEmployeeDetails(hr, {
+        userId: worker.id,
+        name: 'აკრძალული მინიჭება',
+        contactEmail: '',
+        role: 'accountant',
+      }),
+    ).rejects.toThrow()
+    const accountantCode = await service.provisionEmployee(owner, {
+      ...input,
+      role: 'accountant',
+    })
+    const accountantRecord = await identityForCode(accountantCode.code)
+    await expect(
+      service.manageEmployeeAccount(hr, {
+        userId: accountantRecord.id,
+        action: 'issue_reset',
+        reason: 'აკრძალული წვდომის შემოწმება',
+      }),
+    ).rejects.toThrow()
     await expect(
       service.provisionEmployee(hr, {
         ...input,

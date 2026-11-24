@@ -6,7 +6,7 @@ import { createdAt } from '../_shared/columns'
 import type { z } from 'zod'
 import type { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
 
-/** Current recurring assignment; absence means company defaults. Replacing it rewrites the row, and the access audit keeps the history and reason. Attendance snapshots retain past expectations. */
+/** Current recurring assignment; absence means company defaults. Writers retain every change in employee_schedule_version within the same transaction. Attendance snapshots retain the expectations of already-started sessions. */
 export const employeeWorkSchedule = pgTable(
   'employee_work_schedule',
   {

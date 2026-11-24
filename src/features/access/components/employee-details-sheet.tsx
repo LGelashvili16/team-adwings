@@ -57,7 +57,7 @@ export function EmployeeDetailsSheet({
 }: {
   open: boolean
   target: EmployeeAccountRecord
-  /** Assigning or editing the admin role requires admin.access, users.manage, and roles.manage. */
+  /** Assigning privileged administrator/accountant roles requires admin.access, users.manage, and roles.manage. */
   canAssignAdmin?: boolean
   /** Editing the working week additionally requires the attendance.configure permission. */
   canConfigureSchedule: boolean
@@ -73,7 +73,9 @@ export function EmployeeDetailsSheet({
   })
   const targetRoles = parseRoles(target.roles)
   const singleRole =
-    targetRoles.length === 1 ? provisionableRoleSchema.safeParse(targetRoles[0]) : null
+    targetRoles.length === 1
+      ? provisionableRoleSchema.safeParse(targetRoles[0])
+      : null
   const editableRole = singleRole?.success ? singleRole.data : undefined
   const availableRoles = canAssignAdmin
     ? provisionableRoleSchema.options
@@ -238,8 +240,9 @@ export function EmployeeDetailsSheet({
               </form.Field>
             ) : (
               <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                ამ ანგარიშის როლი ({targetRoles.map((r) => roleLabels[r]).join(', ')})
-                იმართება წვდომის მართვის გვერდიდან.
+                ამ ანგარიშის როლი (
+                {targetRoles.map((r) => roleLabels[r]).join(', ')}) იმართება
+                წვდომის მართვის გვერდიდან.
               </p>
             )}
             {canConfigureSchedule ? (

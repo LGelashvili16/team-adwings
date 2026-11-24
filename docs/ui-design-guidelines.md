@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 78. Last updated: 2026-11-21.
+Status: required project instructions. Version: 79. Last updated: 2026-11-24.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -293,6 +293,10 @@ Feedback references: `src/components/ui/sonner.tsx` owns the shared Sonner styli
 Day-off requests use one date picker labeled `თარიღი`; vacations use separate start and end date pickers. Apply this distinction to employee submissions and reviewer date changes. Switching a vacation to a day off retains the start date as the single selected day.
 
 When the user changes a shared UI standard, update this file instead of creating a competing design manual. Increment its version, update the date, and record the substantive decision below. Update references when files move. Carry accepted rules into shared primitives when implementing them, with verification proportional to their reach.
+
+## Payroll configuration
+
+`/manage/payroll/settings` belongs to management navigation under `ხელფასების პარამეტრები`, guarded by `payroll.configure`. Administrators, accountants and owners can edit it without granting accountants platform-administration access. Use separate Cards for calculation rules, statutory withholding settings and the save reason, with a single Save action. Keep employee and employer pension rates separately labeled and explain that the employer share is an additional company expense. Disabled built-in calculation does not imply a statutory exemption. Retain the dated version indicator, honest unavailable-calculation notice, inline validation, required reason, pending Spinner and draft preservation after conflicts or background refetch failures. Date selection uses the Georgian shadcn Calendar. Never display estimated settings as an employee's salary or simulate deductions.
 
 | Version | Date       | Decision                                                                                                                                                                                                               |
 | ------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

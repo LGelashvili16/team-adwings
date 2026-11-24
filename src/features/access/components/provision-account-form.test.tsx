@@ -60,7 +60,7 @@ describe('administrative account provisioning', () => {
       'გაყიდვების მენეჯერი',
     )
   })
-  it('adds the admin role option for owners and admins without exposing owner', async () => {
+  it('adds the accountant and admin options for owners and admins without exposing owner', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
     render(
@@ -79,6 +79,7 @@ describe('administrative account provisioning', () => {
       'წარმოების უფროსი',
       'გაყიდვების მენეჯერი',
       'HR',
+      'ბუღალტერი',
       'ადმინისტრატორი',
     ])
     await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))

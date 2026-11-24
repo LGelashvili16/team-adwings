@@ -12,6 +12,8 @@ import {
   companyScheduleSchema,
   saveCompanyScheduleSchema,
   employeeWorkingWeekSchema,
+  employeeScheduleRangeSchema,
+  scheduleRangeSchema,
 } from '../scheduling.schemas'
 import {
   companyLocalDate,
@@ -19,12 +21,17 @@ import {
   sameWorkingWeek,
 } from '../scheduling.rules'
 import * as repository from './scheduling.repository.server'
+import * as scheduleHistory from './employee-schedule-history.repository.server'
+import {
+  historicalScheduleDay,
+  historicalCompanyScheduleDay,
+} from '../employee-schedule-history.rules'
 import type { Actor } from '#/lib/authorization/actor'
 import type { OwnSchedule, ScheduleSettings } from '../scheduling.types'
 
 export class ScheduleWorkflowError extends Error {}
 
-/** Provisioning owns the account transaction; only current schedule administrators can assign a custom week. */
+/** Only current schedule administrators can assign an individual week. */
 async function requireScheduleAdministrator(
   tx: repository.ScheduleTransaction,
   actorId: string,
@@ -58,12 +65,26 @@ async function parseCustomWeek(
 export async function assignInitialEmployeeWeek(
   employeeId: string,
   days: unknown,
-  actorId: string,
+  actorId: string | null,
   tx: repository.ScheduleTransaction,
 ) {
-  await requireScheduleAdministrator(tx, actorId)
-  const week = await parseCustomWeek(days, tx)
-  await repository.insertEmployeeWeek(tx, employeeId, week, actorId)
+  // Provisioning authorizes the account transaction, including operator-only owner bootstrap.
+  // Inherited schedules need a retained decision too, even if the company week is not configured yet.
+  let week = null
+  if (days !== null) {
+    if (!actorId) throw new AuthorizationError()
+    await requireScheduleAdministrator(tx, actorId)
+    week = await parseCustomWeek(days, tx)
+    await repository.insertEmployeeWeek(tx, employeeId, week, actorId)
+  }
+  const { date } = await repository.companyWorkdayAt(new Date(), tx)
+  await scheduleHistory.appendEmployeeSchedule(tx, {
+    employeeId,
+    days: week,
+    actorId,
+    effectiveFrom: date,
+    source: 'provisioned',
+  })
 }
 
 /**
@@ -89,6 +110,16 @@ export async function replaceEmployeeWeek(
     week,
     actorId,
   )
+  if (changed) {
+    const { date } = await repository.companyWorkdayAt(new Date(), tx)
+    await scheduleHistory.appendEmployeeSchedule(tx, {
+      employeeId,
+      days: week,
+      actorId,
+      effectiveFrom: date,
+      source: 'changed',
+    })
+  }
   if (
     changed &&
     context &&
@@ -273,4 +304,26 @@ export function getVacationWorkingDates(
   endDate: string,
 ) {
   return repository.vacationWorkingDates(tx, userId, startDate, endDate)
+}
+
+/** Private calculation interface. The caller owns the transaction and checks current actor permissions and target-employee scope, as with attendance/leave schedule reads. Unknown history must block financial conclusions. */
+export async function getHistoricalEmployeeSchedule(
+  tx: repository.ScheduleTransaction,
+  input: unknown,
+) {
+  const range = employeeScheduleRangeSchema.parse(input)
+  return (await scheduleHistory.readEmployeeScheduleDates(tx, range)).map(
+    historicalScheduleDay,
+  )
+}
+
+/** Authorized reporting workflows own the read transaction and consume only retained company versions. */
+export async function getHistoricalCompanySchedule(
+  tx: repository.ScheduleTransaction,
+  input: unknown,
+) {
+  const range = scheduleRangeSchema.parse(input)
+  return (await scheduleHistory.readCompanyScheduleDates(tx, range)).map(
+    historicalCompanyScheduleDay,
+  )
 }

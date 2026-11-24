@@ -1,5 +1,6 @@
 import { EmployeeDayOffBalanceCard } from '#/features/leave/components/day-off-allowance-card'
 import { EmployeeNetworkCard } from '#/features/attendance-security/components/employee-network-card'
+import { EmployeeEmploymentCard } from '#/features/employees/components/employee-employment-card'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -7,7 +8,10 @@ import { IconArrowLeft } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
-import { hasEveryPermission, hasPermission } from '#/lib/authorization/permissions'
+import {
+  hasEveryPermission,
+  hasPermission,
+} from '#/lib/authorization/permissions'
 import { getEmployeeAccount } from '../access.functions'
 import { availableAccountActions, canManageAccount } from '../access.actions'
 import { AccountActionDialog } from './account-action-dialog'
@@ -40,9 +44,13 @@ function BackLink() {
 export function UserDetail({
   userId,
   actor,
+  employmentPage = 1,
+  employmentHistoryPage = 1,
 }: {
   userId: string
   actor: Actor
+  employmentPage?: number
+  employmentHistoryPage?: number
 }) {
   const query = useQuery({
     queryKey: ['employee-accounts', 'detail', userId],
@@ -110,6 +118,13 @@ export function UserDetail({
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_25rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <UserProfileCard record={record} />
+          <EmployeeEmploymentCard
+            actor={actor}
+            userId={userId}
+            name={record.name}
+            employmentPage={employmentPage}
+            employmentHistoryPage={employmentHistoryPage}
+          />
           <UserScheduleCard
             week={record.workingWeek}
             companyWeek={companyWeek}

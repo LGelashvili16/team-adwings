@@ -114,3 +114,24 @@ export const saveCompanyScheduleSchema = companyScheduleSchema.safeExtend({
   }),
 })
 export type SaveCompanyScheduleInput = z.input<typeof saveCompanyScheduleSchema>
+
+/** Bounded internal payroll/calendar read. Callers establish employee access before crossing the private service interface. */
+export const scheduleRangeSchema = z
+  .object(
+    {
+      startDate: scheduleDateSchema,
+      endDate: scheduleDateSchema,
+    },
+    { error: 'განრიგის პერიოდი არასწორია.' },
+  )
+  .refine(
+    ({ startDate, endDate }) =>
+      startDate <= endDate &&
+      Date.parse(`${endDate}T00:00:00Z`) -
+        Date.parse(`${startDate}T00:00:00Z`) <=
+        365 * 86400000,
+    { path: ['endDate'], message: 'აირჩიეთ სწორი პერიოდი, მაქსიმუმ 366 დღე.' },
+  )
+export const employeeScheduleRangeSchema = scheduleRangeSchema.safeExtend({
+  employeeId: z.uuid({ error: 'თანამშრომელი არასწორია.' }),
+})

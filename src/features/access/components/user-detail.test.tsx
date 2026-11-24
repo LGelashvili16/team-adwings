@@ -6,6 +6,10 @@ import { UserDetail } from './user-detail'
 import type { Actor } from '#/lib/authorization/actor'
 import type { EmployeeAccountRecord } from '../access.types'
 
+vi.mock('#/features/employees/components/employee-employment-card', () => ({
+  EmployeeEmploymentCard: () => null,
+}))
+
 vi.mock('#/db', async () => ({
   db: (await import('drizzle-orm/node-postgres')).drizzle.mock({
     schema: await import('#/db/schema'),
@@ -143,6 +147,7 @@ describe('single account page', () => {
       'წარმოების უფროსი',
       'გაყიდვების მენეჯერი',
       'HR',
+      'ბუღალტერი',
       'ადმინისტრატორი',
     ])
     await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
@@ -181,7 +186,7 @@ describe('single account page', () => {
       screen.getByRole('switch', { name: 'კომპანიის განრიგის გამოყენება' }),
     ).toBeInTheDocument()
   })
-  it.each(['admin', 'owner'])(
+  it.each(['admin', 'accountant', 'owner'])(
     'hides privileged %s account actions from HR',
     async (role) => {
       renderDetail({ roles: role }, { ...actor, roles: ['hr_manager'] })

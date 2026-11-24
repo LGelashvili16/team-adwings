@@ -9,6 +9,7 @@ import {
   IconUserCircle,
   IconLock,
   IconCalendarCog,
+  IconCalculator,
   IconUsers,
   IconUser,
   IconCalendarCheck,
@@ -49,6 +50,7 @@ export const navigationItems = [
     label: 'დასწრება',
     permission: null,
   },
+  { to: '/payroll', icon: IconCalculator, label: 'ხელფასი', permission: null },
   {
     to: '/leave',
     icon: IconCalendarOff,
@@ -102,6 +104,12 @@ export const navigationItems = [
   },
   // Management (high priority first)
   {
+    to: '/manage/payroll',
+    icon: IconCalculator,
+    label: 'ხელფასები',
+    permission: 'payroll.read.all',
+  },
+  {
     to: '/manage/attendance',
     icon: IconClock,
     label: 'დასწრებები',
@@ -146,6 +154,12 @@ export const navigationItems = [
     icon: IconCalendarCog,
     label: 'სამუშაო განრიგი',
     permission: 'attendance.configure',
+  },
+  {
+    to: '/manage/payroll/settings',
+    icon: IconCalculator,
+    label: 'ხელფასების პარამეტრები',
+    permission: 'payroll.configure',
   },
   {
     to: '/manage/announcements',
@@ -242,6 +256,12 @@ export const navigationItems = [
 
 export function isNavigationItemActive(pathname: string, destination: string) {
   const path = pathname.replace(/\/$/, '')
+  if (destination === '/manage/payroll')
+    return (
+      path === destination ||
+      (path.startsWith(`${destination}/`) &&
+        path !== '/manage/payroll/settings')
+    )
   if (destination === '/attendance') {
     return (
       path === '/attendance' ||

@@ -4,6 +4,7 @@ import {
   timestamp,
   uniqueIndex,
   check,
+  integer,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { user } from '../auth/auth.schema'
@@ -31,6 +32,8 @@ export const employee = pgTable(
     phone: text('phone'),
     /** Active employment permits login; inactive records remain available for restoration. */
     status: text('status').notNull().default('active'),
+    /** Revision of HR-confirmed payroll eligibility periods; zero means no period changes have been recorded. This is separate from login and employment access state. */
+    employmentRevision: integer('employment_revision').notNull().default(0),
     ...timestamps(),
   },
   (table) => [
@@ -39,6 +42,10 @@ export const employee = pgTable(
     check(
       'employee_status_valid',
       sql`${table.status} in ('active', 'inactive')`,
+    ),
+    check(
+      'employee_employment_revision_valid',
+      sql`${table.employmentRevision} >= 0`,
     ),
     check(
       'employee_username_normalized',

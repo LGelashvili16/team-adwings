@@ -80,7 +80,7 @@ function checkTarget(actor: Actor, id: string, roles: Array<Role>) {
   if (actor.id === id) throw new AuthorizationError()
   if (
     (roles.includes('owner') && !actor.roles.includes('owner')) ||
-    (roles.includes('admin') &&
+    ((roles.includes('admin') || roles.includes('accountant')) &&
       !hasEveryPermission(actor, ['admin.access', 'users.manage']))
   )
     throw new AuthorizationError()
@@ -133,15 +133,13 @@ async function createEmployee(
     input.dayOffAllowance,
     actorId,
   )
-  if (input.workingWeek !== null) {
-    if (!person || !actorId) throw new AuthorizationError()
-    try {
-      await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
-    } catch (error) {
-      if (error instanceof ScheduleWorkflowError)
-        throw new AccountWorkflowError(error.message)
-      throw error
-    }
+  if (!person) throw new AuthorizationError()
+  try {
+    await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
+  } catch (error) {
+    if (error instanceof ScheduleWorkflowError)
+      throw new AccountWorkflowError(error.message)
+    throw error
   }
   await tx
     .update(user)
@@ -168,7 +166,7 @@ export async function provisionEmployee(
   const input = provisionAccountSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
-    if (input.role === 'admin') {
+    if (input.role === 'admin' || input.role === 'accountant') {
       assertPermissions(manager, [
         'admin.access',
         'users.manage',
@@ -277,7 +275,7 @@ export async function editEmployeeDetails(
           'ამ ანგარიშის როლის შეცვლა მხოლოდ წვდომის მართვის გვერდიდანაა შესაძლებელი.',
         )
       if (input.role !== targetRoles[0]) {
-        if (input.role === 'admin') {
+        if (input.role === 'admin' || input.role === 'accountant') {
           assertPermissions(manager, [
             'admin.access',
             'users.manage',

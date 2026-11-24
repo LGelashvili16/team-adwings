@@ -5,7 +5,7 @@ import type { EmployeeAccountSummary } from './access.types'
 
 /**
  * Interface guidance only: the server re-checks every rule. Mirrors checkTarget in the service:
- * nobody manages their own account. Owner accounts need an owner; administrator accounts need platform account authority.
+ * nobody manages their own account. Owner accounts need an owner; administrator and accountant accounts need platform account authority.
  */
 export function canManageAccount(
   record: Pick<EmployeeAccountSummary, 'userId' | 'roles'>,
@@ -14,7 +14,7 @@ export function canManageAccount(
   const targetRoles = parseRoles(record.roles)
   const privileged = targetRoles.includes('owner')
     ? !actor.roles.includes('owner')
-    : targetRoles.includes('admin') &&
+    : (targetRoles.includes('admin') || targetRoles.includes('accountant')) &&
       !hasEveryPermission(actor, ['admin.access', 'users.manage'])
   return (
     hasEveryPermission(actor, ['manage.access', 'employees.manage']) &&
