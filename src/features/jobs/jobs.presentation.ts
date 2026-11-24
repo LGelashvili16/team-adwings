@@ -6,7 +6,7 @@ import {
   IconX,
   IconTool,
   IconRulerMeasure,
-  IconChecklist,
+  IconBriefcase,
 } from '@tabler/icons-react'
 import type { JobKind, JobStatus } from './jobs.types'
 import { jobsTimeZone } from './jobs.dates'
@@ -84,7 +84,7 @@ export const jobKinds = {
   other: {
     label: 'სხვა სამუშაო',
     createLabel: 'სხვა სამუშაოს დამატება',
-    icon: IconChecklist,
+    icon: IconBriefcase,
     variant: 'lavender',
     markerStyle: markerStyle('badge-lavender'),
   },
@@ -113,6 +113,11 @@ export function jobHistoryPresentation(event: {
   if (event.action === 'edited')
     return {
       label: 'ინფორმაცია განახლებულია',
+      color: 'var(--muted-foreground)',
+    }
+  if (event.action === 'assignments_changed')
+    return {
+      label: 'შემსრულებლები განახლებულია',
       color: 'var(--muted-foreground)',
     }
   return {

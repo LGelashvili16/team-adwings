@@ -6,6 +6,7 @@ import {
   doublePrecision,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -13,8 +14,14 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { user } from '../auth/auth.schema'
+import { productionTeam } from '../teams/team.schema'
+import { gpsDevice } from '../gps/gps.schema'
 import { createdAt, timestamps, uuidv7PrimaryKey } from '../_shared/columns'
-import type { JobKind, JobStatus } from '#/features/jobs/jobs.types'
+import type {
+  JobKind,
+  JobStatus,
+  JobAssignments,
+} from '#/features/jobs/jobs.types'
 
 /** One company-visible installation, measurement or other job, optionally placed on the map. Closed jobs retain their immutable event history. */
 export const job = pgTable(
@@ -62,6 +69,14 @@ export const job = pgTable(
     assigneeId: text('assignee_id').references(() => user.id, {
       onDelete: 'restrict',
     }),
+    /** Optional planning team. Deletion releases the label but preserves individual job assignments and audit snapshots. */
+    teamId: uuid('team_id').references(() => productionTeam.id, {
+      onDelete: 'set null',
+    }),
+    /** Optional tracker identity only; assigning it does not grant telemetry access. */
+    gpsDeviceId: uuid('gps_device_id').references(() => gpsDevice.id, {
+      onDelete: 'restrict',
+    }),
     /** Monotonically increasing revision prevents a stale editor overwriting another user's change. */
     version: integer('version').notNull().default(1),
     ...timestamps(),
@@ -71,6 +86,8 @@ export const job = pgTable(
     index('job_created_order').on(table.createdAt, table.id),
     index('job_status_order').on(table.status, table.createdAt, table.id),
     index('job_assignee_order').on(table.assigneeId, table.createdAt, table.id),
+    index('job_team').on(table.teamId),
+    index('job_gps_device').on(table.gpsDeviceId),
     check(
       'job_kind_valid',
       sql`${table.kind} in ('installation', 'measurement', 'other')`,
@@ -103,7 +120,7 @@ export const job = pgTable(
   ],
 )
 
-/** One immutable job creation, edit, or status event; written in the same transaction as its job. */
+/** One immutable job creation, edit, assignment or status event; written in the same transaction as its job. */
 export const jobEvent = pgTable(
   'job_event',
   {
@@ -117,12 +134,17 @@ export const jobEvent = pgTable(
     actorId: text('actor_id')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
-    /** Stable action: created, edited, or status_changed. */
+    /** Stable action: created, edited, assignments_changed or status_changed. */
     action: text('action').notNull(),
     /** Status after this event. */
     status: text('status').$type<JobStatus>().notNull(),
     /** User's progress note or rejection/reopening reason; empty for ordinary creation/edit. */
     note: text('note').notNull().default(''),
+    /** Immutable crew evidence, including names at the time of the change. */
+    assignmentChange: jsonb('assignment_change').$type<{
+      before: JobAssignments
+      after: JobAssignments
+    }>(),
     /** Database-time UTC instant of the event. */
     createdAt: createdAt(),
   },
@@ -131,7 +153,7 @@ export const jobEvent = pgTable(
     index('job_event_actor').on(table.actorId),
     check(
       'job_event_action_valid',
-      sql`${table.action} in ('created', 'edited', 'status_changed')`,
+      sql`${table.action} in ('created', 'edited', 'status_changed', 'assignments_changed')`,
     ),
     check(
       'job_event_status_valid',

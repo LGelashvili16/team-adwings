@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { allowedJobTransitions, canManageJobs, canEditJob } from './jobs.rules'
+import {
+  allowedJobTransitions,
+  canManageJobs,
+  canEditJob,
+  canAssignJobs,
+} from './jobs.rules'
 import { hasPermission } from '#/lib/authorization/permissions'
 import type { Actor } from '#/lib/authorization/actor'
 
@@ -12,6 +17,33 @@ const employee: Actor = {
 }
 const manager: Actor = { ...employee, id: 'manager', roles: ['supervisor'] }
 describe('shared map work policy', () => {
+  it('restricts assignment to administrators, owners and production supervisors, honoring denies', () => {
+    for (const role of ['admin', 'owner', 'supervisor'] as const) {
+      expect(canAssignJobs({ ...employee, roles: [role] })).toBe(true)
+      expect(
+        canAssignJobs({
+          ...employee,
+          roles: [role],
+          permissionOverrides: { allow: [], deny: ['jobs.assign'] },
+        }),
+      ).toBe(false)
+    }
+    for (const role of [
+      'employee',
+      'production_specialist',
+      'sales_manager',
+      'hr_manager',
+    ] as const) {
+      expect(canAssignJobs({ ...employee, roles: [role] })).toBe(false)
+      expect(
+        canAssignJobs({
+          ...employee,
+          roles: [role],
+          permissionOverrides: { allow: ['jobs.assign'], deny: [] },
+        }),
+      ).toBe(false)
+    }
+  })
   it.each(['sales_manager', 'supervisor', 'employee'] as const)(
     'allows %s to edit and reopen only their own jobs',
     (role) => {

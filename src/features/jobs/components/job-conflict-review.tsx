@@ -72,6 +72,18 @@ export function JobConflictReview({
             </p>
             <p>{latest.assigneeName ?? 'პასუხისმგებელი არ არის მინიჭებული'}</p>
             <p className="break-words">
+              შემსრულებლები:{' '}
+              {latest.assignments.employees
+                .map((person) => person.name)
+                .join(', ') || 'არ არის მითითებული'}
+            </p>
+            <p className="break-words">
+              გუნდი: {latest.assignments.team?.name ?? 'არ არის მითითებული'}
+            </p>
+            <p className="break-words">
+              GPS: {latest.assignments.gpsDevice?.name ?? 'არ არის მითითებული'}
+            </p>
+            <p className="break-words">
               {latest.address || 'მისამართი არ არის მითითებული'}
             </p>
             <p>

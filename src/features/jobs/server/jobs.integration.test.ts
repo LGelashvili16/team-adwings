@@ -101,6 +101,399 @@ async function transition(id: string, status: string, by = worker, note = '') {
 }
 
 describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
+  it('filters assignment candidates by validated roles and literal search without changing eligibility', async () => {
+    await sql().query(`UPDATE "user" SET roles='employee' WHERE id=$1`, [
+      other.id,
+    ])
+    try {
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'employees',
+            q: '',
+            page: 1,
+          })
+        ).items.map((person) => person.id),
+      ).toEqual([worker.id])
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'employees',
+            q: '',
+            page: 1,
+            roles: ['employee'],
+          })
+        ).items.map((person) => person.id),
+      ).toEqual([other.id])
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'employees',
+            q: '',
+            page: 1,
+            roles: [],
+          })
+        ).total,
+      ).toBe(0)
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'employees',
+            q: '%',
+            page: 1,
+            roles: ['employee', 'production_specialist'],
+          })
+        ).total,
+      ).toBe(0)
+      await expect(
+        service.listJobAssignmentCandidates(manager, {
+          kind: 'employees',
+          q: '',
+          page: 1,
+          roles: ['admin'],
+        }),
+      ).rejects.toThrow('მოთხოვნა არასწორია')
+    } finally {
+      await sql().query(
+        `UPDATE "user" SET roles='production_specialist' WHERE id=$1`,
+        [other.id],
+      )
+    }
+  })
+  it('rejects disabled resources, returns minimal candidates and serializes concurrent assignment saves', async () => {
+    const { id } = await createPin()
+    const [team] = (
+      await sql().query(
+        "INSERT INTO production_team (name, active) VALUES ('გამორთული გუნდი', false) RETURNING id",
+      )
+    ).rows
+    const [device] = (
+      await sql().query(
+        "INSERT INTO gps_device (name, reported_id, phone, enabled) VALUES ('გამორთული GPS', '009876543211', '+995555000000', false) RETURNING id",
+      )
+    ).rows
+    const input = {
+      id,
+      version: 1,
+      employeeIds: [worker.id],
+      teamId: null,
+      teamVersion: null,
+      gpsDeviceId: null,
+    }
+    try {
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...input,
+          teamId: team.id,
+        }),
+      ).rejects.toThrow('მოქმედი გუნდი')
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...input,
+          gpsDeviceId: device.id,
+        }),
+      ).rejects.toThrow('მოქმედი GPS')
+      await expect(
+        service.getJobAssignmentTeam(manager, { id: team.id }),
+      ).rejects.toThrow('მოქმედი გუნდი')
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'devices',
+            q: 'გამორთული GPS',
+            page: 1,
+          })
+        ).total,
+      ).toBe(0)
+      await sql().query('UPDATE gps_device SET enabled=true WHERE id=$1', [
+        device.id,
+      ])
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'devices',
+            q: 'გამორთული GPS',
+            page: 1,
+          })
+        ).items,
+      ).toEqual([
+        {
+          id: device.id,
+          name: 'გამორთული GPS',
+          jobTitle: null,
+          reportedId: '009876543211',
+          phone: '+995555000000',
+        },
+      ])
+      const results = await Promise.allSettled([
+        service.saveCompanyJobAssignments(manager, input),
+        service.saveCompanyJobAssignments(platformAdmin, {
+          ...input,
+          employeeIds: [other.id],
+        }),
+      ])
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1)
+      expect(
+        results.filter((result) => result.status === 'rejected'),
+      ).toHaveLength(1)
+      expect((await detail(id)).version).toBe(2)
+      expect(
+        (await detail(id)).history.filter(
+          (event) => event.action === 'assignments_changed',
+        ),
+      ).toHaveLength(1)
+    } finally {
+      await sql().query('DELETE FROM production_team WHERE id=$1', [team.id])
+      await sql().query('DELETE FROM gps_device WHERE id=$1', [device.id])
+    }
+  })
+  it('saves a crew, team and GPS device with atomic audit, scoped reads and stale-edit protection', async () => {
+    const { id } = await createPin()
+    const [team] = (
+      await sql().query(
+        "INSERT INTO production_team (name) VALUES ('სატესტო გუნდი') RETURNING id, version",
+      )
+    ).rows
+    const [device] = (
+      await sql().query(
+        "INSERT INTO gps_device (name, reported_id) VALUES ('სატესტო GPS', '009876543210') RETURNING id",
+      )
+    ).rows
+    try {
+      await sql().query(
+        'INSERT INTO team_membership (team_id, user_id) VALUES ($1, $2)',
+        [team.id, worker.id],
+      )
+      const roster = await service.getJobAssignmentTeam(manager, {
+        id: team.id,
+      })
+      expect(roster.employees.map((person) => person.id)).toEqual([worker.id])
+      const assignmentDraft = {
+        id,
+        version: 1,
+        employeeIds: [worker.id, other.id],
+        teamId: team.id,
+        teamVersion: roster.version,
+        gpsDeviceId: device.id,
+      }
+      await service.saveCompanyJobAssignments(platformAdmin, assignmentDraft)
+      expect(await detail(id)).toMatchObject({
+        version: 2,
+        status: 'pending',
+        assigneeId: null,
+        assignments: {
+          team: { id: team.id },
+          gpsDevice: { id: device.id },
+          employees: expect.arrayContaining([
+            expect.objectContaining({ id: worker.id }),
+            expect.objectContaining({ id: other.id }),
+          ]),
+        },
+      })
+      expect(
+        (await service.listCompanyJobs(worker, { ...search, scope: 'mine' }))
+          .items,
+      ).toEqual([expect.objectContaining({ id, assignedEmployeeCount: 2 })])
+      expect(
+        (await service.listCompanyJobs(other, { ...search, scope: 'related' }))
+          .total,
+      ).toBe(1)
+      expect(
+        (
+          await service.listCompanyJobs(ordinaryEmployee, {
+            ...search,
+            scope: 'mine',
+          })
+        ).total,
+      ).toBe(0)
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...assignmentDraft,
+          employeeIds: [],
+        }),
+      ).rejects.toThrow('უკვე შეიცვალა')
+      const events = (
+        await sql().query(
+          "SELECT assignment_change FROM job_event WHERE job_id=$1 AND action='assignments_changed'",
+          [id],
+        )
+      ).rows
+      expect(events).toHaveLength(1)
+      expect(events[0].assignment_change.before.employees).toEqual([])
+      expect(events[0].assignment_change.after.employees).toHaveLength(2)
+      expect(events[0].assignment_change.after.team.name).toBe('სატესტო გუნდი')
+      const summary = 'შემსრულებლები: 2\nGPS: სატესტო GPS'
+      expect((await detail(id)).history[0].note).toBe(summary)
+      // Simulate a pre-format-change event without rewriting its immutable assignment snapshot.
+      await sql().query(
+        "UPDATE job_event SET note=$2 WHERE job_id=$1 AND action='assignments_changed'",
+        [id, 'თანამშრომლები: 2. გუნდი: სატესტო გუნდი. GPS: სატესტო GPS.'],
+      )
+      const legacy = await detail(id)
+      expect(legacy.history[0].note).toBe(summary)
+      expect(legacy.history[0]).not.toHaveProperty('assignmentChange')
+      await sql().query(
+        'UPDATE production_team SET version=version+1 WHERE id=$1',
+        [team.id],
+      )
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...assignmentDraft,
+          version: 2,
+        }),
+      ).rejects.toThrow('გუნდი შეიცვალა')
+      expect((await detail(id)).version).toBe(2)
+      await service.saveCompanyJobAssignments(manager, {
+        ...assignmentDraft,
+        version: 2,
+        employeeIds: [other.id],
+        teamId: null,
+        teamVersion: null,
+        gpsDeviceId: null,
+      })
+      expect((await detail(id)).assignments).toEqual({
+        employees: [expect.objectContaining({ id: other.id })],
+        team: null,
+        gpsDevice: null,
+      })
+      expect((await detail(id)).history[0].note).toBe(
+        'შემსრულებლები: 1\nGPS: არ არის მითითებული',
+      )
+      expect((await detail(id)).history[1].note).toBe(summary)
+      const noOp = {
+        id,
+        version: 3,
+        employeeIds: [other.id],
+        teamId: null,
+        teamVersion: null,
+        gpsDeviceId: null,
+      }
+      await service.saveCompanyJobAssignments(manager, noOp)
+      expect((await detail(id)).version).toBe(3)
+      await transition(id, 'completed', manager)
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...noOp,
+          version: 4,
+          employeeIds: [],
+        }),
+      ).rejects.toThrow('თავიდან დაგეგმეთ')
+      expect((await detail(id)).assignments.employees).toHaveLength(1)
+    } finally {
+      await sql().query('DELETE FROM team_membership WHERE team_id=$1', [
+        team.id,
+      ])
+      // Keep tracker identities referenced by the immutable audit until the isolated database is dropped.
+      await sql().query('DELETE FROM production_team WHERE id=$1', [team.id])
+    }
+  })
+  it('denies direct unauthorized assignments and candidate reads using current stored grants and employment', async () => {
+    const { id } = await createPin()
+    const input = {
+      id,
+      version: 1,
+      employeeIds: [worker.id],
+      teamId: null,
+      teamVersion: null,
+      gpsDeviceId: null,
+    }
+    for (const by of [
+      null,
+      worker,
+      ordinaryEmployee,
+      { ...worker, roles: ['admin'] as Actor['roles'] },
+    ]) {
+      await expect(
+        service.saveCompanyJobAssignments(by, input),
+      ).rejects.toThrow('წვდომა')
+      await expect(
+        service.listJobAssignmentCandidates(by, {
+          kind: 'employees',
+          q: '',
+          page: 1,
+        }),
+      ).rejects.toThrow('წვდომა')
+    }
+    await sql().query(
+      `UPDATE "user" SET roles='sales_manager', permission_overrides='{"allow":["jobs.assign"],"deny":[]}' WHERE id=$1`,
+      [other.id],
+    )
+    try {
+      await expect(
+        service.saveCompanyJobAssignments(other, input),
+      ).rejects.toThrow('წვდომა')
+    } finally {
+      await sql().query(
+        `UPDATE "user" SET roles='production_specialist', permission_overrides='{"allow":[],"deny":[]}' WHERE id=$1`,
+        [other.id],
+      )
+    }
+    await sql().query(
+      `UPDATE "user" SET permission_overrides='{"allow":[],"deny":["jobs.assign"]}' WHERE id=$1`,
+      [manager.id],
+    )
+    try {
+      await expect(
+        service.saveCompanyJobAssignments(manager, input),
+      ).rejects.toThrow('წვდომა')
+    } finally {
+      await sql().query(
+        `UPDATE "user" SET permission_overrides='{"allow":[],"deny":[]}' WHERE id=$1`,
+        [manager.id],
+      )
+    }
+    await sql().query(
+      "UPDATE employee SET status='inactive' WHERE user_id=$1",
+      [worker.id],
+    )
+    try {
+      await expect(
+        service.saveCompanyJobAssignments(manager, input),
+      ).rejects.toThrow('მოქმედი თანამშრომლები')
+      expect(
+        (
+          await service.listJobAssignmentCandidates(manager, {
+            kind: 'employees',
+            q: '',
+            page: 1,
+          })
+        ).items.some((person) => person.id === worker.id),
+      ).toBe(false)
+    } finally {
+      await sql().query(
+        "UPDATE employee SET status='active' WHERE user_id=$1",
+        [worker.id],
+      )
+    }
+    expect((await detail(id)).version).toBe(1)
+    expect((await detail(id)).assignments.employees).toEqual([])
+  })
+  it('rolls back assignments and their revision when audit persistence fails', async () => {
+    const { id } = await createPin()
+    await sql().query(
+      `CREATE FUNCTION fail_job_assignment_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='assignments_changed' THEN RAISE EXCEPTION 'test event failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_job_assignment_event BEFORE INSERT ON job_event FOR EACH ROW EXECUTE FUNCTION fail_job_assignment_event()`,
+    )
+    try {
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          id,
+          version: 1,
+          employeeIds: [worker.id],
+          teamId: null,
+          teamVersion: null,
+          gpsDeviceId: null,
+        }),
+      ).rejects.toThrow()
+      expect((await detail(id)).version).toBe(1)
+      expect((await detail(id)).assignments.employees).toEqual([])
+    } finally {
+      await sql().query(
+        'DROP TRIGGER fail_job_assignment_event ON job_event; DROP FUNCTION fail_job_assignment_event()',
+      )
+    }
+  })
   it('permits only the stored creator or an administrator to edit and reopen, retaining production completion and audit', async () => {
     await sql().query('UPDATE "user" SET roles=$1 WHERE id=$2', [
       'sales_manager',
@@ -411,7 +804,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     )
   }, 30_000)
   beforeEach(async () => {
-    await sql().query('TRUNCATE job_read, job_event, job')
+    await sql().query('TRUNCATE job_employee, job_read, job_event, job')
     await sql().query(
       'TRUNCATE notification, notification_policy, notification_policy_audit',
     )
@@ -1298,7 +1691,9 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       ).toEqual(recipients.map((recipient) => recipient.id).sort())
     } finally {
       await Promise.all(readers.map((reader) => reader.cancel()))
-      await sql().query('TRUNCATE job_read, job_event, job, notification')
+      await sql().query(
+        'TRUNCATE job_employee, job_read, job_event, job, notification',
+      )
       await sql().query('DELETE FROM "user" WHERE id=$1', [sales.id])
     }
   }, 15_000)

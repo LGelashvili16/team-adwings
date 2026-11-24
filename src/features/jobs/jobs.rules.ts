@@ -13,6 +13,10 @@ export class JobConflictError extends JobWorkflowError {}
 export const canManageJobs = (actor: Actor) =>
   hasPermission(actor, 'jobs.manage')
 
+export const canAssignJobs = (actor: Actor) =>
+  actor.roles.some((role) => ['admin', 'owner', 'supervisor'].includes(role)) &&
+  hasPermission(actor, 'jobs.assign')
+
 export const canManageJobDetails = (actor: Actor, job: { createdBy: string }) =>
   actor.id === job.createdBy || hasPermission(actor, 'jobs.edit.all')
 

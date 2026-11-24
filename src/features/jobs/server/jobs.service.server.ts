@@ -8,11 +8,15 @@ import {
   jobLookupSchema,
   jobSearchSchema,
   jobTransitionSchema,
+  jobAssignmentsSchema,
+  jobAssignmentSearchSchema,
+  jobAssignmentTeamSchema,
 } from '../jobs.schemas'
 import {
   hasJobCoordinates,
   JobConflictError,
   JobWorkflowError,
+  canAssignJobs,
 } from '../jobs.rules'
 import {
   assertJobManager,
@@ -21,10 +25,14 @@ import {
   requireJobActor,
 } from './jobs.policy.server'
 import * as repository from './jobs.repository.server'
+import * as assignments from './job-assignments.repository.server'
+import { AuthorizationError } from '#/lib/authorization/authorization-error'
+import { parseRoles } from '#/lib/authorization/permissions'
+import { canJoinProductionTeam } from '#/features/teams/teams.rules'
 import { resolveJobStreet } from './job-locations.service.server'
 import type { ResolvedLocation } from '../job-locations.types'
 import type { Actor } from '#/lib/authorization/actor'
-import type { JobDetail, JobsWorkspace } from '../jobs.types'
+import type { JobDetail, JobsWorkspace, JobAssignments } from '../jobs.types'
 import { formatJobDay } from '../jobs.dates'
 
 function validateInput<T>(
@@ -41,6 +49,124 @@ function validateInput<T>(
       'მოთხოვნა არასწორია. გადაამოწმეთ შეყვანილი მონაცემები.',
     )
   return parsed.data
+}
+
+function assertAssignmentManager(actor: Actor) {
+  if (!canAssignJobs(actor)) throw new AuthorizationError()
+}
+function assignmentHistoryNote(crew: JobAssignments) {
+  return `შემსრულებლები: ${crew.employees.length}\nGPS: ${crew.gpsDevice?.name ?? 'არ არის მითითებული'}`
+}
+export async function listJobAssignmentCandidates(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const data = validateInput(jobAssignmentSearchSchema, input)
+  return repository.transactJobs(
+    async (tx) => {
+      assertAssignmentManager(await requireJobActor(tx, actor))
+      return assignments.assignmentCandidates(tx, data)
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
+}
+export async function getJobAssignmentTeam(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { id } = validateInput(jobAssignmentTeamSchema, input)
+  return repository.transactJobs(
+    async (tx) => {
+      assertAssignmentManager(await requireJobActor(tx, actor))
+      const team = await assignments.assignmentTeam(tx, id)
+      if (!team?.active) throw new JobWorkflowError('აირჩიეთ მოქმედი გუნდი.')
+      const employees = await assignments.assignmentTeamMembers(tx, id)
+      if (employees.length > 200)
+        throw new JobWorkflowError(
+          'გუნდში 200-ზე მეტი თანამშრომელია. სამუშაოს შემსრულებლები ცალ-ცალკე აირჩიეთ.',
+        )
+      return {
+        ...team,
+        employees,
+      }
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
+}
+export async function saveCompanyJobAssignments(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const data = validateInput(jobAssignmentsSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    assertAssignmentManager(current)
+    const record = await currentJob(tx, data.id, data.version)
+    if (record.status === 'completed' || record.status === 'rejected')
+      throw new JobWorkflowError(
+        'შემსრულებლების შეცვლამდე სამუშაო თავიდან დაგეგმეთ.',
+      )
+    const before = await assignments.readAssignments(tx, record.id)
+    if (data.teamId) {
+      const team = await assignments.assignmentTeam(tx, data.teamId, true)
+      if (!team?.active) throw new JobWorkflowError('აირჩიეთ მოქმედი გუნდი.')
+      if (data.teamVersion !== null && team.version !== data.teamVersion)
+        throw new JobWorkflowError(
+          'გუნდი შეიცვალა. ხელახლა აირჩიეთ გუნდი და გადაამოწმეთ თანამშრომლები.',
+        )
+    }
+    if (
+      data.gpsDeviceId &&
+      !(await assignments.assignmentDevice(tx, data.gpsDeviceId))?.enabled
+    )
+      throw new JobWorkflowError('აირჩიეთ მოქმედი GPS მოწყობილობა.')
+    for (const id of [...data.employeeIds].sort()) {
+      const { identity, person } = await repository.currentIdentity(
+        tx,
+        id,
+        true,
+      )
+      if (
+        !identity ||
+        identity.state !== 'active' ||
+        person?.status !== 'active' ||
+        !canJoinProductionTeam(parseRoles(identity.roles))
+      )
+        throw new JobWorkflowError(
+          'აირჩიეთ მოქმედი თანამშრომლები დასაშვები როლით.',
+        )
+    }
+    if (
+      record.teamId === data.teamId &&
+      record.gpsDeviceId === data.gpsDeviceId &&
+      before.employees.length === data.employeeIds.length &&
+      before.employees.every((person) => data.employeeIds.includes(person.id))
+    )
+      return { id: record.id }
+    await assignments.replaceEmployees(tx, record.id, data.employeeIds)
+    await repository.updateJob(tx, record.id, {
+      teamId: data.teamId,
+      gpsDeviceId: data.gpsDeviceId,
+      version: record.version + 1,
+    })
+    const after = await assignments.readAssignments(tx, record.id)
+    await repository.appendJobEvent(tx, {
+      jobId: record.id,
+      actorId: current.id,
+      action: 'assignments_changed',
+      status: record.status,
+      assignmentChange: { before, after },
+      note: assignmentHistoryNote(after),
+    })
+    await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
+    await notifyJobEvent(tx, current, {
+      jobId: record.id,
+      eventKey: `job:${record.id}:${record.version + 1}:assignments`,
+      title: 'სამუშაოს შემსრულებლები შეიცვალა',
+      body: 'გადაამოწმეთ სამუშაოზე დამატებული თანამშრომლები, გუნდი და GPS მოწყობილობა.',
+    })
+    return { id: record.id }
+  })
 }
 export async function listCompanyJobs(
   actor: Actor | null,
@@ -82,8 +208,12 @@ export async function getCompanyJob(
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         locationResolvedAt: record.locationResolvedAt?.toISOString() ?? null,
-        history: record.history.map((event) => ({
+        history: record.history.map(({ assignmentChange, ...event }) => ({
           ...event,
+          note:
+            event.action === 'assignments_changed' && assignmentChange
+              ? assignmentHistoryNote(assignmentChange.after)
+              : event.note,
           createdAt: event.createdAt.toISOString(),
         })),
       }

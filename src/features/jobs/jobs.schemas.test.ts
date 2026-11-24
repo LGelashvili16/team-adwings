@@ -6,9 +6,34 @@ import {
   jobFieldsSchema,
   jobSearchSchema,
   jobTransitionSchema,
+  jobAssignmentsSchema,
 } from './jobs.schemas'
 
 const id = '019a365d-37cc-7a5c-bfe1-1e0752235b68'
+it('validates bounded unique employee assignments, resource identifiers and revisions', () => {
+  const valid = {
+    id,
+    version: 1,
+    employeeIds: ['employee'],
+    teamId: null,
+    teamVersion: null,
+    gpsDeviceId: null,
+  }
+  expect(jobAssignmentsSchema.safeParse(valid).success).toBe(true)
+  for (const change of [
+    { employeeIds: ['employee', 'employee'] },
+    { employeeIds: [''] },
+    { employeeIds: Array.from({ length: 201 }, (_, i) => String(i)) },
+    { teamId: 'bad' },
+    { gpsDeviceId: 'bad' },
+    { version: 0 },
+    { teamVersion: 0 },
+    { employeeIds: undefined },
+  ])
+    expect(
+      jobAssignmentsSchema.safeParse({ ...valid, ...change }).success,
+    ).toBe(false)
+})
 it('validates the related-to-me URL filter and rejects unknown relationship scopes', () => {
   expect(jobSearchSchema.parse({ scope: 'related' }).scope).toBe('related')
   expect(jobSearchSchema.safeParse({ scope: 'someone-else' }).success).toBe(

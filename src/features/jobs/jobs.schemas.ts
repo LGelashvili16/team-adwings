@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { georgiaLocationError, isLocationInGeorgia } from './jobs.geography'
 import { jobsMonthRange } from './jobs.dates'
+import { teamRoleFilterSchema } from '#/features/teams/teams.schemas'
 
 const jobDateSchema = z.iso
   .date({ error: 'თარიღი არასწორია.' })
@@ -117,6 +118,51 @@ export const editJobSchema = jobFieldsSchema.safeExtend({
   deadline: requiredJobDeadlineSchema,
 })
 export const jobLookupSchema = z.object({ id: jobIdSchema })
+export const jobAssignmentFieldsSchema = z.object({
+  employeeIds: z
+    .array(
+      z
+        .string({ error: 'თანამშრომელი არასწორია.' })
+        .min(1, 'აირჩიეთ თანამშრომელი.')
+        .max(256, 'იდენტიფიკატორი ძალიან გრძელია.'),
+      { error: 'თანამშრომლების სია არასწორია.' },
+    )
+    .max(200, 'შეგიძლიათ დაამატოთ მაქსიმუმ 200 თანამშრომელი.')
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      'თანამშრომელი სიაში მეორდება.',
+    ),
+  teamId: z.uuid({ error: 'გუნდი არასწორია.' }).nullable(),
+  teamVersion: versionSchema.nullable(),
+  gpsDeviceId: z.uuid({ error: 'GPS მოწყობილობა არასწორია.' }).nullable(),
+})
+export const jobAssignmentsSchema = jobAssignmentFieldsSchema.extend({
+  id: jobIdSchema,
+  version: versionSchema,
+})
+export const jobAssignmentSearchSchema = z.object({
+  roles: teamRoleFilterSchema.default(['production_specialist']),
+  kind: z.enum(['employees', 'teams', 'devices'], {
+    error: 'არჩევანის ტიპი არასწორია.',
+  }),
+  q: z
+    .string({ error: 'ძიება არასწორია.' })
+    .trim()
+    .max(100, 'ძიება ძალიან გრძელია.'),
+  page: z
+    .number({ error: 'გვერდი არასწორია.' })
+    .int('გვერდი არასწორია.')
+    .min(1, 'გვერდი არასწორია.')
+    .max(100000, 'გვერდი არასწორია.'),
+})
+export const jobAssignmentTeamSchema = z.object({
+  id: z.uuid({ error: 'გუნდი არასწორია.' }),
+})
+export const jobAssignmentFilterSchema = jobAssignmentSearchSchema
+  .pick({ q: true, roles: true })
+  .extend({ roles: jobAssignmentSearchSchema.shape.roles.removeDefault() })
+export const jobAssignmentPageSize = 20
+export type JobAssignmentSearch = z.infer<typeof jobAssignmentSearchSchema>
 export const jobTransitionSchema = z
   .object({
     id: jobIdSchema,

@@ -78,6 +78,13 @@ export function JobsList({
           header: 'პასუხისმგებელი',
           cell: ({ row }) => row.original.assigneeName ?? 'თავისუფალია',
         }),
+        helper.accessor('assignedEmployeeCount', {
+          header: 'შემსრულებლები',
+          cell: ({ row }) =>
+            row.original.assignedEmployeeCount
+              ? `${row.original.assignedEmployeeCount} თანამშრომელი`
+              : 'არ არის დამატებული',
+        }),
         helper.accessor('deadline', {
           header: () => (
             <Link

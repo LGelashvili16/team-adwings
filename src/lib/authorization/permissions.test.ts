@@ -151,6 +151,7 @@ describe('role and permission boundaries', () => {
       'jobs.claim',
       'jobs.complete.manage',
       'jobs.edit.all',
+      'jobs.assign',
       'attendance.read.all',
       'admin.access',
       'users.manage',

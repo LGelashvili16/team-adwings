@@ -8,7 +8,7 @@ import {
   IconMapPin,
   IconNotes,
   IconPencil,
-  IconUser,
+  IconUserPlus,
 } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
@@ -33,6 +33,7 @@ import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
 import { JobActionDialog } from './job-actions'
+import { JobAssignmentsCard } from './job-assignments-card'
 import type { JobAction } from './job-actions'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobDetail } from '../jobs.types'
@@ -139,6 +140,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
           {jobStatuses[primary].action}
         </Button>
       ) : null}
+      <JobAssignmentsCard actor={actor} job={job} />
       <Card size="sm" className="shrink-0">
         <CardHeader>
           <CardTitle>სამუშაოს ინფორმაცია</CardTitle>
@@ -159,12 +161,10 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
             </div>
             <div>
               <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
-                <IconUser className="size-4 shrink-0" aria-hidden="true" />
-                პასუხისმგებელი
+                <IconUserPlus className="size-4 shrink-0" aria-hidden="true" />
+                სამუშაო დაამატა
               </dt>
-              <dd className="pl-7 break-words">
-                {job.assigneeName ?? 'თავისუფალია'}
-              </dd>
+              <dd className="pl-7 break-words">{job.creatorName}</dd>
             </div>
             <div>
               <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">

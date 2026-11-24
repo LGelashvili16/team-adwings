@@ -26,6 +26,7 @@ const actor: Actor = {
   emailVerified: false,
 }
 const job: JobDetail = {
+  assignments: { employees: [], team: null, gpsDevice: null },
   id: '019a365d-37cc-7a5c-bfe1-1e0752235b68',
   title: 'მონტაჟი',
   notes: 'ინსტრუქციები',

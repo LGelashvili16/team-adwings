@@ -30,6 +30,7 @@ const employee: Actor = {
   roles: ['production_specialist'],
 }
 const job: JobDetail = {
+  assignments: { employees: [], team: null, gpsDevice: null },
   id: '019a365d-37cc-7a5c-bfe1-1e0752235b68',
   title: 'ბინის აზომვა',
   kind: 'measurement',
@@ -255,6 +256,9 @@ it('shows a concise address, notes and recent history without duplicating the la
     />,
   )
   expect(screen.getByText(job.address)).toBeInTheDocument()
+  expect(screen.getByText('სამუშაო დაამატა')).toBeVisible()
+  expect(screen.getByText(job.creatorName)).toBeVisible()
+  expect(screen.queryByText('პასუხისმგებელი')).not.toBeInTheDocument()
   expect(screen.getByText(job.notes)).toBeInTheDocument()
   expect(screen.queryByText('University Street')).not.toBeInTheDocument()
   expect(screen.queryByText(/OpenStreetMap/)).not.toBeInTheDocument()

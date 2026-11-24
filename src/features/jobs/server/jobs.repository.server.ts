@@ -16,7 +16,18 @@ import {
 import { jobsTimeZone } from '../jobs.dates'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '#/db'
-import { employee, job, jobEvent, jobRead, user } from '#/db/schema'
+import {
+  employee,
+  job,
+  jobEvent,
+  jobRead,
+  jobEmployee,
+  user,
+} from '#/db/schema'
+import {
+  readAssignments,
+  employeeAssignmentCounts,
+} from './job-assignments.repository.server'
 import { jobsMapLimit, jobsPageSize } from '../jobs.schemas'
 import { hasJobCoordinates } from '../jobs.rules'
 import type { JobSearch } from '../jobs.types'
@@ -143,6 +154,10 @@ export async function listJobs(
   actorId: string,
   search: JobSearch,
 ) {
+  const assignedToActor = or(
+    eq(job.assigneeId, actorId),
+    sql`exists (select 1 from ${jobEmployee} where ${jobEmployee.jobId} = ${job.id} and ${jobEmployee.userId} = ${actorId})`,
+  )
   // Escape SQL wildcard characters so ordinary input is a literal substring search.
   const term = `%${search.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
   const where = and(
@@ -161,9 +176,9 @@ export async function listJobs(
       : undefined,
     search.status !== 'all' ? eq(job.status, search.status) : undefined,
     search.kind !== 'all' ? eq(job.kind, search.kind) : undefined,
-    search.scope === 'mine' ? eq(job.assigneeId, actorId) : undefined,
+    search.scope === 'mine' ? assignedToActor : undefined,
     search.scope === 'related'
-      ? or(eq(job.createdBy, actorId), eq(job.assigneeId, actorId))
+      ? or(eq(job.createdBy, actorId), assignedToActor)
       : undefined,
   )
   const order =
@@ -204,8 +219,15 @@ export async function listJobs(
     .select({ count: count(), mappedCount: count(job.longitude) })
     .from(job)
     .where(where)
+  const assignedCounts = await employeeAssignmentCounts(
+    tx,
+    items.map((item) => item.id),
+  )
   return {
-    items,
+    items: items.map((item) => ({
+      ...item,
+      assignedEmployeeCount: assignedCounts.get(item.id) ?? 0,
+    })),
     markers: markers.filter(hasJobCoordinates),
     total: total.count,
     mapTruncated: total.mappedCount > jobsMapLimit,
@@ -239,6 +261,7 @@ export async function readJob(tx: JobsTransaction, id: string) {
       action: jobEvent.action,
       status: jobEvent.status,
       note: jobEvent.note,
+      assignmentChange: jobEvent.assignmentChange,
       actorName: user.name,
       createdAt: jobEvent.createdAt,
     })
@@ -249,6 +272,7 @@ export async function readJob(tx: JobsTransaction, id: string) {
     .limit(26)
   return {
     ...record,
+    assignments: await readAssignments(tx, id),
     history: history.slice(0, 25),
     hasMoreHistory: history.length > 25,
   }
@@ -298,6 +322,8 @@ export async function updateJob(
       | 'latitude'
       | 'status'
       | 'assigneeId'
+      | 'teamId'
+      | 'gpsDeviceId'
       | 'version'
       | 'streetNameKa'
       | 'streetNameEn'

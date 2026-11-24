@@ -17,6 +17,7 @@ export const permissionSchema = z.enum(
     'jobs.claim',
     'jobs.complete.manage',
     'jobs.edit.all',
+    'jobs.assign',
     'gps.read',
     'gps.manage',
     'announcements.manage',
@@ -126,6 +127,7 @@ const administrationPermissions = [
   'jobs.claim',
   'jobs.complete.manage',
   'jobs.edit.all',
+  'jobs.assign',
   'attendance.read.all',
   'admin.access',
   'users.manage',
@@ -156,6 +158,7 @@ const managementPermissions: Record<
     'timesheets.review.team',
     'jobs.manage',
     'jobs.complete.manage',
+    'jobs.assign',
     'employees.read',
   ],
   hr_manager: [

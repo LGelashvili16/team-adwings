@@ -133,7 +133,9 @@ export function JobsCards({
                   <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
                     <IconUser className="size-4 shrink-0" aria-hidden="true" />
                     <span className="break-words">
-                      {job.assigneeName ?? 'თავისუფალია'}
+                      {job.assignedEmployeeCount
+                        ? `${job.assignedEmployeeCount} შემსრულებელი`
+                        : 'შემსრულებელი არ არის დამატებული'}
                     </span>
                   </p>
                   <IconChevronRight

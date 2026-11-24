@@ -29,6 +29,7 @@ export type JobSummary = {
   createdAt: string
   updatedAt: string
   isUnread?: boolean
+  assignedEmployeeCount?: number
 }
 export type JobMarker = Pick<JobSummary, 'id' | 'title' | 'kind' | 'status'> & {
   deadline?: string | null
@@ -38,6 +39,7 @@ export type JobMarker = Pick<JobSummary, 'id' | 'title' | 'kind' | 'status'> & {
   latitude: number
 }
 export type JobDetail = JobSummary & {
+  assignments: JobAssignments
   createdBy: string
   streetNameKa: string | null
   streetNameEn: string | null
@@ -55,6 +57,21 @@ export type JobDetail = JobSummary & {
     createdAt: string
   }>
   hasMoreHistory: boolean
+}
+export type JobAssignmentPerson = {
+  id: string
+  name: string
+  jobTitle: string | null
+}
+/** Device metadata is returned only for authorized GPS picker candidates. */
+export type JobAssignmentCandidate = JobAssignmentPerson & {
+  reportedId?: string
+  phone?: string | null
+}
+export type JobAssignments = {
+  employees: Array<JobAssignmentPerson>
+  team: { id: string; name: string } | null
+  gpsDevice: { id: string; name: string } | null
 }
 export type JobsWorkspace = {
   items: Array<JobSummary>

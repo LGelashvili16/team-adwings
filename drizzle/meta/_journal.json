@@ -372,6 +372,13 @@
       "when": 1795515073705,
       "tag": "0052_job_read_indicators",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795527530105,
+      "tag": "0053_job_assignments",
+      "breakpoints": true
     }
   ]
 }
