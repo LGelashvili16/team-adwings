@@ -1,13 +1,55 @@
-import { queryOptions } from '@tanstack/react-query'
+import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query'
 import {
   findJobLocations,
   readJob,
   readJobs,
+  readUnreadJobs,
   suggestJobAddress,
+  readJobAssignmentCandidates,
 } from './jobs.functions'
+import { jobAssignmentPageSize } from './jobs.schemas'
+import type { JobAssignmentSearch } from './jobs.schemas'
 import type { JobMapPosition, JobSearch } from './jobs.types'
 
 export const jobsKeys = { all: (actorId: string) => ['jobs', actorId] as const }
+export const jobAssignmentCandidatesQueryOptions = (
+  actorId: string,
+  search: Omit<JobAssignmentSearch, 'page'>,
+) =>
+  infiniteQueryOptions({
+    queryKey: [
+      ...jobsKeys.all(actorId),
+      'assignment-candidates',
+      search.kind,
+      search.q,
+      search.roles,
+    ],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam, signal }) => {
+      const result = await readJobAssignmentCandidates({
+        data: { ...search, page: pageParam },
+        signal,
+      })
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    getNextPageParam: (page, _pages, pageNumber) =>
+      pageNumber * jobAssignmentPageSize < page.total
+        ? pageNumber + 1
+        : undefined,
+    retry: false,
+  })
+export const unreadJobsQueryOptions = (actorId: string) =>
+  queryOptions({
+    queryKey: [...jobsKeys.all(actorId), 'unread'],
+    queryFn: async () => {
+      const result = await readUnreadJobs()
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    staleTime: 15_000,
+    retry: false,
+  })
 export const jobsQueryOptions = (actorId: string, search: JobSearch) =>
   queryOptions({
     queryKey: [

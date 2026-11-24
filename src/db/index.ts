@@ -7,7 +7,10 @@ import { reportError } from '#/lib/error-diagnostics'
 
 const databaseUrl = process.env.DATABASE_URL
 if (!databaseUrl) {
-  throw new Error('DATABASE_URL is not defined in the environment variables.')
+  throw Object.assign(
+    new Error('DATABASE_URL is not defined in the environment variables.'),
+    { code: 'DATABASE_NOT_CONFIGURED' },
+  )
 }
 
 const pool = new Pool({

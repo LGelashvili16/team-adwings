@@ -25,11 +25,11 @@ export const employeeCodeSchema = z
     /^[a-z0-9][a-z0-9._-]*$/,
     'გამოიყენეთ ლათინური ასოები, ციფრები, წერტილი, დეფისი ან ქვედა ტირე.',
   )
-export const reasonSchema = z
-  .string()
-  .trim()
-  .min(5, 'მიუთითეთ მოქმედების მიზეზი, მინიმუმ 5 სიმბოლო.')
-  .max(500, 'მიზეზი ძალიან გრძელია.')
+const boundedReasonSchema = z.string().trim().max(500, 'მიზეზი ძალიან გრძელია.')
+export const reasonSchema = boundedReasonSchema.min(
+  5,
+  'მიუთითეთ მოქმედების მიზეზი, მინიმუმ 5 სიმბოლო.',
+)
 export const accountIdSchema = z
   .string()
   .min(1, 'ანგარიში არასწორია.')
@@ -97,13 +97,24 @@ export const employeeDetailsSchema = z.object({
 })
 /** The only field employees may change themselves; everything else is administrator-controlled. */
 export const ownPhoneSchema = z.object({ phone: phoneSchema })
-export const accountActionSchema = z.object({
-  userId: accountIdSchema,
-  action: z.enum(['issue_activation', 'issue_reset', 'suspend', 'restore'], {
-    error: 'მოქმედება არასწორია.',
-  }),
-  reason: reasonSchema,
-})
+export const accountActionSchema = z
+  .object({
+    userId: accountIdSchema,
+    action: z.enum(['issue_activation', 'issue_reset', 'suspend', 'restore'], {
+      error: 'მოქმედება არასწორია.',
+    }),
+    reason: boundedReasonSchema,
+  })
+  .refine(
+    (value) =>
+      value.action === 'issue_activation' ||
+      value.action === 'issue_reset' ||
+      value.reason.length >= 5,
+    {
+      path: ['reason'],
+      message: 'მიუთითეთ მოქმედების მიზეზი, მინიმუმ 5 სიმბოლო.',
+    },
+  )
 export const ownerRecoverySchema = z.object({
   code: employeeCodeSchema,
   reason: reasonSchema,

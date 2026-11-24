@@ -5,7 +5,7 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table'
-import { IconArrowUp, IconArrowDown } from '@tabler/icons-react'
+import { IconArrowUp, IconArrowsSort } from '@tabler/icons-react'
 import {
   Table,
   TableBody,
@@ -18,6 +18,7 @@ import { formatJobDate } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { Badge } from '#/components/ui/badge'
 import type { JobSearch, JobSummary } from '../jobs.types'
 
 const features = tableFeatures({})
@@ -50,9 +51,15 @@ export function JobsList({
             <Link
               to="/jobs"
               search={{ ...search, pin: row.original.id }}
+              aria-current={search.pin === row.original.id ? 'true' : undefined}
               className="block max-w-80 min-w-40 rounded font-medium break-words outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               {row.original.title}
+              {row.original.isUnread ? (
+                <Badge variant="red-vivid" className="ml-2">
+                  ახალი
+                </Badge>
+              ) : null}
               <span className="mt-1 block text-sm font-normal text-muted-foreground">
                 {row.original.address || 'მისამართი არ არის მითითებული'}
               </span>
@@ -71,8 +78,31 @@ export function JobsList({
           header: 'პასუხისმგებელი',
           cell: ({ row }) => row.original.assigneeName ?? 'თავისუფალია',
         }),
+        helper.accessor('assignedEmployeeCount', {
+          header: 'შემსრულებლები',
+          cell: ({ row }) =>
+            row.original.assignedEmployeeCount
+              ? `${row.original.assignedEmployeeCount} თანამშრომელი`
+              : 'არ არის დამატებული',
+        }),
         helper.accessor('deadline', {
-          header: 'ვადა',
+          header: () => (
+            <Link
+              to="/jobs"
+              search={{
+                ...search,
+                sort:
+                  search.sort === 'deadline_asc'
+                    ? 'deadline_desc'
+                    : 'deadline_asc',
+                page: 1,
+              }}
+              className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
+            >
+              ჩაბარების ვადა
+              <IconArrowsSort className="size-4" aria-hidden="true" />
+            </Link>
+          ),
           cell: ({ row }) =>
             row.original.deadline ? (
               <time
@@ -97,11 +127,7 @@ export function JobsList({
               className="inline-flex items-center gap-2 text-primary underline-offset-4 hover:underline"
             >
               დამატების თარიღი
-              {search.sort === 'newest' ? (
-                <IconArrowDown className="size-4" aria-hidden="true" />
-              ) : search.sort === 'oldest' ? (
-                <IconArrowUp className="size-4" aria-hidden="true" />
-              ) : null}
+              <IconArrowsSort className="size-4" aria-hidden="true" />
             </Link>
           ),
           cell: ({ row }) => (
@@ -132,12 +158,19 @@ export function JobsList({
                   aria-sort={
                     header.column.id === 'title' && search.sort === 'title'
                       ? 'ascending'
-                      : header.column.id === 'createdAt' &&
-                          search.sort !== 'title'
-                        ? search.sort === 'oldest'
+                      : header.column.id === 'deadline' &&
+                          (search.sort === 'deadline_asc' ||
+                            search.sort === 'deadline_desc')
+                        ? search.sort === 'deadline_asc'
                           ? 'ascending'
                           : 'descending'
-                        : undefined
+                        : header.column.id === 'createdAt' &&
+                            (search.sort === 'newest' ||
+                              search.sort === 'oldest')
+                          ? search.sort === 'oldest'
+                            ? 'ascending'
+                            : 'descending'
+                          : undefined
                   }
                 >
                   <table.FlexRender header={header} />
@@ -151,6 +184,10 @@ export function JobsList({
             <TableRow
               key={row.id}
               className="cursor-pointer focus-within:bg-muted/50"
+              data-state={
+                search.pin === row.original.id ? 'selected' : undefined
+              }
+              aria-selected={search.pin === row.original.id}
               onClick={(event) => {
                 if (
                   event.defaultPrevented ||

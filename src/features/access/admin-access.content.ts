@@ -1,6 +1,10 @@
 import type { Permission } from '#/lib/authorization/permissions'
 
 export const permissionLabels: Record<Permission, string> = {
+  'jobs.complete.manage': 'სამუშაოების დასრულება',
+  'jobs.edit.all': 'ყველა სამუშაოს რედაქტირება და თავიდან დაგეგმვა',
+  'jobs.assign':
+    'სამუშაოზე თანამშრომლების, გუნდისა და GPS მოწყობილობის დანიშვნა',
   'attendance.devices.manage': 'დასწრების მოწყობილობების დადასტურება',
   'attendance.devices.approve.self':
     'საკუთარი დასწრების მოწყობილობის დადასტურება',

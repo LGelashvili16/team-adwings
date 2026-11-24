@@ -7,6 +7,22 @@ import { jobSearchSchema } from '../jobs.schemas'
 vi.mock('#/hooks/use-mobile', () => ({ useIsMobile: () => false }))
 
 describe('job URL filters', () => {
+  it('offers related-to-me separately from assigned jobs and preserves other filters', async () => {
+    const onChange = vi.fn()
+    const search = jobSearchSchema.parse({ page: 3, kind: 'measurement' })
+    render(<JobsFilters search={search} onChange={onChange} />)
+    await userEvent.click(screen.getByRole('combobox', { name: 'სამუშაოები' }))
+    expect(
+      await screen.findByRole('option', { name: 'ჩემზე მინიჭებული' }),
+    ).toBeVisible()
+    await userEvent.click(
+      screen.getByRole('option', { name: 'ჩემთან დაკავშირებული' }),
+    )
+    expect(onChange).toHaveBeenCalledWith(
+      { ...search, page: 1, scope: 'related' },
+      false,
+    )
+  })
   it('debounces text changes, preserves other filters and resets the page', async () => {
     const onChange = vi.fn()
     const search = jobSearchSchema.parse({ page: 3, kind: 'measurement' })

@@ -123,7 +123,7 @@ describe('PWA navigation privacy', () => {
     const forbidden = new Response('Forbidden', { status: 403 })
     network.mockResolvedValue(forbidden)
     expect(await navigate({ request })).toBe(forbidden)
-    expect(network).toHaveBeenCalledWith(request)
+    expect(network).toHaveBeenCalledWith(request, { cache: 'no-store' })
     expect(workbox.matchPrecache).not.toHaveBeenCalled()
   })
 

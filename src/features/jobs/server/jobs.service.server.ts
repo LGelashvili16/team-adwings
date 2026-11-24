@@ -1,4 +1,5 @@
 import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
+import { readJobNotificationRoles } from '#/features/notifications/server/notification-settings.service.server'
 import { signalRealtime } from '#/lib/realtime/postgres-events.server'
 import '@tanstack/react-start/server-only'
 import {
@@ -7,22 +8,32 @@ import {
   jobLookupSchema,
   jobSearchSchema,
   jobTransitionSchema,
+  jobAssignmentsSchema,
+  jobAssignmentSearchSchema,
+  jobAssignmentTeamSchema,
 } from '../jobs.schemas'
 import {
   hasJobCoordinates,
   JobConflictError,
   JobWorkflowError,
+  canAssignJobs,
 } from '../jobs.rules'
 import {
   assertJobManager,
+  assertJobEditor,
   assertJobTransition,
   requireJobActor,
 } from './jobs.policy.server'
 import * as repository from './jobs.repository.server'
+import * as assignments from './job-assignments.repository.server'
+import { AuthorizationError } from '#/lib/authorization/authorization-error'
+import { parseRoles } from '#/lib/authorization/permissions'
+import { canJoinProductionTeam } from '#/features/teams/teams.rules'
 import { resolveJobStreet } from './job-locations.service.server'
 import type { ResolvedLocation } from '../job-locations.types'
 import type { Actor } from '#/lib/authorization/actor'
-import type { JobDetail, JobsWorkspace } from '../jobs.types'
+import type { JobDetail, JobsWorkspace, JobAssignments } from '../jobs.types'
+import { formatJobDay } from '../jobs.dates'
 
 function validateInput<T>(
   schema: {
@@ -39,6 +50,124 @@ function validateInput<T>(
     )
   return parsed.data
 }
+
+function assertAssignmentManager(actor: Actor) {
+  if (!canAssignJobs(actor)) throw new AuthorizationError()
+}
+function assignmentHistoryNote(crew: JobAssignments) {
+  return `შემსრულებლები: ${crew.employees.length}\nGPS: ${crew.gpsDevice?.name ?? 'არ არის მითითებული'}`
+}
+export async function listJobAssignmentCandidates(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const data = validateInput(jobAssignmentSearchSchema, input)
+  return repository.transactJobs(
+    async (tx) => {
+      assertAssignmentManager(await requireJobActor(tx, actor))
+      return assignments.assignmentCandidates(tx, data)
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
+}
+export async function getJobAssignmentTeam(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { id } = validateInput(jobAssignmentTeamSchema, input)
+  return repository.transactJobs(
+    async (tx) => {
+      assertAssignmentManager(await requireJobActor(tx, actor))
+      const team = await assignments.assignmentTeam(tx, id)
+      if (!team?.active) throw new JobWorkflowError('აირჩიეთ მოქმედი გუნდი.')
+      const employees = await assignments.assignmentTeamMembers(tx, id)
+      if (employees.length > 200)
+        throw new JobWorkflowError(
+          'გუნდში 200-ზე მეტი თანამშრომელია. სამუშაოს შემსრულებლები ცალ-ცალკე აირჩიეთ.',
+        )
+      return {
+        ...team,
+        employees,
+      }
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' },
+  )
+}
+export async function saveCompanyJobAssignments(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const data = validateInput(jobAssignmentsSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    assertAssignmentManager(current)
+    const record = await currentJob(tx, data.id, data.version)
+    if (record.status === 'completed' || record.status === 'rejected')
+      throw new JobWorkflowError(
+        'შემსრულებლების შეცვლამდე სამუშაო თავიდან დაგეგმეთ.',
+      )
+    const before = await assignments.readAssignments(tx, record.id)
+    if (data.teamId) {
+      const team = await assignments.assignmentTeam(tx, data.teamId, true)
+      if (!team?.active) throw new JobWorkflowError('აირჩიეთ მოქმედი გუნდი.')
+      if (data.teamVersion !== null && team.version !== data.teamVersion)
+        throw new JobWorkflowError(
+          'გუნდი შეიცვალა. ხელახლა აირჩიეთ გუნდი და გადაამოწმეთ თანამშრომლები.',
+        )
+    }
+    if (
+      data.gpsDeviceId &&
+      !(await assignments.assignmentDevice(tx, data.gpsDeviceId))?.enabled
+    )
+      throw new JobWorkflowError('აირჩიეთ მოქმედი GPS მოწყობილობა.')
+    for (const id of [...data.employeeIds].sort()) {
+      const { identity, person } = await repository.currentIdentity(
+        tx,
+        id,
+        true,
+      )
+      if (
+        !identity ||
+        identity.state !== 'active' ||
+        person?.status !== 'active' ||
+        !canJoinProductionTeam(parseRoles(identity.roles))
+      )
+        throw new JobWorkflowError(
+          'აირჩიეთ მოქმედი თანამშრომლები დასაშვები როლით.',
+        )
+    }
+    if (
+      record.teamId === data.teamId &&
+      record.gpsDeviceId === data.gpsDeviceId &&
+      before.employees.length === data.employeeIds.length &&
+      before.employees.every((person) => data.employeeIds.includes(person.id))
+    )
+      return { id: record.id }
+    await assignments.replaceEmployees(tx, record.id, data.employeeIds)
+    await repository.updateJob(tx, record.id, {
+      teamId: data.teamId,
+      gpsDeviceId: data.gpsDeviceId,
+      version: record.version + 1,
+    })
+    const after = await assignments.readAssignments(tx, record.id)
+    await repository.appendJobEvent(tx, {
+      jobId: record.id,
+      actorId: current.id,
+      action: 'assignments_changed',
+      status: record.status,
+      assignmentChange: { before, after },
+      note: assignmentHistoryNote(after),
+    })
+    await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
+    await notifyJobEvent(tx, current, {
+      jobId: record.id,
+      eventKey: `job:${record.id}:${record.version + 1}:assignments`,
+      title: 'სამუშაოს შემსრულებლები შეიცვალა',
+      body: 'გადაამოწმეთ სამუშაოზე დამატებული თანამშრომლები, გუნდი და GPS მოწყობილობა.',
+    })
+    return { id: record.id }
+  })
+}
 export async function listCompanyJobs(
   actor: Actor | null,
   input: unknown,
@@ -50,6 +179,10 @@ export async function listCompanyJobs(
       const result = await repository.listJobs(tx, current.id, search)
       return {
         ...result,
+        markers: result.markers.map((marker) => ({
+          ...marker,
+          createdAt: marker.createdAt.toISOString(),
+        })),
         items: result.items.map((item) => ({
           ...item,
           createdAt: item.createdAt.toISOString(),
@@ -75,14 +208,41 @@ export async function getCompanyJob(
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         locationResolvedAt: record.locationResolvedAt?.toISOString() ?? null,
-        history: record.history.map((event) => ({
+        history: record.history.map(({ assignmentChange, ...event }) => ({
           ...event,
+          note:
+            event.action === 'assignments_changed' && assignmentChange
+              ? assignmentHistoryNote(assignmentChange.after)
+              : event.note,
           createdAt: event.createdAt.toISOString(),
         })),
       }
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
+}
+export async function getUnreadCompanyJobs(actor: Actor | null) {
+  return repository.transactJobs(
+    async (tx) => {
+      const current = await requireJobActor(tx, actor)
+      return { hasUnread: await repository.hasUnreadJobs(tx, current.id) }
+    },
+    { accessMode: 'read only' },
+  )
+}
+export async function acknowledgeCompanyJob(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { id } = validateInput(jobLookupSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    const record = await repository.readJob(tx, id)
+    if (!record) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
+    await repository.markJobRead(tx, current.id, id)
+    await signalRealtime(tx, { topic: 'jobs', recipientId: current.id })
+    return { id }
+  })
 }
 export async function createCompanyJob(actor: Actor | null, input: unknown) {
   const data = validateInput(createJobSchema, input)
@@ -113,6 +273,12 @@ export async function createCompanyJob(actor: Actor | null, input: unknown) {
         action: 'created',
         status: 'pending',
       })
+      await notifyJobEvent(tx, current, {
+        jobId: record.id,
+        eventKey: `job:${record.id}:created`,
+        title: 'ახალი სამუშაო დაემატა',
+        body: 'ახალი სამუშაო ხელმისაწვდომია. დეტალების სანახავად გახსენით სამუშაო.',
+      })
     }
     return {
       id: record.id,
@@ -138,8 +304,9 @@ async function currentJob(
 export async function editCompanyJob(actor: Actor | null, input: unknown) {
   const data = validateInput(editJobSchema, input)
   const before = await repository.transactJobs(async (tx) => {
-    assertJobManager(await requireJobActor(tx, actor))
+    const current = await requireJobActor(tx, actor)
     const record = await currentJob(tx, data.id, data.version)
+    assertJobEditor(current, record)
     if (record.status === 'completed' || record.status === 'rejected')
       throw new JobWorkflowError('რედაქტირებამდე სამუშაო თავიდან დაგეგმეთ.')
     return record
@@ -152,8 +319,8 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
     needsLookup && hasJobCoordinates(data) ? await resolveJobStreet(data) : null
   return repository.transactJobs(async (tx) => {
     const current = await requireJobActor(tx, actor, true)
-    assertJobManager(current)
     const record = await currentJob(tx, data.id, data.version)
+    assertJobEditor(current, record)
     if (record.status === 'completed' || record.status === 'rejected')
       throw new JobWorkflowError('რედაქტირებამდე სამუშაო თავიდან დაგეგმეთ.')
     const materialChange =
@@ -189,14 +356,12 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
       status: record.status,
     })
     await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
-    if (materialChange && record.assigneeId)
-      await deliverNotifications(tx, {
+    if (changed)
+      await notifyJobEvent(tx, current, {
         eventKey: `job:${record.id}:${record.version + 1}:edited`,
-        recipientIds: [record.assigneeId],
-        actorId: current.id,
+        jobId: record.id,
         title: 'სამუშაოს დეტალები შეიცვალა',
         body: 'გადაამოწმეთ სამუშაოს მისამართი, ვადა და ინსტრუქცია.',
-        destination: { kind: 'job', jobId: record.id },
       })
     return {
       id: record.id,
@@ -231,7 +396,9 @@ export async function transitionCompanyJob(
         ? null
         : record.status === 'pending' && data.status === 'en_route'
           ? current.id
-          : record.assigneeId
+          : data.status === 'completed' && record.assigneeId === null
+            ? current.id
+            : record.assigneeId
     await repository.updateJob(tx, record.id, {
       status: data.status,
       assigneeId,
@@ -245,25 +412,14 @@ export async function transitionCompanyJob(
       note: data.note,
     })
     await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
-    const recipients = await repository.notificationCreator(
-      tx,
-      record.createdBy,
-    )
-    await deliverNotifications(tx, {
+    await notifyJobEvent(tx, current, {
+      jobId: record.id,
       eventKey: `job:${record.id}:${record.version + 1}:${data.status}`,
-      recipientIds: [
-        ...recipients,
-        ...[record.assigneeId, assigneeId].filter((id): id is string =>
-          Boolean(id),
-        ),
-      ],
-      actorId: current.id,
       title: jobStatusNotificationTitles[data.status],
       body: `${record.title}${data.note ? `. ${data.note}` : ''}`.slice(
         0,
         2000,
       ),
-      destination: { kind: 'job', jobId: record.id },
     })
     return { id: record.id }
   })
@@ -275,4 +431,57 @@ const jobStatusNotificationTitles = {
   on_site: 'თანამშრომელი ადგილზე მივიდა',
   completed: 'სამუშაო დასრულდა',
   rejected: 'სამუშაო უარყოფილია',
+}
+
+/** Each job change uses one policy and one deduplicated delivery path inside the owning transaction. */
+async function notifyJobEvent(
+  tx: repository.JobsTransaction,
+  actor: Actor,
+  event: {
+    jobId: string
+    eventKey: string
+    title: string
+    body: string
+  },
+) {
+  const roles = await readJobNotificationRoles(tx)
+  if (!roles.length) return
+  const job = await repository.jobNotificationDetails(tx, event.jobId)
+  if (!job) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
+  const body = [
+    `სამუშაო: ${job.title}`,
+    `შემქმნელი: ${job.creatorName}`,
+    `მისამართი: ${job.address || 'არ არის მითითებული'}`,
+    ...(job.deadline ? [`ვადა: ${formatJobDay(job.deadline)}`] : []),
+    event.body,
+  ]
+    .join('\n')
+    .slice(0, 2000)
+  const includeOwn = actor.roles.some(
+    (role) => role === 'admin' || role === 'owner',
+  )
+  let afterId: string | undefined
+  do {
+    const page = await repository.jobNotificationCandidates(tx, roles, afterId)
+    const delivery = {
+      eventKey: event.eventKey,
+      title: event.title,
+      body,
+      destination: { kind: 'job' as const, jobId: event.jobId },
+    }
+    await deliverNotifications(tx, {
+      ...delivery,
+      recipientIds: page.recipientIds,
+      actorId: actor.id,
+    })
+    if (includeOwn && page.recipientIds.includes(actor.id)) {
+      // The existing action toast confirms the write; keep the administrator's own inbox entry without a second toast.
+      await deliverNotifications(tx, {
+        ...delivery,
+        recipientIds: [actor.id],
+        liveToast: false,
+      })
+    }
+    afterId = page.afterId
+  } while (afterId)
 }

@@ -10,6 +10,9 @@ import {
   jobLocationSchema,
   jobSearchSchema,
   jobTransitionSchema,
+  jobAssignmentsSchema,
+  jobAssignmentSearchSchema,
+  jobAssignmentTeamSchema,
 } from './jobs.schemas'
 import { JobConflictError, JobWorkflowError } from './jobs.rules'
 import { locationSearchSchema } from './job-locations.schemas'
@@ -19,10 +22,15 @@ import {
 } from './server/job-locations.service.server'
 import {
   createCompanyJob,
+  getUnreadCompanyJobs,
+  acknowledgeCompanyJob,
   editCompanyJob,
   getCompanyJob,
   listCompanyJobs,
   transitionCompanyJob,
+  saveCompanyJobAssignments,
+  listJobAssignmentCandidates,
+  getJobAssignmentTeam,
 } from './server/jobs.service.server'
 
 async function safely<T>(action: () => Promise<T>) {
@@ -49,6 +57,33 @@ export const readJobs = createServerFn({ method: 'GET' })
   .validator(jobSearchSchema)
   .handler(({ context, data }) =>
     safely(() => listCompanyJobs(context.actor, data)),
+  )
+export const readJobAssignmentCandidates = createServerFn({ method: 'GET' })
+  .middleware([authenticatedMiddleware])
+  .validator(jobAssignmentSearchSchema)
+  .handler(({ context, data }) =>
+    safely(() => listJobAssignmentCandidates(context.actor, data)),
+  )
+export const readJobAssignmentTeam = createServerFn({ method: 'GET' })
+  .middleware([authenticatedMiddleware])
+  .validator(jobAssignmentTeamSchema)
+  .handler(({ context, data }) =>
+    safely(() => getJobAssignmentTeam(context.actor, data)),
+  )
+export const saveJobAssignments = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(jobAssignmentsSchema)
+  .handler(({ context, data }) =>
+    safely(() => saveCompanyJobAssignments(context.actor, data)),
+  )
+export const readUnreadJobs = createServerFn({ method: 'GET' })
+  .middleware([authenticatedMiddleware])
+  .handler(({ context }) => safely(() => getUnreadCompanyJobs(context.actor)))
+export const markJobRead = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(jobLookupSchema)
+  .handler(({ context, data }) =>
+    safely(() => acknowledgeCompanyJob(context.actor, data)),
   )
 // Search may populate a shared cache and reserve provider capacity, so it is an explicit POST action.
 export const findJobLocations = createServerFn({ method: 'POST' })

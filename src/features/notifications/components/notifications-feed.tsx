@@ -40,7 +40,7 @@ export function NotificationsFeed({
   )
   const markSeen = useMarkNotificationsSeen(actorId)
   const markUnseen = useMarkNotificationsUnseen(actorId)
-  if (query.isPending) return <NotificationsLoading />
+  if (query.isPending) return <NotificationsLoading variant={variant} />
   if (query.isError)
     return (
       <div

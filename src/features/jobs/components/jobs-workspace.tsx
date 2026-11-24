@@ -179,7 +179,7 @@ export function JobsWorkspace({
         </TabsList>
         <TabsContent
           value={search.view}
-          className="flex min-w-0 flex-col gap-4 sm:gap-6"
+          className="flex min-w-0 flex-col gap-3"
         >
           <JobsFilters
             search={search}
@@ -262,7 +262,9 @@ export function JobsWorkspace({
                   aria-describedby={undefined}
                 >
                   <SheetHeader className="shrink-0 border-b px-6 py-5">
-                    <SheetTitle>სამუშაოს დეტალები</SheetTitle>
+                    <SheetTitle>
+                      {selected.data?.title ?? 'სამუშაოს დეტალები'}
+                    </SheetTitle>
                   </SheetHeader>
                   <div className="min-h-0 flex-1 overflow-y-auto">
                     {search.pin ? (

@@ -1,0 +1,21 @@
+@keyframes job-new-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.94;
+    transform: scale(1.08);
+  }
+}
+.job-new-pulse {
+  transform-origin: 50% calc(100% + 10px);
+  animation: job-new-pulse 2.5s ease-in-out 120 forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .job-new-pulse {
+    animation: none;
+    opacity: 1;
+  }
+}

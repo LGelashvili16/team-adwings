@@ -188,7 +188,7 @@ export function Map({
   return (
     <div
       className={cn(
-        'relative isolate h-full w-full overflow-hidden bg-muted',
+        'app-map relative isolate h-full w-full overflow-hidden bg-muted',
         className,
       )}
     >
@@ -249,22 +249,26 @@ export function MapMarker({
   latitude,
   children,
   elevated = false,
+  priority = 0,
 }: {
   longitude: number
   latitude: number
   children: ReactNode
   /** Raises the marker above its siblings, for example while its popup is open. */
   elevated?: boolean
+  /** Ordering within the map; elevated popups stay above ordinary marker priorities. */
+  priority?: number
 }) {
-  const { map, library } = useMap()
+  const { map, library, loaded } = useMap()
   const [element] = useState(() => document.createElement('div'))
   const markerRef = useRef<MapLibre.Marker | null>(null)
   const position = useRef({ longitude, latitude })
   position.current = { longitude, latitude }
   useEffect(() => {
-    element.style.zIndex = elevated ? '10' : ''
-  }, [element, elevated])
+    element.style.zIndex = elevated ? '10' : priority ? String(priority) : ''
+  }, [element, elevated, priority])
   useEffect(() => {
+    if (!loaded) return
     const marker = new library.Marker({ element, anchor: 'bottom' })
       .setLngLat([position.current.longitude, position.current.latitude])
       .addTo(map)
@@ -273,22 +277,26 @@ export function MapMarker({
       markerRef.current = null
       marker.remove()
     }
-  }, [map, library, element])
+  }, [map, library, element, loaded])
   useEffect(() => {
     markerRef.current?.setLngLat([longitude, latitude])
   }, [longitude, latitude])
-  return createPortal(children, element)
+  return loaded ? createPortal(children, element) : null
 }
-export function MapControls() {
+export function MapControls({ inline = false }: { inline?: boolean }) {
   const { map } = useMap()
   return (
     <div
-      className="absolute right-4 bottom-12 z-10 flex flex-col gap-2 rounded-xl border bg-background p-1.5 shadow-sm"
+      className={
+        inline
+          ? 'flex flex-col gap-2'
+          : 'absolute right-4 bottom-12 z-10 flex flex-col gap-2 rounded-xl border bg-background p-1.5 shadow-sm'
+      }
       role="group"
       aria-label="რუკის მასშტაბი"
     >
       <Button
-        variant="outline"
+        variant="outline-solid"
         depth="raised"
         size="icon-lg"
         aria-label="რუკის გადიდება"
@@ -298,7 +306,7 @@ export function MapControls() {
         <IconPlus aria-hidden="true" />
       </Button>
       <Button
-        variant="outline"
+        variant="outline-solid"
         depth="raised"
         size="icon-lg"
         aria-label="რუკის დაპატარავება"

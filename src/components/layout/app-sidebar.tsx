@@ -38,6 +38,7 @@ export function AppSidebar({
   hasUnreadAnnouncements = false,
   hasUnreadComplaints = false,
   hasUnreadNotifications = false,
+  hasUnreadJobs = false,
 }: {
   actor: Actor
   inset?: boolean
@@ -45,6 +46,7 @@ export function AppSidebar({
   hasUnreadAnnouncements?: boolean
   hasUnreadComplaints?: boolean
   hasUnreadNotifications?: boolean
+  hasUnreadJobs?: boolean
 }) {
   const pathname = useLocation({ select: (location) => location.pathname })
   const { setOpenMobile, isMobile } = useSidebar()
@@ -156,6 +158,16 @@ export function AppSidebar({
                     >
                       <item.icon aria-hidden="true" />
                       <span>{item.label}</span>
+                      {item.to === '/jobs' && hasUnreadJobs ? (
+                        <>
+                          <span
+                            aria-hidden="true"
+                            data-slot="jobs-unread-dot"
+                            className="ml-auto size-2 shrink-0 rounded-full bg-destructive"
+                          />
+                          <span className="sr-only">, ახალი სამუშაოები</span>
+                        </>
+                      ) : null}
                       {item.to === '/manage/complaints' &&
                       hasUnreadComplaints ? (
                         <>

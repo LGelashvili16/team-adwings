@@ -67,14 +67,14 @@ it('loads 20 immediately and fetches the next page when the list end becomes vis
   expect(screen.getByText('ნაჩვენებია 21 / 21')).toBeVisible()
   expect(readCandidates).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      data: { q: '', jobTitle: '', roles: ['production_specialist'], page: 2 },
+      data: { q: '', roles: ['production_specialist'], page: 2 },
     }),
   )
   expect(
     screen.queryByRole('button', { name: 'მეტის ჩატვირთვა' }),
   ).not.toBeInTheDocument()
 })
-it('restarts at page one after debounced name and job-title filters', async () => {
+it('uses one debounced search for names, usernames and job titles', async () => {
   vi.mocked(readCandidates).mockResolvedValue({
     ok: true,
     value: { items: [person(0)], total: 1 },
@@ -82,8 +82,11 @@ it('restarts at page one after debounced name and job-title filters', async () =
   mount()
   await screen.findByText('სპეციალისტი 0')
   const user = userEvent.setup()
+  expect(screen.getAllByRole('textbox')).toHaveLength(1)
   await user.type(
-    screen.getByRole('textbox', { name: 'თანამშრომლის ძიება' }),
+    screen.getByRole('textbox', {
+      name: 'სახელის, მომხმარებლის ან თანამდებობის ძიება',
+    }),
     'ანა',
   )
   await waitFor(() =>
@@ -91,23 +94,28 @@ it('restarts at page one after debounced name and job-title filters', async () =
       expect.objectContaining({
         data: {
           q: 'ანა',
-          jobTitle: '',
           roles: ['production_specialist'],
           page: 1,
         },
       }),
     ),
   )
+  await user.clear(
+    screen.getByRole('textbox', {
+      name: 'სახელის, მომხმარებლის ან თანამდებობის ძიება',
+    }),
+  )
   await user.type(
-    screen.getByRole('textbox', { name: 'თანამდებობით გაფილტვრა' }),
+    screen.getByRole('textbox', {
+      name: 'სახელის, მომხმარებლის ან თანამდებობის ძიება',
+    }),
     'მემონტაჟე',
   )
   await waitFor(() =>
     expect(readCandidates).toHaveBeenLastCalledWith(
       expect.objectContaining({
         data: {
-          q: 'ანა',
-          jobTitle: 'მემონტაჟე',
+          q: 'მემონტაჟე',
           roles: ['production_specialist'],
           page: 1,
         },
@@ -165,7 +173,6 @@ it('defaults to specialists and allows selecting other operational roles', async
       expect.objectContaining({
         data: {
           q: '',
-          jobTitle: '',
           roles: ['production_specialist', 'employee'],
           page: 1,
         },
@@ -184,26 +191,23 @@ it('closes the filter popup and clears text filters with their inline controls',
   await user.click(
     screen.getByRole('button', { name: 'როლების ფილტრი, არჩეულია 1' }),
   )
-  await user.click(screen.getByRole('button', { name: 'მზადაა' }))
+  expect(
+    screen.queryByRole('button', { name: 'მზადაა' }),
+  ).not.toBeInTheDocument()
+  await user.keyboard('{Escape}')
   await waitFor(() =>
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument(),
   )
   await user.type(
-    screen.getByRole('textbox', { name: 'თანამშრომლის ძიება' }),
+    screen.getByRole('textbox', {
+      name: 'სახელის, მომხმარებლის ან თანამდებობის ძიება',
+    }),
     'ანა',
   )
-  await user.type(
-    screen.getByRole('textbox', { name: 'თანამდებობით გაფილტვრა' }),
-    'მემონტაჟე',
-  )
   await user.click(screen.getByRole('button', { name: 'ძიების გასუფთავება' }))
-  await user.click(
-    screen.getByRole('button', { name: 'თანამდებობის ფილტრის გასუფთავება' }),
-  )
   expect(
-    screen.getByRole('textbox', { name: 'თანამშრომლის ძიება' }),
-  ).toHaveValue('')
-  expect(
-    screen.getByRole('textbox', { name: 'თანამდებობით გაფილტვრა' }),
+    screen.getByRole('textbox', {
+      name: 'სახელის, მომხმარებლის ან თანამდებობის ძიება',
+    }),
   ).toHaveValue('')
 })

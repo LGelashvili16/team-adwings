@@ -82,10 +82,11 @@ const filterFields = [
   },
   {
     name: 'scope',
-    label: 'პასუხისმგებელი',
+    label: 'სამუშაოები',
     options: [
       { value: 'all', label: 'ყველა სამუშაო' },
-      { value: 'mine', label: 'ჩემი სამუშაოები' },
+      { value: 'mine', label: 'ჩემზე მინიჭებული' },
+      { value: 'related', label: 'ჩემთან დაკავშირებული' },
     ],
   },
   {
@@ -95,6 +96,8 @@ const filterFields = [
       { value: 'newest', label: 'ჯერ ახალი' },
       { value: 'oldest', label: 'ჯერ ძველი' },
       { value: 'title', label: 'სათაურით' },
+      { value: 'deadline_asc', label: 'ჯერ ახლო ვადა' },
+      { value: 'deadline_desc', label: 'ჯერ შორი ვადა' },
     ],
   },
 ] as const
@@ -187,37 +190,27 @@ export function JobsFilters({
       className={cn(
         isMobile
           ? 'flex flex-col gap-3'
-          : 'flex flex-row flex-wrap items-start gap-3',
+          : 'flex flex-row flex-wrap items-start gap-2',
       )}
     >
-      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
-        <JobsDateRange
-          key={`${search.from}:${search.to}`}
-          value={{ from: search.from, to: search.to }}
-          onChange={(range) => {
-            form.setFieldValue('from', range.from)
-            form.setFieldValue('to', range.to)
-            commit({ ...form.state.values, ...range }, false)
-          }}
-        />
-      </Field>
       {showSearch ? (
         <form.Field name="q">
           {(field) => (
             <Field
-              className={cn(isMobile ? 'w-full' : 'min-w-48 flex-1')}
+              className={cn(isMobile ? 'w-full' : 'w-full md:w-80')}
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel className="sr-only" htmlFor="jobs-search">
                 სამუშაოს ძიება
               </FieldLabel>
-              <InputGroup>
+              <InputGroup className="h-11 rounded-full px-1 md:h-9">
                 <InputGroupAddon>
                   <IconSearch aria-hidden="true" />
                 </InputGroupAddon>
                 <InputGroupInput
                   id="jobs-search"
-                  placeholder="სამუშაოს სათაური, შენახული მისამართი ან შენიშვნა"
+                  className="h-full"
+                  placeholder="სამუშაოს ძიება"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   onBlur={field.handleBlur}
@@ -237,6 +230,17 @@ export function JobsFilters({
           )}
         </form.Field>
       ) : null}
+      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
+        <JobsDateRange
+          key={`${search.from}:${search.to}`}
+          value={{ from: search.from, to: search.to }}
+          onChange={(range) => {
+            form.setFieldValue('from', range.from)
+            form.setFieldValue('to', range.to)
+            commit({ ...form.state.values, ...range }, false)
+          }}
+        />
+      </Field>
       {filterFields.map(({ name, label, options }) => (
         <form.Field key={name} name={name}>
           {(field) => (
@@ -256,11 +260,11 @@ export function JobsFilters({
               >
                 <SelectTrigger
                   id={`jobs-filter-${name}`}
-                  className="w-full shadow-control-raised active:shadow-control-pressed"
+                  className="w-full rounded-full px-3 shadow-control-raised active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
                 >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="w-max min-w-(--anchor-width) max-w-[calc(100vw-2rem)]">
                   <SelectGroup>
                     {options.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
@@ -279,7 +283,10 @@ export function JobsFilters({
         type="button"
         variant="destructive"
         depth="raised"
-        className={cn(isMobile && 'w-full')}
+        className={cn(
+          'h-11 rounded-full px-3 md:size-9 md:p-0',
+          isMobile && 'w-full',
+        )}
         aria-label="ფილტრების გასუფთავება"
         title="ფილტრების გასუფთავება"
         onClick={() => {

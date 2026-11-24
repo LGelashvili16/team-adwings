@@ -1,0 +1,57 @@
+<div id="more-vivid-pins" aria-label="Twelve more vivid installation pin colors">
+  <style>
+    #more-vivid-pins { color-scheme:light dark; font:14px/1.5 system-ui,sans-serif; color:light-dark(#303030,#eee); }
+    #more-vivid-pins .palette { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:22px; }
+    #more-vivid-pins h3 { margin:0 0 10px; font-size:14px; font-weight:500; }
+    #more-vivid-pins .stage { display:flex; gap:24px; justify-content:center; align-items:center; padding:26px 14px 34px; border-radius:14px; background:light-dark(#e6ecee,#304254); }
+    #more-vivid-pins .pin { width:44px; height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; position:relative; border:2px solid var(--ink); border-radius:16px; background:var(--fill); color:var(--ink); box-sizing:border-box; }
+    #more-vivid-pins .pin::after { content:""; width:14px; height:14px; position:absolute; bottom:-7px; left:50%; transform:translateX(-50%) rotate(45deg); background:var(--fill); border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); border-bottom-right-radius:3px; box-sizing:border-box; }
+    #more-vivid-pins .pin svg { position:relative; z-index:1; width:20px; height:20px; }
+    #more-vivid-pins .measure { --fill:#ff8a1f; --ink:#431407; }
+    #more-vivid-pins .other { --fill:light-dark(#ede9fe,#2e1065); --ink:light-dark(#5b21b6,#c4b5fd); }
+    #more-vivid-pins .legend { display:flex; flex-wrap:wrap; gap:8px 22px; margin-top:18px; font-size:12px; color:light-dark(#575757,#bdbdbd); }
+  </style>
+  <div class="palette"></div>
+  <template>
+    <section>
+      <h3></h3>
+      <div class="stage" role="img">
+        <span class="pin installation"><i data-lucide="wrench" aria-hidden="true"></i></span>
+        <span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span>
+        <span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span>
+      </div>
+    </section>
+  </template>
+  <div class="legend"><span>Wrench: installation alternative</span><span>Ruler: current measurement</span><span>Briefcase: current other work</span></div>
+  <script>
+    (() => {
+      const root = document.getElementById('more-vivid-pins');
+      const palette = root.querySelector('.palette');
+      const template = root.querySelector('template');
+      const colors = [
+        ['Azure', '#009dff', '#042747'],
+        ['Sapphire', '#1245f5', '#ffffff'],
+        ['Electric indigo', '#5435ff', '#ffffff'],
+        ['Iris', '#8b3dff', '#ffffff'],
+        ['Orchid', '#d957ff', '#330848'],
+        ['Raspberry', '#ff1478', '#37051c'],
+        ['Scarlet', '#ff4238', '#3f0905'],
+        ['Coral', '#ff7152', '#45170c'],
+        ['Golden yellow', '#ffd000', '#3e2a00'],
+        ['Chartreuse', '#d6ff00', '#2f3900'],
+        ['Emerald', '#00df79', '#003d25'],
+        ['Aquamarine', '#00f2dc', '#003e3b']
+      ];
+      for (const [name, fill, ink] of colors) {
+        const section = template.content.cloneNode(true);
+        section.querySelector('h3').textContent = name;
+        section.querySelector('.stage').setAttribute('aria-label', `${name} installation with orange measurement and violet other work`);
+        const pin = section.querySelector('.installation');
+        pin.style.setProperty('--fill', fill);
+        pin.style.setProperty('--ink', ink);
+        palette.appendChild(section);
+      }
+      if (globalThis.lucide) globalThis.lucide.createIcons({attrs:{width:20,height:20}});
+    })();
+  </script>
+</div>

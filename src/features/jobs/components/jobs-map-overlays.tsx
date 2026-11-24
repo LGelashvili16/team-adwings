@@ -1,7 +1,19 @@
-import { IconPlus, IconX } from '@tabler/icons-react'
+import {
+  IconPlus,
+  IconX,
+  IconCalendarDue,
+  IconCheck,
+  IconMap2,
+} from '@tabler/icons-react'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
-import { Card, CardContent } from '#/components/ui/card'
-import { Separator } from '#/components/ui/separator'
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '#/components/ui/card'
 import { GpsMapLegendSections } from '#/features/gps/components/gps-map-legend'
 import { jobKinds } from '../jobs.presentation'
 import { jobStatusSchema } from '../jobs.schemas'
@@ -58,65 +70,103 @@ export function JobsMapOverlays({
 
 export function JobsMapLegend({ showGps = false }: { showGps?: boolean }) {
   return (
-    <Card size="sm">
-      <CardContent
-        role="group"
-        aria-label="რუკის ნიშნების განმარტება"
-        className="flex flex-col gap-4 py-1"
-      >
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
-          <div
-            role="group"
-            aria-label="სამუშაოს ტიპები"
-            className="flex flex-col gap-2"
+    <Card
+      size="sm"
+      role="group"
+      aria-label="რუკის ნიშნების განმარტება"
+      className="gap-0"
+    >
+      <CardHeader className="border-b pb-3">
+        <CardTitle
+          role="heading"
+          aria-level={2}
+          className="flex items-center gap-2.5"
+        >
+          <span
+            className="flex size-7 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+            aria-hidden="true"
           >
-            <span className="text-xs font-medium text-muted-foreground">
-              სამუშაოს ტიპები
-            </span>
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-              {Object.entries(jobKinds).map(([kind, item]) => {
-                const Icon = item.icon
-                return (
+            <IconMap2 className="size-4" />
+          </span>
+          რუკის ნიშნები
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-5 py-4 md:grid-cols-2 xl:grid-cols-[1fr_1.25fr_1fr]">
+        <div
+          role="group"
+          aria-label="სამუშაოს ტიპები"
+          className="flex min-w-0 flex-col gap-3"
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            სამუშაოს ტიპები
+          </span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            {Object.entries(jobKinds).map(([kind, item]) => {
+              const Icon = item.icon
+              return (
+                <span
+                  key={kind}
+                  className="flex items-center gap-2 text-sm text-foreground"
+                >
                   <span
-                    key={kind}
-                    className="flex items-center gap-2 text-sm text-foreground"
+                    className="flex size-7 shrink-0 items-center justify-center rounded-lg border shadow-xs"
+                    style={item.markerStyle}
                   >
-                    <span
-                      className="flex size-6 shrink-0 items-center justify-center rounded-lg border"
-                      style={item.markerStyle}
-                    >
-                      <Icon className="size-3.5" aria-hidden="true" />
-                    </span>
-                    {item.label}
+                    <Icon className="size-3.5" aria-hidden="true" />
                   </span>
-                )
-              })}
-            </div>
-          </div>
-
-          <div
-            role="group"
-            aria-label="სამუშაოს სტატუსები"
-            className="flex flex-col gap-2"
-          >
-            <span className="text-xs font-medium text-muted-foreground">
-              სამუშაოს სტატუსები
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {jobStatusSchema.options.map((status) => (
-                <JobStatusBadge key={status} status={status} />
-              ))}
-            </div>
+                  {item.label}
+                </span>
+              )
+            })}
           </div>
         </div>
 
-        {showGps ? (
-          <>
-            <Separator />
-            <GpsMapLegendSections />
-          </>
-        ) : null}
+        <div
+          role="group"
+          aria-label="სამუშაოს სტატუსები"
+          className="flex min-w-0 flex-col gap-3 xl:border-x xl:px-5"
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            სამუშაოს სტატუსები
+          </span>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {jobStatusSchema.options.map((status) => (
+              <JobStatusBadge key={status} status={status} />
+            ))}
+          </div>
+        </div>
+        <div
+          className="flex min-w-0 flex-col gap-3 text-sm"
+          role="group"
+          aria-label="სამუშაოს დამატებითი ნიშნები"
+        >
+          <span className="text-xs font-medium text-muted-foreground">
+            დამატებითი ნიშნები
+          </span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            <span className="flex items-center gap-2">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-badge-crimson text-badge-crimson-foreground">
+                <IconCalendarDue className="size-3.5" aria-hidden="true" />
+              </span>
+              ვადა ხვალ
+            </span>
+            <span className="flex items-center gap-2">
+              <Badge variant="red-vivid">ახალი</Badge>ჯერ არ გაგიხსნიათ
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-lg border border-badge-green-foreground bg-badge-green text-badge-green-foreground">
+                <IconCheck className="size-3.5" aria-hidden="true" />
+              </span>
+              დასრულებული სამუშაო
+            </span>
+          </div>
+        </div>
       </CardContent>
+      {showGps ? (
+        <CardFooter className="py-4">
+          <GpsMapLegendSections />
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }

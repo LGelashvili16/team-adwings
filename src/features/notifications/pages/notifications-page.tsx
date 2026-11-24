@@ -109,7 +109,7 @@ export function NotificationsPage() {
 
   return (
     <div className="flex w-full flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             შეტყობინებები
@@ -120,10 +120,11 @@ export function NotificationsPage() {
             </Badge>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-[auto_auto]">
           <Button
             variant="outline"
             depth="raised"
+            className="min-h-11 min-w-0 px-3"
             disabled={
               unseenCount === 0 ||
               markAllSeen.isPending ||
@@ -139,11 +140,12 @@ export function NotificationsPage() {
             ) : (
               <IconChecks data-icon="inline-start" aria-hidden="true" />
             )}
-            ყველას ნანახად მონიშვნა
+            <span>ყველას ნანახად მონიშვნა</span>
           </Button>
           <Button
             variant="destructive"
             depth="raised"
+            className="min-h-11 min-w-0 px-3"
             disabled={
               totalCount === 0 ||
               markAllSeen.isPending ||
@@ -174,12 +176,12 @@ export function NotificationsPage() {
           }
         }}
       >
-        <TabsList className="gap-1 group-data-horizontal/tabs:h-auto">
-          <TabsTrigger value="all" className="h-9 px-4">
+        <TabsList className="w-full gap-1 group-data-horizontal/tabs:h-auto sm:w-fit">
+          <TabsTrigger value="all" className="h-10 px-4 sm:h-9">
             <IconBell aria-hidden="true" />
             ყველა
           </TabsTrigger>
-          <TabsTrigger value="unread" className="h-9 px-4">
+          <TabsTrigger value="unread" className="h-10 px-4 sm:h-9">
             <IconBellRinging aria-hidden="true" />
             წაუკითხავი
           </TabsTrigger>

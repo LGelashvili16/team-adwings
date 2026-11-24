@@ -65,8 +65,18 @@
   --badge-yellow-foreground: #854d0e;
   --badge-orange: #ffedd5;
   --badge-orange-foreground: #9a3412;
+  --badge-orange-vivid: #ff8a1f;
+  --badge-orange-vivid-foreground: #431407;
   --badge-blue: #dbeafe;
   --badge-blue-foreground: #1e40af;
+  --badge-sky: #38b8ff;
+  --badge-crimson: #f52f66;
+  --badge-red-vivid: #dc2626;
+  --badge-red-vivid-foreground: #ffffff;
+  --badge-crimson-foreground: #ffffff;
+  --badge-sky-foreground: #062d48;
+  --badge-lavender: #ba8cff;
+  --badge-lavender-foreground: #32105e;
   --badge-purple: #ede9fe;
   --badge-purple-foreground: #5b21b6;
   --border: #dedede;
@@ -637,8 +647,18 @@ a {
   --color-badge-yellow-foreground: var(--badge-yellow-foreground);
   --color-badge-orange: var(--badge-orange);
   --color-badge-orange-foreground: var(--badge-orange-foreground);
+  --color-badge-orange-vivid: var(--badge-orange-vivid);
+  --color-badge-orange-vivid-foreground: var(--badge-orange-vivid-foreground);
   --color-badge-blue: var(--badge-blue);
   --color-badge-blue-foreground: var(--badge-blue-foreground);
+  --color-badge-sky: var(--badge-sky);
+  --color-badge-crimson: var(--badge-crimson);
+  --color-badge-red-vivid: var(--badge-red-vivid);
+  --color-badge-red-vivid-foreground: var(--badge-red-vivid-foreground);
+  --color-badge-crimson-foreground: var(--badge-crimson-foreground);
+  --color-badge-sky-foreground: var(--badge-sky-foreground);
+  --color-badge-lavender: var(--badge-lavender);
+  --color-badge-lavender-foreground: var(--badge-lavender-foreground);
   --color-badge-purple: var(--badge-purple);
   --color-badge-purple-foreground: var(--badge-purple-foreground);
   --color-accent-foreground: var(--accent-foreground);
@@ -878,6 +898,11 @@ a {
 
 .schedule-work-block .schedule-work-end {
   color: #f1f5ff;
+}
+
+.app-map .maplibregl-map,
+.app-map .maplibregl-popup {
+  font-family: var(--font-sans);
 }
 
 .dark .maplibregl-ctrl.maplibregl-ctrl-attrib {

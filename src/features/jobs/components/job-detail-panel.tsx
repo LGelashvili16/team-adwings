@@ -7,7 +7,14 @@ import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
 import { jobQueryOptions } from '../jobs.queries'
 import { JobDetails } from './job-details'
+import { useMarkJobRead } from '../hooks/use-mark-job-read'
+import type { JobDetail } from '../jobs.types'
 import type { Actor } from '#/lib/authorization/actor'
+
+function ReadJobDetails({ actor, job }: { actor: Actor; job: JobDetail }) {
+  useMarkJobRead(actor.id, job.id)
+  return <JobDetails actor={actor} job={job} />
+}
 
 export function JobDetailSkeleton() {
   return (
@@ -80,7 +87,7 @@ export function JobDetailPanel({
           </Alert>
         </div>
       ) : (
-        <JobDetails key={query.data.id} job={query.data} actor={actor} />
+        <ReadJobDetails key={query.data.id} job={query.data} actor={actor} />
       )}
     </section>
   )

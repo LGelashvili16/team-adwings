@@ -317,7 +317,7 @@ it('shows recorded history and submits a two-day calendar selection', async () =
 
 it('registers a named tracker with its leading zeroes and refreshes the directory', async () => {
   getMapDevices.mockResolvedValue({ devices: [], total: 0 })
-  saveDevice.mockImplementation(async () => {
+  saveDevice.mockReset().mockImplementation(async () => {
     getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
     return true
   })
@@ -339,6 +339,16 @@ it('registers a named tracker with its leading zeroes and refreshes the director
     }),
     tracker.reportedId,
   )
+  const phoneInput = within(editor).getByRole('textbox', {
+    name: 'ტელეფონის ნომერი',
+  })
+  expect(phoneInput).toBeRequired()
+  await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
+  expect(
+    await within(editor).findByText('მიუთითეთ ტელეფონის ნომერი.'),
+  ).toBeVisible()
+  expect(saveDevice).not.toHaveBeenCalled()
+  await user.type(phoneInput, '555 12 34 56')
   await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
   expect(
     await screen.findByRole('button', { name: `${tracker.name}: რედაქტირება` }),
@@ -350,7 +360,7 @@ it('registers a named tracker with its leading zeroes and refreshes the director
       enabled: true,
       name: tracker.name,
       reportedId: tracker.reportedId,
-      phone: '',
+      phone: '+995 555 12 34 56',
     },
   })
 })
@@ -381,7 +391,7 @@ it('shows the Georgian search placeholder and clears the search input', async ()
   expect(onSearch).toHaveBeenCalledWith({ q: '' }, true)
 })
 
-it('validates optional phone numbers when adding and editing a GPS device', async () => {
+it('validates optional phone numbers when editing a GPS device', async () => {
   const withPhone = { ...tracker, phone: '+995 555 12 34 56', version: 2 }
   getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
   saveDevice.mockReset().mockImplementation(async () => {
@@ -399,6 +409,7 @@ it('validates optional phone numbers when adding and editing a GPS device', asyn
   const phoneInput = within(editor).getByRole('textbox', {
     name: 'ტელეფონის ნომერი',
   })
+  expect(phoneInput).not.toBeRequired()
   expect(within(editor).getByText('+995')).toBeVisible()
   await user.type(phoneInput, '123')
   await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))

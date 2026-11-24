@@ -714,7 +714,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const first = await service.manageEmployeeAccount(owner, {
       userId: record.id,
       action: 'issue_reset',
-      reason: 'პირველი აღდგენის მცდელობა.',
+      reason: '',
     })
     const second = await service.manageEmployeeAccount(owner, {
       userId: record.id,
@@ -722,6 +722,17 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       reason: 'კოდის ხელახალი გაცემა.',
     })
     if (!first || !second) throw new Error('Expected reset codes')
+    const audit = await testDatabase()
+      .select()
+      .from(tables.accessAudit)
+      .where(
+        and(
+          eq(tables.accessAudit.targetId, record.id),
+          eq(tables.accessAudit.action, 'account.issue_reset'),
+          eq(tables.accessAudit.reason, ''),
+        ),
+      )
+    expect(audit.some((entry) => entry.actorId === owner.id)).toBe(true)
     await expect(
       service.completeEmployeeReset(
         { code: first.code, newPassword: password },

@@ -7,6 +7,7 @@ import { JobsMapMenu } from './jobs-map-menu'
 import { JobDetails } from './job-details'
 import type { JobDetail } from '../jobs.types'
 import type { Actor } from '#/lib/authorization/actor'
+import { jobStatuses } from '../jobs.presentation'
 
 const api = vi.hoisted(() => ({
   readJob: vi.fn(),
@@ -29,6 +30,7 @@ const employee: Actor = {
   roles: ['production_specialist'],
 }
 const job: JobDetail = {
+  assignments: { employees: [], team: null, gpsDevice: null },
   id: '019a365d-37cc-7a5c-bfe1-1e0752235b68',
   title: 'ბინის აზომვა',
   kind: 'measurement',
@@ -49,6 +51,7 @@ const job: JobDetail = {
   locationLabelEn: null,
   locationResolvedAt: null,
   creatorName: 'მენეჯერი',
+  createdBy: manager.id,
   history: [],
   hasMoreHistory: false,
 }
@@ -72,7 +75,7 @@ function setup(actor = manager, value = job) {
       >
         <canvas aria-label="სატესტო რუკა" />
         <JobMarker
-          pin={{ ...job, longitude: 44.8, latitude: 41.7 }}
+          pin={{ ...value, longitude: 44.8, latitude: 41.7 }}
           actor={actor}
           selected={false}
           onSelect={onSelect}
@@ -82,13 +85,78 @@ function setup(actor = manager, value = job) {
   )
   return {
     marker: screen.getByRole('button', {
-      name: 'ბინის აზომვა, აზომვა, დაგეგმილი',
+      name: /^ბინის აზომვა,/,
     }),
     onSelect,
   }
 }
 beforeEach(() => vi.resetAllMocks())
 afterEach(() => vi.useRealTimers())
+
+it('does not offer editing or reopening to a supervisor who did not create the job', async () => {
+  const value = {
+    ...job,
+    createdBy: 'another-creator',
+    status: 'completed' as const,
+  }
+  const { marker } = setup(manager, value)
+  fireEvent.contextMenu(marker)
+  await screen.findByText('მენეჯერი')
+  expect(
+    screen.queryByRole('menuitem', { name: 'თავიდან დაგეგმვა' }),
+  ).not.toBeInTheDocument()
+  expect(
+    screen.queryByRole('menuitem', { name: 'რედაქტირება' }),
+  ).not.toBeInTheDocument()
+})
+it.each(['supervisor', 'admin'] as const)(
+  'offers reopening to the creator or an %s',
+  async (role) => {
+    const actor: Actor = { ...manager, roles: [role] }
+    const { marker } = setup(actor, {
+      ...job,
+      createdBy: role === 'admin' ? 'another-creator' : actor.id,
+      status: 'completed',
+    })
+    fireEvent.contextMenu(marker)
+    expect(
+      await screen.findByRole('menuitem', { name: 'თავიდან დაგეგმვა' }),
+    ).toBeVisible()
+  },
+)
+
+it.each(['installation', 'measurement', 'other'] as const)(
+  'uses the completed green for the %s pin body and pointer',
+  (kind) => {
+    const { marker } = setup(manager, { ...job, kind, status: 'completed' })
+    expect(marker.style.backgroundColor).toBe(
+      jobStatuses.completed.markerStyle.backgroundColor,
+    )
+    const pointer = marker.querySelector('.rotate-45') as HTMLElement
+    expect(pointer.style.backgroundColor).toBe(
+      jobStatuses.completed.markerStyle.backgroundColor,
+    )
+  },
+)
+it('shows tomorrow and unread indicators without replacing the category or workflow status', () => {
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse('2026-11-24T10:00:00Z'))
+  try {
+    const { marker } = setup(manager, {
+      ...job,
+      deadline: '2026-11-25',
+      isUnread: true,
+      createdAt: '2026-11-24T09:59:00Z',
+    })
+    expect(marker).toHaveAccessibleName(
+      'ბინის აზომვა, აზომვა, დაგეგმილი, ვადა ხვალ, ახალი',
+    )
+    expect(screen.getByText('ახალი')).toBeVisible()
+  } finally {
+    clock.mockRestore()
+  }
+})
 
 it('loads the selected job on demand and confirms a worker claim before any write', async () => {
   const user = userEvent.setup()
@@ -188,12 +256,39 @@ it('shows a concise address, notes and recent history without duplicating the la
     />,
   )
   expect(screen.getByText(job.address)).toBeInTheDocument()
+  expect(screen.getByText('სამუშაო დაამატა')).toBeVisible()
+  expect(screen.getByText(job.creatorName)).toBeVisible()
+  expect(screen.queryByText('პასუხისმგებელი')).not.toBeInTheDocument()
   expect(screen.getByText(job.notes)).toBeInTheDocument()
   expect(screen.queryByText('University Street')).not.toBeInTheDocument()
   expect(screen.queryByText(/OpenStreetMap/)).not.toBeInTheDocument()
   expect(screen.queryByText('ბოლო ცვლილება')).not.toBeInTheDocument()
   expect(screen.getByText('ისტორიის ავტორი')).toBeVisible()
   expect(screen.getAllByText('ისტორიის ავტორი')).toHaveLength(1)
+})
+it('calls a pending transition replanned without relabeling creation, edits or the current status', () => {
+  render(
+    <JobDetails
+      actor={employee}
+      job={{
+        ...job,
+        history: ['status_changed', 'edited', 'created'].map(
+          (action, index) => ({
+            id: String(index),
+            action,
+            status: 'pending',
+            note: '',
+            actorName: 'ავტორი',
+            createdAt: job.createdAt,
+          }),
+        ),
+      }}
+    />,
+  )
+  expect(screen.getByText('თავიდან დაგეგმილი')).toBeVisible()
+  expect(screen.getByText('ინფორმაცია განახლებულია')).toBeVisible()
+  expect(screen.getByText('სამუშაო დამატებულია')).toBeVisible()
+  expect(screen.getAllByText('დაგეგმილი')).toHaveLength(1)
 })
 it('shows recent history first and expands the remaining entries', async () => {
   render(

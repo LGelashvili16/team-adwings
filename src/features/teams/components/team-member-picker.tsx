@@ -1,17 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import {
-  IconCheck,
-  IconPlus,
-  IconSearch,
-  IconFilter,
-  IconBriefcase,
-  IconX,
-} from '@tabler/icons-react'
+import { IconSearch, IconFilter, IconX } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Card, CardHeader, CardTitle, CardContent } from '#/components/ui/card'
-import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import { roleLabels } from '#/lib/authorization/permissions'
@@ -45,14 +37,17 @@ import { teamCandidateFiltersSchema, teamsPageSize } from '../teams.schemas'
 import { teamsKey } from '../teams.queries'
 import { teamMemberRoles, TeamWorkflowError } from '../teams.rules'
 import type { TeamCandidate } from './team-editor'
+import { TeamCandidateRow } from './team-candidate-row'
 
 export function TeamMemberPicker({
   actorId,
+  currentTeamId = null,
   selected,
   disabled,
   onAdd,
 }: {
   actorId: string
+  currentTeamId?: string | null
   selected: Array<string>
   disabled: boolean
   onAdd: (person: TeamCandidate) => void
@@ -60,12 +55,10 @@ export function TeamMemberPicker({
   const [filters, setFilters] = useState(() =>
     teamCandidateFiltersSchema.parse({
       q: '',
-      jobTitle: '',
       roles: ['production_specialist'],
     }),
   )
   const [draft, setDraft] = useState(filters)
-  const [rolesOpen, setRolesOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const sentinel = useRef<HTMLDivElement>(null)
   const fieldId = useId()
@@ -165,7 +158,7 @@ export function TeamMemberPicker({
               {(field) => (
                 <Field data-invalid={!field.state.meta.isValid}>
                   <FieldLabel htmlFor={`${fieldId}-name`} className="sr-only">
-                    თანამშრომლის ძიება
+                    სახელის, მომხმარებლის ან თანამდებობის ძიება
                   </FieldLabel>
                   <InputGroup>
                     <InputGroupAddon>
@@ -176,7 +169,7 @@ export function TeamMemberPicker({
                       disabled={disabled}
                       value={draft.q}
                       maxLength={100}
-                      placeholder="სახელის ან მომხმარებლის ძიება"
+                      placeholder="სახელის, მომხმარებლის ან თანამდებობის ძიება"
                       onChange={(event) => {
                         setDraft((current) => ({
                           ...current,
@@ -206,7 +199,7 @@ export function TeamMemberPicker({
                 </Field>
               )}
             </form.Field>
-            <Popover open={rolesOpen} onOpenChange={setRolesOpen}>
+            <Popover>
               <PopoverTrigger
                 render={
                   <Button
@@ -263,7 +256,7 @@ export function TeamMemberPicker({
                         </Field>
                       ))}
                       <FieldError errors={field.state.meta.errors} />
-                      <div className="mt-2 flex items-center justify-between gap-2 border-t pt-3">
+                      <div className="mt-2 flex items-center border-t pt-3">
                         <Button
                           type="button"
                           size="sm"
@@ -279,71 +272,12 @@ export function TeamMemberPicker({
                         >
                           ნაგულისხმევი
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setRolesOpen(false)}
-                        >
-                          მზადაა
-                        </Button>
                       </div>
                     </FieldSet>
                   )}
                 </form.Field>
               </PopoverContent>
             </Popover>
-            <form.Field name="jobTitle">
-              {(field) => (
-                <Field
-                  className="col-span-2"
-                  data-invalid={!field.state.meta.isValid}
-                >
-                  <FieldLabel htmlFor={`${fieldId}-title`} className="sr-only">
-                    თანამდებობით გაფილტვრა
-                  </FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon>
-                      <IconBriefcase aria-hidden="true" />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id={`${fieldId}-title`}
-                      disabled={disabled}
-                      value={draft.jobTitle}
-                      maxLength={100}
-                      placeholder="თანამდებობა, მაგალითად მემონტაჟე"
-                      onChange={(event) => {
-                        setDraft((current) => ({
-                          ...current,
-                          jobTitle: event.target.value,
-                        }))
-                        field.handleChange(event.target.value)
-                      }}
-                      aria-invalid={!field.state.meta.isValid}
-                    />
-                    {draft.jobTitle && (
-                      <InputGroupAddon align="inline-end">
-                        <InputGroupButton
-                          size="icon-xs"
-                          aria-label="თანამდებობის ფილტრის გასუფთავება"
-                          disabled={disabled}
-                          onClick={() => {
-                            setDraft((current) => ({
-                              ...current,
-                              jobTitle: '',
-                            }))
-                            field.handleChange('')
-                          }}
-                        >
-                          <IconX aria-hidden="true" />
-                        </InputGroupButton>
-                      </InputGroupAddon>
-                    )}
-                  </InputGroup>
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
           </div>
         </FieldGroup>
         {query.isPending ? (
@@ -375,55 +309,20 @@ export function TeamMemberPicker({
               tabIndex={0}
             >
               <ul className="divide-y">
-                {items.map((person) => {
-                  const picked = selected.includes(person.userId)
-                  return (
-                    <li
-                      key={person.userId}
-                      className="flex flex-wrap items-center gap-3 p-3"
-                    >
-                      <Avatar aria-hidden="true">
-                        <AvatarFallback>
-                          {person.name
-                            .trim()
-                            .split(/\s+/)
-                            .slice(0, 2)
-                            .map((part) => part[0])
-                            .join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium break-words">{person.name}</p>
-                        <p className="text-sm text-muted-foreground break-words">
-                          {person.jobTitle || 'თანამდებობა მითითებული არ არის'}
-                        </p>
-                        {person.teamName && (
-                          <Badge variant="outline" className="mt-1">
-                            {person.teamName}
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant={picked ? 'secondary' : 'outline'}
-                        size="sm"
-                        disabled={disabled || picked}
-                        onClick={() => onAdd(person)}
-                      >
-                        {picked ? (
-                          <IconCheck aria-hidden="true" />
-                        ) : (
-                          <IconPlus aria-hidden="true" />
-                        )}
-                        {picked ? 'არჩეულია' : 'დამატება'}
-                      </Button>
-                    </li>
-                  )
-                })}
+                {items.map((person) => (
+                  <TeamCandidateRow
+                    key={person.userId}
+                    person={person}
+                    currentTeamId={currentTeamId}
+                    picked={selected.includes(person.userId)}
+                    disabled={disabled}
+                    onAdd={onAdd}
+                  />
+                ))}
               </ul>
               {!items.length && (
                 <p className="p-6 text-center text-sm text-muted-foreground">
-                  {filters.q || filters.jobTitle || !filters.roles.length
+                  {filters.q || !filters.roles.length
                     ? 'ამ ფილტრებით თანამშრომლები ვერ მოიძებნა.'
                     : 'მოქმედი თანამშრომლები არჩეული როლებით ჯერ არ არიან.'}
                 </p>

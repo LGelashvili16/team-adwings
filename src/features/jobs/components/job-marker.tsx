@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import './job-marker.css'
 import { useQuery } from '@tanstack/react-query'
 import {
   IconArrowRight,
@@ -22,6 +23,8 @@ import {
 import { cn } from '#/lib/utils'
 import { jobQueryOptions } from '../jobs.queries'
 import { jobKinds, jobStatuses } from '../jobs.presentation'
+import { jobIndicators } from '../jobs.indicators'
+import { Badge } from '#/components/ui/badge'
 import { useMapLongPress } from '../hooks/use-map-long-press'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
@@ -36,45 +39,81 @@ export function JobMarker({
   actor,
   selected,
   onSelect,
+  now = Date.now(),
 }: {
   pin: Marker
   actor: Actor
   selected: boolean
   onSelect: (id: string) => void
+  now?: number
 }) {
   const [open, setOpen] = useState(false)
+  const [pulseMountedAt] = useState(() => Date.now())
   const [action, setAction] = useState<JobAction | null>(null)
   const hold = useMapLongPress()
   const status = jobStatuses[pin.status]
   const kind = jobKinds[pin.kind]
+  const markerStyle =
+    pin.status === 'completed'
+      ? jobStatuses.completed.markerStyle
+      : kind.markerStyle
   const Icon = kind.icon
   const StatusIcon = status.icon
+  const indicators = jobIndicators(pin, now)
+  const indicatorLabel = `${indicators.dueTomorrow ? ', ვადა ხვალ' : ''}${indicators.isNew ? ', ახალი' : ''}`
   return (
     <>
       <ContextMenu open={open} onOpenChange={setOpen}>
-        <ContextMenuTrigger {...hold} data-job-marker>
+        <ContextMenuTrigger {...hold} data-job-marker className="pb-2.5">
           <Button
             variant="outline"
             depth="raised"
             className={cn(
               'relative size-11 rounded-2xl border-2 p-0 shadow-md',
+              indicators.pulse && 'job-new-pulse',
               selected &&
-                'ring-4 ring-ring/40 ring-offset-2 ring-offset-background',
+                'ring-4 ring-white/75 ring-offset-2 ring-offset-black/50',
             )}
-            style={kind.markerStyle}
-            aria-label={`${pin.title}, ${kind.label}, ${status.label}`}
+            style={{
+              ...markerStyle,
+              animationDelay: pin.createdAt
+                ? `${-Math.max(0, pulseMountedAt - Date.parse(pin.createdAt))}ms`
+                : undefined,
+            }}
+            aria-label={`${pin.title}, ${kind.label}, ${status.label}${indicatorLabel}`}
             aria-pressed={selected}
             aria-haspopup="menu"
-            title={`${pin.title} · ${kind.label} · ${status.label}`}
+            title={`${pin.title} · ${kind.label} · ${status.label}${indicatorLabel}`}
             onClick={(event) => {
               event.stopPropagation()
               if (!open) onSelect(pin.id)
             }}
           >
-            <Icon className="size-5" aria-hidden="true" />
+            {indicators.isNew ? (
+              <Badge
+                variant="red-vivid"
+                className="pointer-events-none absolute -top-7 left-1/2 z-20 -translate-x-1/2"
+              >
+                ახალი
+              </Badge>
+            ) : null}
+            {indicators.dueTomorrow ? (
+              <span
+                aria-hidden="true"
+                className="absolute -top-1 -left-1 z-10 flex size-5 items-center justify-center rounded-full border-2 border-background bg-badge-crimson text-badge-crimson-foreground"
+              >
+                <IconCalendarDue className="size-3" />
+              </span>
+            ) : null}
             <span
               aria-hidden="true"
-              className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full border-2"
+              className="pointer-events-none absolute -bottom-1.75 left-1/2 size-3.5 -translate-x-1/2 rotate-45 rounded-br-sm border-r-2 border-b-2"
+              style={markerStyle}
+            />
+            <Icon className="relative size-5" aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              className="absolute -right-1 -bottom-1 z-10 flex size-5 items-center justify-center rounded-full border-2"
               style={{
                 ...status.markerStyle,
                 borderColor: 'var(--background)',

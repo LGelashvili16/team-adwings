@@ -351,6 +351,34 @@
       "when": 1795457504297,
       "tag": "0049_notification_deleted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795508622558,
+      "tag": "0050_job_creation_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1795509464380,
+      "tag": "0051_job_notification_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795515073705,
+      "tag": "0052_job_read_indicators",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795527530105,
+      "tag": "0053_job_assignments",
+      "breakpoints": true
     }
   ]
 }

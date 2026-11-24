@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { georgiaLocationError, isLocationInGeorgia } from './jobs.geography'
 import { jobsMonthRange } from './jobs.dates'
+import { teamRoleFilterSchema } from '#/features/teams/teams.schemas'
 
 const jobDateSchema = z.iso
   .date({ error: 'თარიღი არასწორია.' })
@@ -9,6 +10,10 @@ const jobDateSchema = z.iso
     'აირჩიეთ თარიღი 1900 და 2100 წლებს შორის.',
   )
 export const jobDeadlineSchema = jobDateSchema.nullable()
+const requiredJobDeadlineSchema = z
+  .string({ error: 'მიუთითეთ სამუშაოს ვადა.' })
+  .min(1, 'მიუთითეთ სამუშაოს ვადა.')
+  .pipe(jobDateSchema)
 
 export const jobStatusSchema = z.enum(
   ['pending', 'en_route', 'on_site', 'completed', 'rejected'],
@@ -54,8 +59,9 @@ export const jobFieldsSchema = z
       .trim()
       .max(4000, 'შენიშვნა ძალიან გრძელია.'),
     address: z
-      .string({ error: 'მისამართი არასწორია.' })
+      .string({ error: 'მიუთითეთ მისამართი.' })
       .trim()
+      .min(1, 'მიუთითეთ მისამართი.')
       .max(300, 'მისამართი ძალიან გრძელია.'),
     kind: jobKindSchema,
     deadline: jobDeadlineSchema.default(null),
@@ -87,7 +93,7 @@ export const jobEditorSchema = jobFieldsSchema
     longitude: jobLocationSchema.shape.longitude.nullable(),
     latitude: jobLocationSchema.shape.latitude.nullable(),
     hasCoordinates: z.boolean({ error: 'მდებარეობის არჩევანი არასწორია.' }),
-    deadline: jobDeadlineSchema,
+    deadline: requiredJobDeadlineSchema,
   })
   .superRefine((value, context) => {
     if (!value.hasCoordinates) return
@@ -102,15 +108,61 @@ export const jobEditorSchema = jobFieldsSchema
     }
   })
 export const createJobSchema = jobFieldsSchema.safeExtend({
+  deadline: requiredJobDeadlineSchema,
   requestId: z.uuid({ error: 'მოთხოვნა არასწორია.' }),
 })
 export const editJobSchema = jobFieldsSchema.safeExtend({
   id: jobIdSchema,
   version: versionSchema,
   // An omitted field must never silently clear a deadline saved by a newer client.
-  deadline: jobDeadlineSchema,
+  deadline: requiredJobDeadlineSchema,
 })
 export const jobLookupSchema = z.object({ id: jobIdSchema })
+export const jobAssignmentFieldsSchema = z.object({
+  employeeIds: z
+    .array(
+      z
+        .string({ error: 'თანამშრომელი არასწორია.' })
+        .min(1, 'აირჩიეთ თანამშრომელი.')
+        .max(256, 'იდენტიფიკატორი ძალიან გრძელია.'),
+      { error: 'თანამშრომლების სია არასწორია.' },
+    )
+    .max(200, 'შეგიძლიათ დაამატოთ მაქსიმუმ 200 თანამშრომელი.')
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      'თანამშრომელი სიაში მეორდება.',
+    ),
+  teamId: z.uuid({ error: 'გუნდი არასწორია.' }).nullable(),
+  teamVersion: versionSchema.nullable(),
+  gpsDeviceId: z.uuid({ error: 'GPS მოწყობილობა არასწორია.' }).nullable(),
+})
+export const jobAssignmentsSchema = jobAssignmentFieldsSchema.extend({
+  id: jobIdSchema,
+  version: versionSchema,
+})
+export const jobAssignmentSearchSchema = z.object({
+  roles: teamRoleFilterSchema.default(['production_specialist']),
+  kind: z.enum(['employees', 'teams', 'devices'], {
+    error: 'არჩევანის ტიპი არასწორია.',
+  }),
+  q: z
+    .string({ error: 'ძიება არასწორია.' })
+    .trim()
+    .max(100, 'ძიება ძალიან გრძელია.'),
+  page: z
+    .number({ error: 'გვერდი არასწორია.' })
+    .int('გვერდი არასწორია.')
+    .min(1, 'გვერდი არასწორია.')
+    .max(100000, 'გვერდი არასწორია.'),
+})
+export const jobAssignmentTeamSchema = z.object({
+  id: z.uuid({ error: 'გუნდი არასწორია.' }),
+})
+export const jobAssignmentFilterSchema = jobAssignmentSearchSchema
+  .pick({ q: true, roles: true })
+  .extend({ roles: jobAssignmentSearchSchema.shape.roles.removeDefault() })
+export const jobAssignmentPageSize = 20
+export type JobAssignmentSearch = z.infer<typeof jobAssignmentSearchSchema>
 export const jobTransitionSchema = z
   .object({
     id: jobIdSchema,
@@ -153,10 +205,13 @@ export const jobFilterSchema = z
     kind: z.enum(['all', ...jobKindSchema.options], {
       error: 'ტიპი არასწორია.',
     }),
-    scope: z.enum(['all', 'mine'], { error: 'ფილტრი არასწორია.' }),
-    sort: z.enum(['newest', 'oldest', 'title'], {
-      error: 'დალაგება არასწორია.',
-    }),
+    scope: z.enum(['all', 'mine', 'related'], { error: 'ფილტრი არასწორია.' }),
+    sort: z.enum(
+      ['newest', 'oldest', 'title', 'deadline_asc', 'deadline_desc'],
+      {
+        error: 'დალაგება არასწორია.',
+      },
+    ),
   })
   .refine((range) => range.from <= range.to, {
     path: ['to'],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountCodeSchema } from './access.schemas'
+import { accountCodeSchema, accountActionSchema } from './access.schemas'
 import { formatSetupCode, normalizeSetupCode } from './access.rules'
 
 describe('setup codes', () => {
@@ -17,6 +17,55 @@ describe('setup codes', () => {
     'rejects %s',
     (code) => {
       expect(accountCodeSchema.safeParse(code).success).toBe(false)
+    },
+  )
+})
+
+describe('account action reasons', () => {
+  it.each(['issue_activation', 'issue_reset'] as const)(
+    'allows an optional bounded reason for %s',
+    (action) => {
+      expect(
+        accountActionSchema.parse({ userId: 'employee', action, reason: '' })
+          .reason,
+      ).toBe('')
+      expect(
+        accountActionSchema.parse({ userId: 'employee', action, reason: '   ' })
+          .reason,
+      ).toBe('')
+      expect(
+        accountActionSchema.parse({
+          userId: 'employee',
+          action,
+          reason: ' HR ',
+        }).reason,
+      ).toBe('HR')
+      expect(
+        accountActionSchema.safeParse({
+          userId: 'employee',
+          action,
+          reason: 'a'.repeat(501),
+        }).success,
+      ).toBe(false)
+    },
+  )
+  it.each(['suspend', 'restore'] as const)(
+    'retains the required reason for %s',
+    (action) => {
+      expect(
+        accountActionSchema.safeParse({
+          userId: 'employee',
+          action,
+          reason: ' ',
+        }).success,
+      ).toBe(false)
+      expect(
+        accountActionSchema.safeParse({
+          userId: 'employee',
+          action,
+          reason: 'audit reason',
+        }).success,
+      ).toBe(true)
     },
   )
 })

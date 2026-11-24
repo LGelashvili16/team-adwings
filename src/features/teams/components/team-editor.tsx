@@ -303,6 +303,7 @@ export function TeamEditor({
                 {initial?.active !== false && (
                   <TeamMemberPicker
                     actorId={actorId}
+                    currentTeamId={initial?.id ?? null}
                     selected={draft.members.map((member) => member.userId)}
                     disabled={mutation.isPending || !draft.active}
                     onAdd={(person) => {

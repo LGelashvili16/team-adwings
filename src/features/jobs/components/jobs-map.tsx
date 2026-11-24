@@ -6,12 +6,17 @@ import {
   IconMinimize,
   IconBuildingStore,
   IconBuildingSkyscraper,
+  IconChevronLeft,
+  IconChevronRight,
+  IconCircleCheck,
 } from '@tabler/icons-react'
 import { Map, MapControls, MapMarker, useMap } from '#/components/ui/map'
 import { Button } from '#/components/ui/button'
+import { Card, CardContent } from '#/components/ui/card'
 import { cn } from '#/lib/utils'
 import { JobsMapMenu, MapContextLocation } from './jobs-map-menu'
 import { JobMarker as JobMapMarker } from './job-marker'
+import { jobIndicators, jobMarkerPriority } from '../jobs.indicators'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobMapPosition, JobMarker } from '../jobs.types'
 import type { ReactNode, RefObject } from 'react'
@@ -19,7 +24,7 @@ import type { MapCamera } from '#/components/ui/map'
 import type { ResolvedLocation } from '../job-locations.types'
 
 // Markers anchor at their bottom edge; reserve their height as well as the top controls.
-const fitPadding = { top: 112, right: 64, bottom: 80, left: 64 }
+const fitPadding = { top: 112, right: 128, bottom: 80, left: 64 }
 
 function MapFocus({
   pins,
@@ -32,6 +37,9 @@ function MapFocus({
   restoreCamera,
   focusRequest,
   actor,
+  controls,
+  expanded,
+  onExpand,
 }: {
   pins: Array<JobMarker>
   pinsReady: boolean
@@ -43,17 +51,33 @@ function MapFocus({
   restoreCamera: boolean
   focusRequest: number
   actor: Actor
+  controls?: ReactNode
+  expanded: boolean
+  onExpand: () => void
 }) {
   const { map, library, loaded } = useMap()
+  const [controlsOpen, setControlsOpen] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
   const initialized = useRef(restoreCamera)
   function fit() {
     if (!pins.length) return
     const bounds = new library.LngLatBounds()
     for (const pin of pins) bounds.extend([pin.longitude, pin.latitude])
-    map.fitBounds(bounds, { padding: fitPadding, maxZoom: 14, duration: 0 })
+    map.fitBounds(bounds, {
+      padding: fitPadding,
+      maxZoom: 14,
+      duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 0
+        : 500,
+      linear: true,
+    })
   }
   useEffect(() => {
-    if (!loaded || !pinsReady || initialized.current) return
+    if (!pinsReady || initialized.current) return
     initialized.current = true
     if (
       location ||
@@ -63,7 +87,16 @@ function MapFocus({
       return
     const bounds = new library.LngLatBounds()
     for (const pin of pins) bounds.extend([pin.longitude, pin.latitude])
-    map.fitBounds(bounds, { padding: fitPadding, maxZoom: 14, duration: 0 })
+    // Position before the first tiles render; animate only when job results arrive after map load.
+    map.fitBounds(bounds, {
+      padding: fitPadding,
+      maxZoom: 14,
+      duration:
+        loaded && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 500
+          : 0,
+      linear: true,
+    })
   }, [
     map,
     library,
@@ -131,8 +164,13 @@ function MapFocus({
           key={pin.id}
           longitude={pin.longitude}
           latitude={pin.latitude}
+          priority={jobMarkerPriority(
+            jobIndicators(pin, now),
+            selected?.id === pin.id,
+          )}
         >
           <JobMapMarker
+            now={now}
             pin={pin}
             actor={actor}
             selected={selected?.id === pin.id}
@@ -140,18 +178,72 @@ function MapFocus({
           />
         </MapMarker>
       ))}
-      <Button
-        variant="outline"
-        depth="raised"
-        size="icon-lg"
-        className="absolute top-16 right-4 z-10 bg-background dark:bg-background"
-        aria-label="ყველა სამუშაოს ჩვენება"
-        title="ყველა სამუშაოს ჩვენება"
-        onClick={fit}
-        disabled={!pins.length}
+      <div
+        className={cn(
+          'absolute top-4 right-4 z-20 transition-transform duration-200 ease-out motion-reduce:transition-none',
+          !controlsOpen && 'translate-x-[calc(100%+1rem)]',
+        )}
       >
-        <IconFocus2 data-icon="inline-start" aria-hidden="true" />
-      </Button>
+        <Button
+          type="button"
+          variant="outline-solid"
+          depth="raised"
+          size="icon-lg"
+          className="absolute top-0 -left-11"
+          aria-label={
+            controlsOpen
+              ? 'რუკის ხელსაწყოების დამალვა'
+              : 'რუკის ხელსაწყოების ჩვენება'
+          }
+          aria-expanded={controlsOpen}
+          aria-controls="jobs-map-controls"
+          onClick={() => setControlsOpen(!controlsOpen)}
+        >
+          {controlsOpen ? (
+            <IconChevronRight aria-hidden="true" />
+          ) : (
+            <IconChevronLeft aria-hidden="true" />
+          )}
+        </Button>
+        <Card
+          id="jobs-map-controls"
+          inert={!controlsOpen}
+          aria-hidden={!controlsOpen || undefined}
+          size="sm"
+          className="gap-0 py-2"
+        >
+          <CardContent className="flex flex-col gap-2 px-2">
+            <Button
+              data-map-expand
+              variant="outline-solid"
+              depth="raised"
+              size="icon-lg"
+              aria-label={expanded ? 'რუკის შემცირება' : 'რუკის გაშლა'}
+              title={expanded ? 'რუკის შემცირება' : 'რუკის გაშლა'}
+              onClick={onExpand}
+            >
+              {expanded ? (
+                <IconMinimize aria-hidden="true" />
+              ) : (
+                <IconMaximize aria-hidden="true" />
+              )}
+            </Button>
+            <Button
+              variant="outline-solid"
+              depth="raised"
+              size="icon-lg"
+              aria-label="ყველა სამუშაოს ჩვენება"
+              title="ყველა სამუშაოს ჩვენება"
+              onClick={fit}
+              disabled={!pins.length}
+            >
+              <IconFocus2 data-icon="inline-start" aria-hidden="true" />
+            </Button>
+            {controls}
+            <MapControls inline />
+          </CardContent>
+        </Card>
+      </div>
     </>
   )
 }
@@ -176,6 +268,9 @@ export default function JobsMap({
   onPlacesChange,
   showBuildings,
   onBuildingsChange,
+  showCompleted = true,
+  onCompletedChange,
+  controlExtras,
 }: {
   pins: Array<JobMarker>
   pinsReady: boolean
@@ -197,72 +292,83 @@ export default function JobsMap({
   onPlacesChange: (show: boolean) => void
   showBuildings: boolean
   onBuildingsChange: (show: boolean) => void
+  showCompleted?: boolean
+  onCompletedChange?: (show: boolean) => void
+  controlExtras?: ReactNode
 }) {
   const [position, setPosition] = useState<JobMapPosition | null>(null)
   const [restoreCamera] = useState(() => Boolean(camera.current))
+  const visiblePins = showCompleted
+    ? pins
+    : pins.filter((pin) => pin.status !== 'completed')
   const content = (
     <Map camera={camera} showPlaces={showPlaces} showBuildings={showBuildings}>
       <MapFocus
-        pins={pins}
+        pins={visiblePins}
         pinsReady={pinsReady}
         initialPin={initialPin}
-        selected={selected}
+        selected={
+          selected?.status === 'completed' && !showCompleted
+            ? undefined
+            : selected
+        }
         location={location}
         onSelect={onSelect}
         focused={focused}
         restoreCamera={restoreCamera}
         focusRequest={focusRequest}
         actor={actor}
+        expanded={expanded}
+        onExpand={onExpand}
+        controls={
+          <>
+            <Button
+              variant={showPlaces ? 'default' : 'outline-solid'}
+              depth="raised"
+              size="icon-lg"
+              aria-label="ობიექტების ჩვენება"
+              aria-pressed={showPlaces}
+              title={showPlaces ? 'ობიექტების დამალვა' : 'ობიექტების ჩვენება'}
+              onClick={() => onPlacesChange(!showPlaces)}
+            >
+              <IconBuildingStore aria-hidden="true" />
+            </Button>
+            <Button
+              variant={showBuildings ? 'default' : 'outline-solid'}
+              depth="raised"
+              size="icon-lg"
+              aria-label="სამგანზომილებიანი შენობები"
+              aria-pressed={showBuildings}
+              title={
+                showBuildings
+                  ? 'სამგანზომილებიანი შენობების გამორთვა'
+                  : 'სამგანზომილებიანი შენობების ჩართვა'
+              }
+              onClick={() => onBuildingsChange(!showBuildings)}
+            >
+              <IconBuildingSkyscraper aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant={showCompleted ? 'default' : 'outline-solid'}
+              depth="raised"
+              size="icon-lg"
+              aria-label="დასრულებული სამუშაოების ჩვენება"
+              aria-pressed={showCompleted}
+              title={
+                showCompleted
+                  ? 'დასრულებული სამუშაოების დამალვა'
+                  : 'დასრულებული სამუშაოების ჩვენება'
+              }
+              onClick={() => onCompletedChange?.(!showCompleted)}
+            >
+              <IconCircleCheck aria-hidden="true" />
+            </Button>
+            {controlExtras}
+          </>
+        }
       />
       {canCreate ? <MapContextLocation onPoint={setPosition} /> : null}
-      <MapControls />
-      <Button
-        variant={showPlaces ? 'secondary' : 'outline'}
-        depth="raised"
-        size="icon-lg"
-        className="absolute top-28 right-4 z-10 bg-background"
-        aria-label="ობიექტების ჩვენება"
-        aria-pressed={showPlaces}
-        title={showPlaces ? 'ობიექტების დამალვა' : 'ობიექტების ჩვენება'}
-        onClick={() => onPlacesChange(!showPlaces)}
-      >
-        <IconBuildingStore aria-hidden="true" />
-      </Button>
-      <Button
-        variant={showBuildings ? 'default' : 'outline'}
-        depth="raised"
-        size="icon-lg"
-        className={cn(
-          'absolute top-40 right-4 z-10',
-          !showBuildings && 'bg-background',
-        )}
-        aria-label="სამგანზომილებიანი შენობები"
-        aria-pressed={showBuildings}
-        title={
-          showBuildings
-            ? 'სამგანზომილებიანი შენობების გამორთვა'
-            : 'სამგანზომილებიანი შენობების ჩართვა'
-        }
-        onClick={() => onBuildingsChange(!showBuildings)}
-      >
-        <IconBuildingSkyscraper aria-hidden="true" />
-      </Button>
-      <Button
-        data-map-expand
-        variant="outline"
-        depth="raised"
-        size="icon-lg"
-        className="absolute top-4 right-4 z-10 bg-background dark:bg-background"
-        aria-label={expanded ? 'რუკის შემცირება' : 'რუკის გაშლა'}
-        title={expanded ? 'რუკის შემცირება' : 'რუკის გაშლა'}
-        onClick={onExpand}
-      >
-        {expanded ? (
-          <IconMinimize aria-hidden="true" />
-        ) : (
-          <IconMaximize aria-hidden="true" />
-        )}
-      </Button>
       {children}
       {showEmpty && !location ? (
         <div className="pointer-events-none absolute bottom-12 left-4 flex max-w-64 items-start gap-3 rounded-xl border bg-background/95 p-3 text-sm shadow-sm">

@@ -36,6 +36,18 @@ pnpm dev
 
 The development app is available at http://localhost:3005.
 
+Host development binds IPv4 loopback and requires port 3005 to be free. Stop any
+Docker application publishing that port before running `pnpm dev`; keep its
+database running. Do not run a production container and Vite on the same port.
+Otherwise, browsers can resolve `localhost` differently and reach different
+versions over IPv4 and IPv6. A Docker image contains its built release and does
+not pick up source edits from the host.
+
+If the port is occupied, inspect `docker ps` and stop only the intended web
+container. The strict port check deliberately exits instead of choosing another
+port. Keep using `http://localhost:3005` as the browser URL to preserve the
+configured authentication origin.
+
 Configure the application in `.env.local` when implementing database, auth, and
 email integrations:
 

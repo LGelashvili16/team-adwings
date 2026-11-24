@@ -6,23 +6,83 @@ import {
   jobFieldsSchema,
   jobSearchSchema,
   jobTransitionSchema,
+  jobAssignmentsSchema,
 } from './jobs.schemas'
 
 const id = '019a365d-37cc-7a5c-bfe1-1e0752235b68'
+it('validates bounded unique employee assignments, resource identifiers and revisions', () => {
+  const valid = {
+    id,
+    version: 1,
+    employeeIds: ['employee'],
+    teamId: null,
+    teamVersion: null,
+    gpsDeviceId: null,
+  }
+  expect(jobAssignmentsSchema.safeParse(valid).success).toBe(true)
+  for (const change of [
+    { employeeIds: ['employee', 'employee'] },
+    { employeeIds: [''] },
+    { employeeIds: Array.from({ length: 201 }, (_, i) => String(i)) },
+    { teamId: 'bad' },
+    { gpsDeviceId: 'bad' },
+    { version: 0 },
+    { teamVersion: 0 },
+    { employeeIds: undefined },
+  ])
+    expect(
+      jobAssignmentsSchema.safeParse({ ...valid, ...change }).success,
+    ).toBe(false)
+})
+it('validates the related-to-me URL filter and rejects unknown relationship scopes', () => {
+  expect(jobSearchSchema.parse({ scope: 'related' }).scope).toBe('related')
+  expect(jobSearchSchema.safeParse({ scope: 'someone-else' }).success).toBe(
+    false,
+  )
+})
 const fields = {
   title: 'ახალი მონტაჟი',
-  address: '',
+  address: 'თბილისი',
   notes: '',
   kind: 'installation',
-  deadline: null,
+  deadline: '2026-11-20',
   longitude: 44.8,
   latitude: 41.7,
 }
-it('validates optional calendar deadlines and requires edits to preserve or explicitly clear them', () => {
+it.each(['', '   ', '\t\n'])(
+  'rejects blank addresses in forms, creation and edits: %j',
+  (address) => {
+    for (const schema of [jobFieldsSchema, createJobSchema, editJobSchema]) {
+      const result = schema.safeParse({
+        ...fields,
+        address,
+        requestId: id,
+        id,
+        version: 1,
+      })
+      expect(result.success).toBe(false)
+      if (!result.success)
+        expect(result.error.issues).toContainEqual(
+          expect.objectContaining({
+            path: ['address'],
+            message: 'მიუთითეთ მისამართი.',
+          }),
+        )
+    }
+    expect(
+      jobFieldsSchema.parse({ ...fields, address: '  თბილისი  ' }).address,
+    ).toBe('თბილისი')
+  },
+)
+it('requires a valid calendar deadline for both creation and edits', () => {
   const { deadline: _deadline, ...withoutDeadline } = fields
   expect(
-    createJobSchema.parse({ ...withoutDeadline, requestId: id }).deadline,
-  ).toBeNull()
+    createJobSchema.safeParse({ ...withoutDeadline, requestId: id }).success,
+  ).toBe(false)
+  expect(
+    createJobSchema.safeParse({ ...fields, deadline: null, requestId: id })
+      .success,
+  ).toBe(false)
   expect(
     createJobSchema.parse({ ...fields, deadline: '2028-02-29', requestId: id })
       .deadline,
@@ -30,7 +90,10 @@ it('validates optional calendar deadlines and requires edits to preserve or expl
   expect(
     editJobSchema.safeParse({ ...withoutDeadline, id, version: 1 }).success,
   ).toBe(false)
-  expect(editJobSchema.parse({ ...fields, id, version: 1 }).deadline).toBeNull()
+  expect(
+    editJobSchema.safeParse({ ...fields, deadline: null, id, version: 1 })
+      .success,
+  ).toBe(false)
   for (const deadline of [
     '2026-02-30',
     '2026-11-07T10:00:00Z',

@@ -11,9 +11,12 @@ import {
   CardHeader,
   CardDescription,
   CardFooter,
+  CardContent,
 } from '#/components/ui/card'
 import { Button } from '#/components/ui/button'
 import { APP_NAME } from '#/lib/app'
+import { networkErrorDescription } from '#/lib/error-diagnostics'
+import type { ErrorDiagnostic } from '#/lib/error-diagnostics'
 
 // Access can fail before scripts, styles or images are served, so this document is self-contained.
 const styles = `
@@ -31,6 +34,13 @@ main { min-height:100svh; display:flex; flex-direction:column; align-items:cente
 .code { margin:0 0 10px; color:var(--muted-foreground); font-size:12px; font-weight:600; letter-spacing:.08em; }
 h1 { margin:0 0 16px; font-size:24px; font-weight:600; line-height:1.5; letter-spacing:-.025em; overflow-wrap:anywhere; }
 [data-slot=card-description] { color:var(--muted-foreground); font-size:14px; line-height:1.9; }
+[data-slot=card-content] { padding:0 28px 28px; }
+.details { margin:0; padding:20px; border:1px solid var(--border); border-radius:10px; background:var(--background); font-size:13px; line-height:1.8; }
+.details dt { margin-top:16px; color:var(--muted-foreground); }
+.details dt:first-child { margin-top:0; }
+.details dd { margin:4px 0 0; overflow-wrap:anywhere; }
+.details code { font-family:ui-monospace,monospace; font-size:12px; }
+.help { margin:16px 0 0; color:var(--muted-foreground); font-size:12px; line-height:1.9; }
 [data-slot=card-footer] { display:flex; justify-content:center; padding:20px 28px; border-top:1px solid var(--border); background:var(--background); }
 [data-slot=button] { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 22px; border:1px solid var(--border); border-radius:8px; background:var(--primary); color:var(--primary-foreground); box-shadow:0 2px 0 #00000026,inset 0 1px 0 #ffffff26; text-decoration:none; font-size:14px; font-weight:600; line-height:1.5; }
 [data-slot=button]:hover { opacity:.9; }
@@ -43,7 +53,11 @@ h1 { margin:0 0 16px; font-size:24px; font-weight:600; line-height:1.5; letter-s
 export function networkAccessResponse(
   request: Request,
   status: 403 | 503,
-  diagnostic?: { reference: string; timestamp: string },
+  diagnostic?: {
+    reference: string
+    timestamp: string
+    diagnostic: ErrorDiagnostic
+  },
 ) {
   const blocked = status === 403
   const title = blocked
@@ -53,20 +67,29 @@ export function networkAccessResponse(
     .object({
       accept: z.string().max(8192).nullable(),
       destination: z.string().max(64).nullable(),
+      mode: z.string().max(64).nullable(),
     })
     .safeParse({
       accept: request.headers.get('accept'),
       destination: request.headers.get('sec-fetch-dest'),
+      mode: request.headers.get('sec-fetch-mode'),
     })
+  const pathname = new URL(request.url).pathname
+  const internalRequest = /^\/(?:api|_serverFn)(?:\/|$)/.test(pathname)
   const document =
+    !internalRequest &&
     (request.method === 'GET' || request.method === 'HEAD') &&
     negotiation.success &&
-    (negotiation.data.destination === 'document' ||
+    (negotiation.data.mode === 'navigate' ||
+      ['document', 'iframe', 'frame'].includes(
+        negotiation.data.destination ?? '',
+      ) ||
       (!negotiation.data.destination &&
         negotiation.data.accept?.includes('text/html')))
   const headers = new Headers({
     'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff',
+    Vary: 'Accept, Sec-Fetch-Dest, Sec-Fetch-Mode',
   })
   if (diagnostic) headers.set('X-Error-Reference', diagnostic.reference)
   if (status === 503) headers.set('Retry-After', '30')
@@ -114,22 +137,29 @@ export function networkAccessResponse(
               <CardDescription>
                 {blocked
                   ? 'სამუშაო სივრცე ამ ქსელიდან მიუწვდომელია. გამოიყენეთ დაშვებული ქსელი ან დაუკავშირდით ადმინისტრატორს.'
-                  : 'წვდომის შემოწმება ვერ მოხერხდა. ცოტა ხანში სცადეთ ხელახლა. თუ პრობლემა განმეორდება, დაუკავშირდით ადმინისტრატორს.'}
+                  : 'სამუშაო სივრცე ვერ გაიხსნა, რადგან ქსელიდან წვდომის შემოწმება ვერ დასრულდა. ცოტა ხანში სცადეთ ხელახლა.'}
               </CardDescription>
-              {diagnostic && (
-                <CardDescription style={{ marginTop: 16 }}>
-                  ადმინისტრატორთან დაკავშირებისას მიუთითეთ კოდი:
-                  <br />
-                  <span style={{ overflowWrap: 'anywhere' }}>
-                    {diagnostic.reference}
-                  </span>
-                  <br />
-                  <time dateTime={diagnostic.timestamp}>
-                    {diagnostic.timestamp}
-                  </time>
-                </CardDescription>
-              )}
             </CardHeader>
+            {diagnostic && (
+              <CardContent>
+                <dl className="details">
+                  <dt>მიზეზი</dt>
+                  <dd>{networkErrorDescription(diagnostic.diagnostic)}</dd>
+                  <dt>ტექნიკური კოდი</dt>
+                  <dd>
+                    <code>{diagnostic.diagnostic}</code>
+                  </dd>
+                  <dt>შეცდომის კოდი</dt>
+                  <dd>
+                    <code>{diagnostic.reference}</code>
+                  </dd>
+                </dl>
+                <p className="help">
+                  თუ პრობლემა განმეორდება, ადმინისტრატორს მიაწოდეთ შეცდომის
+                  კოდი.
+                </p>
+              </CardContent>
+            )}
             <CardFooter>
               <Button nativeButton={false} role="link" render={<a href="" />}>
                 <IconRefresh aria-hidden="true" />

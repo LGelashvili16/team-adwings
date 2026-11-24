@@ -1,4 +1,6 @@
 import { useBusinessNotificationRefresh } from '#/hooks/use-business-notification-refresh'
+import { unreadJobsQueryOptions } from '#/features/jobs/jobs.queries'
+import { useJobsRealtime } from '#/features/jobs/hooks/use-jobs-realtime'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNotificationRealtime } from '#/features/notifications/hooks/use-notification-realtime'
@@ -46,6 +48,8 @@ export function AppShell({ actor }: { actor: Actor }) {
 function WorkspaceShell({ actor }: { actor: Actor }) {
   useNotificationRealtime(actor.id)
   useBusinessNotificationRefresh(actor.id)
+  useJobsRealtime(actor.id)
+  const unreadJobs = useQuery(unreadJobsQueryOptions(actor.id))
   const notificationsSummary = useQuery(
     notificationsQueryOptions(actor.id, 1, 0, { scope: 'all' }),
   )
@@ -93,6 +97,9 @@ function WorkspaceShell({ actor }: { actor: Actor }) {
           hasUnreadAnnouncements={hasUnreadAnnouncements}
           hasUnreadComplaints={hasUnreadComplaints}
           hasUnreadNotifications={hasUnreadNotifications}
+          hasUnreadJobs={
+            !unreadJobs.isError && Boolean(unreadJobs.data?.hasUnread)
+          }
           inset
           footer={
             <WorkspaceUserMenu

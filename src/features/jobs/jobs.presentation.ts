@@ -16,11 +16,12 @@ const markerStyle = (
   token:
     | 'badge-yellow'
     | 'badge-orange'
+    | 'badge-orange-vivid'
     | 'badge-green'
     | 'badge-red'
     | 'primary'
-    | 'badge-blue'
-    | 'badge-purple'
+    | 'badge-sky'
+    | 'badge-lavender'
     | 'secondary',
 ) => ({
   backgroundColor: `var(--${token})`,
@@ -70,24 +71,60 @@ export const jobKinds = {
     label: 'მონტაჟი',
     createLabel: 'მონტაჟის დამატება',
     icon: IconTool,
-    variant: 'blue',
-    markerStyle: markerStyle('badge-blue'),
+    variant: 'sky',
+    markerStyle: markerStyle('badge-sky'),
   },
   measurement: {
     label: 'აზომვა',
     createLabel: 'აზომვის დამატება',
     icon: IconRulerMeasure,
-    variant: 'purple',
-    markerStyle: markerStyle('badge-purple'),
+    variant: 'orange-vivid',
+    markerStyle: markerStyle('badge-orange-vivid'),
   },
   other: {
     label: 'სხვა სამუშაო',
     createLabel: 'სხვა სამუშაოს დამატება',
     icon: IconBriefcase,
-    variant: 'secondary',
-    markerStyle: markerStyle('secondary'),
+    variant: 'lavender',
+    markerStyle: markerStyle('badge-lavender'),
   },
 } as const satisfies Record<JobKind, unknown>
 export function formatJobDate(date: string) {
   return formatGeorgianDateTime(date, jobsTimeZone)
+}
+
+const historyStatusColors: Record<JobStatus, string> = {
+  pending: 'var(--badge-purple-foreground)',
+  en_route: 'var(--badge-blue-foreground)',
+  on_site: 'var(--badge-orange-foreground)',
+  completed: 'var(--badge-green-foreground)',
+  rejected: 'var(--badge-red-foreground)',
+}
+
+export function jobHistoryPresentation(event: {
+  action: string
+  status: JobStatus
+}) {
+  if (event.action === 'created')
+    return {
+      label: 'სამუშაო დამატებულია',
+      color: 'var(--badge-blue-foreground)',
+    }
+  if (event.action === 'edited')
+    return {
+      label: 'ინფორმაცია განახლებულია',
+      color: 'var(--muted-foreground)',
+    }
+  if (event.action === 'assignments_changed')
+    return {
+      label: 'შემსრულებლები განახლებულია',
+      color: 'var(--muted-foreground)',
+    }
+  return {
+    label:
+      event.status === 'pending'
+        ? 'თავიდან დაგეგმილი'
+        : jobStatuses[event.status].label,
+    color: historyStatusColors[event.status],
+  }
 }

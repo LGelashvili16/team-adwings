@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -81,7 +81,9 @@ export function JobEditor({
   const [conflict, setConflict] = useState(false)
   const [version, setVersion] = useState(job?.version)
   const mutation = useMutation({
-    mutationFn: (fields: z.infer<typeof jobFieldsSchema>) =>
+    mutationFn: (
+      fields: z.infer<typeof jobFieldsSchema> & { deadline: string },
+    ) =>
       job
         ? editJob({
             data: { ...fields, id: job.id, version: version ?? job.version },
@@ -95,19 +97,26 @@ export function JobEditor({
       address: job?.address ?? suggestedAddress ?? '',
       notes: job?.notes ?? '',
       kind: job?.kind ?? suggestedKind ?? 'installation',
-      deadline: job?.deadline ?? null,
+      deadline: job?.deadline ?? '',
       longitude: job?.longitude ?? position?.longitude ?? null,
       latitude: job?.latitude ?? position?.latitude ?? null,
       hasCoordinates: Boolean(
         position || (job?.longitude != null && job.latitude != null),
       ),
     } satisfies z.infer<typeof jobEditorSchema>,
-    validators: { onChange: jobEditorSchema, onSubmit: jobEditorSchema },
+    validationLogic: revalidateLogic({
+      mode: 'submit',
+      modeAfterSubmission: 'change',
+    }),
+    validators: { onDynamic: jobEditorSchema },
     onSubmit: async ({ value }) => {
       if (conflict) return
       setError('')
       try {
-        const result = await mutation.mutateAsync(jobFieldsSchema.parse(value))
+        const result = await mutation.mutateAsync({
+          ...jobFieldsSchema.parse(value),
+          deadline: value.deadline,
+        })
         if (!result.ok) {
           setError(result.message)
           setConflict(result.code === 'conflict')
@@ -138,6 +147,8 @@ export function JobEditor({
       }}
     >
       <DialogContent
+        // The map's dialog context also wraps inline details. Base UI otherwise omits this nested backdrop.
+        forceBackdrop
         className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
         aria-describedby={undefined}
         showCloseButton={!mutation.isPending}
@@ -268,7 +279,7 @@ export function JobEditor({
                           return
                         fieldApi.setValue(address, {
                           dontUpdateMeta: true,
-                          dontValidate: true,
+                          dontValidate: current.submissionAttempts === 0,
                         })
                       })
                       .catch(() => {
@@ -286,7 +297,12 @@ export function JobEditor({
                       field.state.value === addressLookup.data)
                   return (
                     <Field data-invalid={!field.state.meta.isValid}>
-                      <FieldLabel htmlFor="job-address">მისამართი</FieldLabel>
+                      <FieldLabel htmlFor="job-address" className="gap-1">
+                        მისამართი{' '}
+                        <span aria-hidden="true" className="text-destructive">
+                          *
+                        </span>
+                      </FieldLabel>
                       <InputGroup
                         aria-busy={
                           shouldSuggestAddress && addressLookup.isFetching
@@ -294,6 +310,7 @@ export function JobEditor({
                       >
                         <InputGroupInput
                           id="job-address"
+                          required
                           maxLength={300}
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -356,13 +373,19 @@ export function JobEditor({
               <form.Field name="deadline">
                 {(field) => (
                   <Field data-invalid={!field.state.meta.isValid}>
-                    <FieldLabel htmlFor="job-deadline">ვადა</FieldLabel>
+                    <FieldLabel htmlFor="job-deadline" className="gap-1">
+                      ვადა{' '}
+                      <span aria-hidden="true" className="text-destructive">
+                        *
+                      </span>
+                    </FieldLabel>
                     <JobDeadlinePicker
                       value={field.state.value}
-                      onChange={field.handleChange}
+                      onChange={(date) => field.handleChange(date ?? '')}
                       onBlur={field.handleBlur}
                       disabled={mutation.isPending}
                       invalid={!field.state.meta.isValid}
+                      required
                       describedBy={
                         field.state.meta.errors.length
                           ? 'job-deadline-error'

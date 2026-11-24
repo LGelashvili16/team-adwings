@@ -36,6 +36,8 @@ Middleware lives in `src/lib/auth/auth.middleware.ts`. Server-only HTTP guards a
 
 ## Resource policies and ABAC
 
+Job crew assignment uses `jobs.assign`, explicitly granted to administrators, owners and production supervisors. Assignment services require one of those current roles as well as the permission, honor individual denials and reload current identity/employment inside the transaction. Sales managers cannot assign employees, teams or GPS devices through their job-management grant. Minimal job assignment labels do not grant GPS telemetry access. See [job assignments](job-assignments.md).
+
 Attendance and timesheet reads use direct employee-to-reviewer assignments from `attendance_reviewer`, independently from role grants. Attendance review services recheck persisted access, lock assignments and subjects for writes, exclude self-review, and enforce session workflow rules. Company-wide read permissions remain separate from review or correction rights.
 
 The application does not create teams or memberships. The unused team-scope policy scaffolds and the `teams.manage` permission have been removed. Migration `0017_retire_teams_permission.sql` removes that obsolete permission from stored allow/deny arrays while retaining all other exceptions. Existing `.team` permission identifiers remain stable internal names for assigned-employee operations; they do not require or create teams. Do not construct reviewer scope from request payloads, client caches, route context, or `sendContext`.

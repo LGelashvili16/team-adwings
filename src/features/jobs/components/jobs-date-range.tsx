@@ -8,7 +8,6 @@ import { Field, FieldError, FieldGroup } from '#/components/ui/field'
 import {
   Popover,
   PopoverContent,
-  PopoverDescription,
   PopoverHeader,
   PopoverTitle,
   PopoverTrigger,
@@ -67,7 +66,7 @@ export function JobsDateRange({
             type="button"
             variant="outline"
             depth="raised"
-            className="w-full justify-start md:w-auto"
+            className="h-11 w-full justify-start rounded-full px-3 md:h-9 md:w-auto"
             aria-label={`სამუშაოების შექმნის პერიოდი: ${formatJobsRange(value)}`}
           />
         }
@@ -77,40 +76,39 @@ export function JobsDateRange({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="max-h-[min(85dvh,var(--available-height))] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] gap-3 overflow-y-auto p-3 md:w-2xl"
+        className="max-h-[min(85dvh,var(--available-height))] w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] gap-2 overflow-y-auto p-3 md:w-[32rem]"
       >
-        <PopoverHeader>
-          <PopoverTitle>შექმნის პერიოდი</PopoverTitle>
-          <PopoverDescription>თბილისის დროით</PopoverDescription>
+        <PopoverHeader className="flex-row flex-wrap items-center justify-between gap-2">
+          <PopoverTitle>თარიღი</PopoverTitle>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              depth="raised"
+              size="sm"
+              onClick={() => apply(jobsMonthRange())}
+            >
+              მიმდინარე თვე
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              depth="raised"
+              size="sm"
+              onClick={() =>
+                apply(
+                  jobsMonthRange(
+                    jobCalendarDateString(
+                      subMonths(jobCalendarDate(jobsMonthRange().from), 1),
+                    ).slice(0, 7),
+                  ),
+                )
+              }
+            >
+              წინა თვე
+            </Button>
+          </div>
         </PopoverHeader>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            depth="raised"
-            size="sm"
-            onClick={() => apply(jobsMonthRange())}
-          >
-            მიმდინარე თვე
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            depth="raised"
-            size="sm"
-            onClick={() =>
-              apply(
-                jobsMonthRange(
-                  jobCalendarDateString(
-                    subMonths(jobCalendarDate(jobsMonthRange().from), 1),
-                  ).slice(0, 7),
-                ),
-              )
-            }
-          >
-            წინა თვე
-          </Button>
-        </div>
         <form
           noValidate
           onSubmit={(event) => {
@@ -124,62 +122,76 @@ export function JobsDateRange({
               <form.Subscribe selector={(state) => state.values}>
                 {(range) => (
                   <>
-                    <JobCalendar
-                      mode="range"
-                      resetOnSelect
-                      className="mx-auto"
-                      month={month}
-                      onMonthChange={setMonth}
-                      numberOfMonths={mobile ? 1 : 2}
-                      selected={{
-                        from: range.from
-                          ? jobCalendarDate(range.from)
-                          : undefined,
-                        to: range.to ? jobCalendarDate(range.to) : undefined,
-                      }}
-                      onSelect={(selected) => {
-                        form.setFieldValue(
-                          'from',
-                          selected?.from
-                            ? jobCalendarDateString(selected.from)
-                            : '',
-                        )
-                        form.setFieldValue(
-                          'to',
-                          selected?.to
-                            ? jobCalendarDateString(selected.to)
-                            : '',
-                        )
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      depth="raised"
-                      size="sm"
-                      onClick={() => chooseMonth(month)}
-                    >
-                      მთლიანი თვის მონიშვნა
-                    </Button>
-                    <p role="status" className="text-sm text-muted-foreground">
-                      {range.from && range.to
-                        ? formatJobsRange(range)
-                        : 'აირჩიეთ პერიოდის დასაწყისი და დასასრული.'}
-                    </p>
-                    <div className="flex justify-end gap-2 border-t pt-3">
+                    <div className="flex justify-center">
+                      <JobCalendar
+                        mode="range"
+                        resetOnSelect
+                        className="mx-auto w-full p-1 [--cell-size:--spacing(8)] md:w-fit"
+                        classNames={{
+                          months: 'relative flex flex-col gap-3 md:flex-row',
+                          month: 'flex w-full flex-col gap-2',
+                          week: 'mt-1 flex w-full',
+                        }}
+                        month={month}
+                        onMonthChange={setMonth}
+                        numberOfMonths={mobile ? 1 : 2}
+                        selected={{
+                          from: range.from
+                            ? jobCalendarDate(range.from)
+                            : undefined,
+                          to: range.to ? jobCalendarDate(range.to) : undefined,
+                        }}
+                        onSelect={(selected) => {
+                          form.setFieldValue(
+                            'from',
+                            selected?.from
+                              ? jobCalendarDateString(selected.from)
+                              : '',
+                          )
+                          form.setFieldValue(
+                            'to',
+                            selected?.to
+                              ? jobCalendarDateString(selected.to)
+                              : '',
+                          )
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         depth="raised"
+                        size="sm"
+                        onClick={() => chooseMonth(month)}
+                      >
+                        მთლიანი თვის მონიშვნა
+                      </Button>
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {range.from && range.to
+                          ? formatJobsRange(range)
+                          : 'აირჩიეთ პერიოდის დასაწყისი და დასასრული.'}
+                      </p>
+                    </div>
+                    <div className="flex justify-end gap-2 border-t pt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        depth="raised"
+                        className="h-11 md:h-9"
                         onClick={() => setOpen(false)}
                       >
                         გაუქმება
                       </Button>
                       <Button
                         type="submit"
+                        className="h-11 md:h-9"
                         disabled={!jobDateRangeSchema.safeParse(range).success}
                       >
-                        გამოყენება
+                        პერიოდის არჩევა
                       </Button>
                     </div>
                   </>

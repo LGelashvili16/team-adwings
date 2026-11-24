@@ -15,7 +15,10 @@ export function notificationDestination(input: unknown, actorId: string) {
     case 'schedule':
       return { to: '/schedule' } as const
     case 'job':
-      return { to: '/jobs', search: { pin: value.jobId } } as const
+      return {
+        to: '/jobs',
+        search: { pin: value.jobId, view: 'list' },
+      } as const
     case 'jobs':
       return { to: '/jobs' } as const
     case 'devices':

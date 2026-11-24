@@ -149,7 +149,7 @@ Use variants from `src/components/ui/badge.tsx`. Map each feature's states to la
 - Keep colors consistent across features, labels explicit, and contrast sufficient in both themes. Never rely on color alone.
 - A count is not inherently success or danger. Reserve strong color for meaningful state rather than coloring every number.
 - Do not invent colors for every status. If a new semantic variant is necessary, implement it once in the shared component and verify both themes.
-- Job map pins identify installation with blue, measurement with purple and other work with neutral tokens. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend; include type and status in accessible labels.
+- Job map pins identify installation with Sky blue (#38b8ff), measurement with vivid orange and other work with Bright lavender (#ba8cff) tokens. Measurement pins and type badges use a saturated orange fill with dark readable icons and labels in both themes. Use the same saturated Sky blue and Bright lavender fills with dark readable outlines and icons in both themes. Preserve the rounded-square body with a short centered downward point, anchored at its tip. Selected job pins use a prominent 4px translucent white halo with a 2px dark separation, preserving their category fill and status badge. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend; include type and status in accessible labels.
 
 ### Alerts
 
@@ -384,9 +384,57 @@ Complaint table rows open the detail sheet when clicked on non-interactive conte
 
 ## Job details
 
-Group job information, nonempty instructions and change history in separate cards in both the map panel and list sheet. Keep the next permitted progress action visible, and place editing, directions and other permitted transitions in an accessible actions menu. Show the latest three history entries by default and let users expand the remaining loaded entries. Do not repeat the latest change in the information card.
+Editing job details and reopening completed or rejected jobs belong to the job's stored creator and administrators/owners with the explicit `jobs.edit.all` permission. Hide these actions for other users, including other supervisors and sales managers, and repeat ownership/permission checks on the server. Keep production completion and assigned-worker progress available. Reopening retains its required reason and audit history and clears the assignee without changing the creator. In the jobs relationship filter, offer `ყველა სამუშაო`, `ჩემზე მინიჭებული` and `ჩემთან დაკავშირებული`. The related option includes jobs created by or currently assigned to the signed-in account across map/list results and counts; retain the assignment-only option's existing meaning.
+
+Creating and editing a job require an explicitly selected valid calendar deadline, with a visible required marker and inline Georgian validation. Enforce it in both forms and their server schemas. Historical undated jobs remain readable, but saving an edit requires a date. Required date pickers do not offer a clear action. Job modals use the shared dialog's default blurred backdrop.
+
+Completed job pins are shown by default in green. Offer a completed-work toggle in the map controls card to hide or show them, retaining the job-type icon and a matching legend entry. Other jobs use the Tabler briefcase icon. Group map controls in a shadcn Card at the upper right, collapsed by default. Put the expand/shrink map action first at the top of the opened card. Its top-left handle slides the card right to collapse it, keeping the handle visible. Use a subtle 200ms transform transition, honor reduced motion and make collapsed tools inert and hidden from assistive technology.
+
+Map icon controls use the opaque `outline-solid` button variant, with a solid popover surface in both themes and the shared raised treatment. Search starts collapsed as a search icon. Opening reveals the mounted field to the right from this fixed origin; closing retracts it to the left in 200ms without scaling text or losing the query. Return focus to the opening button on collapse, make hidden fields inert and respect reduced motion. The map legend uses one Card with a titled header, responsive groups for job types, workflow states and attention indicators, and a separate GPS footer when authorized. Preserve all category colors and indicator meanings.
+
+Active map-layer toggles, including objects, use the primary button variant. Map HTML markers, popups and controls inherit the app's existing `--font-sans` family without loading additional font files. Keep the basemap's glyph fonts for canvas-rendered street and place labels. Prepare the initial jobs camera as soon as results are ready, before the basemap loads, and attach markers only after the map's load event so pins do not float over its loading state. If results arrive after map load, center them smoothly. The show-all-jobs action uses MapLibre's built-in 500ms eased camera transition, with instant positioning for reduced motion. Do not add per-frame React updates or recreate markers for camera movement; live result updates preserve the viewer's camera.
+
+Creating or editing a job requires a trimmed, nonempty address, even when exact
+map coordinates are supplied. Mark the field required and show its Georgian
+validation error inline. Failed address lookup still permits manual entry;
+coordinates never substitute for the readable address.
+
+Job forms validate on the first submit attempt, then revalidate on change.
+Untouched fields stay free of validation errors before submission, including
+during address suggestions. A late suggestion must clear a submitted address
+error when it supplies a valid value.
+
+Job notifications show the job title, creator, address and any deadline in the
+bell popup and inbox. Preserve readable line breaks and safe bounded previews.
+Their links open the exact job in list-view details, with its title in the sheet
+header and its visible row highlighted through the shared selected-row state.
+
+New jobs refresh authorized lists and maps through the existing shared live connection,
+respecting the viewer's filters. At `/admin/settings/notifications`, notification
+administrators select which roles receive all job events: creation, detail edits
+and status changes. Use a labeled shadcn Checkbox group with an explicit Save
+action. Production specialists, supervisors, sales managers, administrators and
+owners are selected by default; an empty selection disables all job notifications.
+Notify active accounts in any selected role once per event, excluding inactive
+employees. Administrators and owners also receive their own job actions in the
+inbox when selected; retain their existing action toast instead of duplicating it
+with a live notification toast. Other roles do not receive their own actions.
+Role selection never changes job visibility or grants job
+permissions. Preserve Georgian outcome toasts and atomic before/after audits.
+
+Group job information, nonempty instructions and change history in separate cards in both the map panel and list sheet. The information card shows location, the job creator's name under სამუშაო დაამატა and deadline. Omit the responsible-person row from this card; retain execution ownership and permissions internally. The planned employee crew remains in its own card. Keep the next permitted progress action visible, and place editing, directions and other permitted transitions in an accessible actions menu. Show the latest three history entries by default and let users expand the remaining loaded entries. Do not repeat the latest change in the information card.
+
+Assignment-change history shows exactly two lines: შემსრულებლები: followed by the saved employee count, then GPS: followed by the saved device name or არ არის მითითებული. Omit team information and sentence-ending punctuation from this summary. Format existing entries from their immutable assignment snapshots without rewriting their audit evidence.
+
+In job history, a status transition back to pending reads `თავიდან დაგეგმილი`; the current pending status remains `დაგეგმილი`. Keep creation and editing labels distinct. Timeline dots and their outgoing line segments use the existing semantic foreground colors: blue for creation and starting travel, orange for arrival, violet for reopening, red for rejection and green for completion. Detail edits stay neutral. Use a quieter tint of each dot color for its connector and omit the connector after the last visible event. Keep labels, actor, date and reasons readable so color is supplementary, and share this presentation between the map panel and list sheet.
+
+Jobs filters use fully rounded pill controls, including search, the date range, selects and clear action. Keep them 36px high on desktop and 44px on mobile. Space desktop filter controls 8px apart. Preserve complete Georgian option labels and the shared raised control treatment. Use a 12px gap between the filter block and map/list results.
+
+The jobs date-range popover is compact: 512px wide on desktop with two 32px-cell months and one full-width month on mobile. Place the title and month shortcuts in one header row, tighten week spacing, and group whole-month selection with the selected range. Keep the calendar inside a centering wrapper so Field's full-width child rule cannot stretch its day cells. Preserve readable Georgian labels, larger mobile footer actions and viewport-bounded scrolling when space is limited.
 
 ## Notification acknowledgement
+
+The notifications page stacks the mark-all-read and delete-all actions in separate full-width rows on mobile, with single-line labels; desktop keeps them side by side. Both filter tabs share the full content width on mobile and use the compact strip on desktop. Each notification places its icon, timestamp and three-dot actions menu above its full-width title and description. Mobile menu triggers have no background or shadow, including when open or hovered, while retaining their touch target and focus ring. Keep read/unread and delete actions in the shared shadcn dropdown menu, with the existing delete confirmation, Georgian labels, pending feedback and keyboard access. Preserve the compact notification bell preview layout.
 
 The notification bell toolbar uses ყველა შეტყობინების ნანახად მონიშვნა and marks all of the signed-in account's unread notifications read, including older pages. Its enabled state follows the full unread count. The bell dot remains only while unread notifications exist; row controls continue to mark individual entries.
 
@@ -430,6 +478,14 @@ Personal-space and management sections use static shadcn SidebarGroupLabel title
 
 ## Application loading layout
 
+Application updates preserve unsaved work. Production checks for a new release
+on registration, every five minutes while online and visible, and on focus or
+reconnection. Keep the existing Georgian update prompt and require confirmation
+before reloading. HTML responses remain private and uncached; versioned assets
+retain their own cache policy. Development removes only this app's service
+worker and named caches, without clearing cookies, account settings or unrelated
+site storage.
+
 Private-route reload fallbacks reserve the responsive inset shell, sidebar width, header height and content gutters with shared shadcn Skeleton primitives. Keep the authenticated shell mounted while page data loads. Dashboard route and data fallbacks reuse the attendance overview skeleton and its widget grid. Public route fallbacks remain separate. Announce loading once in Georgian, hide decorative placeholders and respect reduced motion; never mount private subscriptions or sample employee records to measure loading layouts.
 
 The management attendance directory shows employee name, company-maintained job position and username, with a link to attendance details. Omit lifetime session counts and the account-status column. Display არ არის მითითებული for missing positions. This directory selects employees; period-based attendance records and worked-hour totals belong in their attendance detail views.
@@ -444,11 +500,22 @@ The seven-column attendance activity grid runs Monday through Sunday. Offset the
 
 Correction reasons are optional; blank reasons still retain the full actor/timestamp/before-and-after audit. Manual attendance entry uses a separate attendance.record.manage permission for administrators, owners and HR, and stays separate from device-verified punches. Its Sheet shows employee identity, check-in date/time, an off-by-default checkout Switch and optional note. Enabled checkout requires a valid later time. Reject future times, overlaps and daily-limit violations; mark entries as ხელით აღრიცხული and leave them pending review.
 
+## Account code issuance
+
+Activation-code and password-recovery-code issuance allow an empty reason.
+Keep the plain reason label and audit every issuance with its actor, target and
+timestamp even when no reason is supplied. Account suspension and restoration
+continue to require a reason.
+
 ## Network access error documents
 
 Network-blocked document requests show a centered, Georgian Team Adwings error card with the correct 403 status and guidance to use an allowed network or contact an administrator. Access-check failures show a separate 503 message and retry action. These pre-app documents use shadcn Card/Button, Tabler icons and self-contained fallback CSS because application assets may also be blocked. They work without JavaScript, respect the system color scheme and expose no session, IP or database details. API and server-function failures keep their plain-text response contract and all errors remain private and uncached.
 
 Error pages distinguish sign-in, permission, missing-resource, rate-limit, temporary-service, and unexpected failures where a safe status is available. Show Georgian recovery guidance and support references for unexpected failures. Diagnostic console records contain only generated reference IDs, UTC timestamps, source, status, and explicitly allowed technical categories. Never log raw errors, stacks, request URLs, tokens, SQL, IP addresses, or employee details. Expected 404s and permission denials do not need error-level logs. Offline guidance must clarify that writes require a connection.
+
+## Job crew assignment
+
+Both the jobs map details panel and list detail Sheet use the same assignment Card. Show individual employees first with readable names and job titles; show the GPS device below them and omit team information from this summary Card. Use a text-only summary action so it fits beside the single-line heading; retain wrapping only as a fallback for exceptionally narrow widths. Administrators, owners and production supervisors can open the complete draft using დამატება. The modal is titled სამუშაოზე დამატება and uses დამატებული თანამშრომლები for its selected list. Force the shared blurred backdrop when the modal is nested over the expanded map. Keep GPS in its own visible first section. Device picker rows show the configured phone number when present and the GPS identifier below the device name in small muted text, preserving leading zeroes. Employee selection follows the teams picker: avatars, explicit დამატება buttons, debounced name/username/job-title search, an immediate role-filter popover with production specialists selected initially, result counts and a bounded list with internal scrolling and server pagination. Place team selection in the initially collapsed დამატებითი პარამეტრები Accordion. Use Georgian labels and one Save action. Selecting a team adds its current eligible members without duplicates; users can adjust individuals before saving. Removing a team leaves the selected employees. Later team roster edits do not silently alter a saved job crew. Closed jobs retain a read-only crew until reopened. Preserve drafts after failures, require current-assignment review after revision conflicts and retain the Dialog through close transitions.
 
 ## Production teams
 
@@ -456,7 +523,7 @@ Use the jobs map for future crew locations. `/manage/teams` owns team names, spe
 
 Version 70 (2026-11-17): Added the authorized production-team management workflow and navigation.
 
-Version 71 (2026-11-17): Employee navigation uses a single-person icon; teams retain the multi-person icon. Team creation and management share one right-side sheet with a fixed header/footer and scrollable sections. Transfers are confirmed inline within the sheet, without nested modals.
+Version 71 (2026-11-17): Employee navigation uses a single-person icon; teams retain the multi-person icon. Team creation and management share one right-side sheet with a fixed header/footer and scrollable sections. Employees already in another team show an orange team badge. Adding them opens a local confirmation dialog identifying the employee and previous team. Confirmation adds them to the draft; the transfer takes effect only when the team is saved.
 
 Version 72 (2026-11-17): Team creation and editing use one complete draft containing the name, roster and optional leader. One footer Save commits all changes atomically. Member selection, transfers, leader changes and deactivation remain local until Save; cancellation discards the draft.
 
@@ -466,4 +533,14 @@ Version 74 (2026-11-17): The team employee picker starts with production special
 
 Version 75 (2026-11-17): Place employee role checkboxes in a shadcn filter popover with an icon trigger and selected-role count. Keep name search and job-title inputs compact, icon-assisted and individually clearable, with accessible Georgian labels.
 
+Team member search uses one input matching employee name, username or job title on the server, combined with the separate role filter.
+
+Team member role filters apply on checkbox changes without a Done or Apply button. Keep the default-reset action and the popover's standard outside-click, Escape and trigger-toggle dismissal.
+
 Version 76 (2026-11-17): Preserve the teams directory while an editor loads. Team removal and deactivation use destructive styling and Tabler icons; permanent deletion requires a clear confirmation, retains an audit snapshot and releases members. Disabled teams can be restored. Team history uses the shared collapsible with a Tabler disclosure icon.
+
+## Job pin attention indicators
+
+Unfinished jobs due tomorrow in Asia/Tbilisi show a separate crimson calendar marker, with ვადა ხვალ in the map legend. Keep category colors and workflow status markers visible. New jobs retain a vivid red (#dc2626) ახალი badge with white text, matching across pins, cards, table titles and the legend, per account until that account successfully opens details. List cards and table titles show the same unread badge. The jobs sidebar red dot follows any unread job across the full authorized scope, independently of current filters or notification-role subscriptions. Persist receipts server-side and refresh all tabs through the existing jobs live topic. Queries, loaders, prefetches and context menus never acknowledge a job. Historical jobs before this feature are excluded; new jobs are unread for every authorized account until viewed.
+
+Pulse the whole new pin with a subtle 2.5-second scale/opacity animation for the first five minutes after creation. Scale around the pointed tip so its map anchor stays stationary. Stop after acknowledgement and keep the pin static for reduced motion. Place the new tag 28px above the pin body, leaving a small clear gap above the deadline indicator. When job pins overlap at any zoom, draw the selected job above all other jobs, then jobs with both new and due-tomorrow indicators, new jobs, due-tomorrow jobs and ordinary jobs. Apply priority to the outer MapLibre marker container so neighboring pins cannot cover these indicators. Unread labels continue after the pulse expires. Avoid replaying a full five-minute pulse on reload.

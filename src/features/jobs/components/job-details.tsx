@@ -8,7 +8,7 @@ import {
   IconMapPin,
   IconNotes,
   IconPencil,
-  IconUser,
+  IconUserPlus,
 } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
@@ -24,11 +24,16 @@ import {
   canEditJob,
   hasJobCoordinates,
 } from '../jobs.rules'
-import { formatJobDate, jobStatuses } from '../jobs.presentation'
+import {
+  formatJobDate,
+  jobHistoryPresentation,
+  jobStatuses,
+} from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
 import { JobActionDialog } from './job-actions'
+import { JobAssignmentsCard } from './job-assignments-card'
 import type { JobAction } from './job-actions'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobDetail } from '../jobs.types'
@@ -135,6 +140,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
           {jobStatuses[primary].action}
         </Button>
       ) : null}
+      <JobAssignmentsCard actor={actor} job={job} />
       <Card size="sm" className="shrink-0">
         <CardHeader>
           <CardTitle>სამუშაოს ინფორმაცია</CardTitle>
@@ -155,12 +161,10 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
             </div>
             <div>
               <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
-                <IconUser className="size-4 shrink-0" aria-hidden="true" />
-                პასუხისმგებელი
+                <IconUserPlus className="size-4 shrink-0" aria-hidden="true" />
+                სამუშაო დაამატა
               </dt>
-              <dd className="pl-7 break-words">
-                {job.assigneeName ?? 'თავისუფალია'}
-              </dd>
+              <dd className="pl-7 break-words">{job.creatorName}</dd>
             </div>
             <div>
               <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
@@ -213,39 +217,46 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
         </CardHeader>
         <CardContent>
           {history.length ? (
-            <ol className="ml-1 flex flex-col gap-4 border-l pl-4">
-              {history.map((event) => (
-                <li
-                  key={event.id}
-                  className="relative flex flex-col gap-1 text-sm"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="absolute -left-5 top-1.5 size-2 rounded-full bg-border"
-                  />
-                  <p className="font-medium">
-                    {event.action === 'created'
-                      ? 'სამუშაო დამატებულია'
-                      : event.action === 'edited'
-                        ? 'ინფორმაცია განახლებულია'
-                        : jobStatuses[event.status].label}
-                  </p>
-                  <p className="break-words text-muted-foreground">
-                    {event.actorName}
-                  </p>
-                  <time
-                    dateTime={event.createdAt}
-                    className="text-xs text-muted-foreground"
+            <ol className="ml-1 flex flex-col gap-4 pl-4">
+              {history.map((event, index) => {
+                const appearance = jobHistoryPresentation(event)
+                return (
+                  <li
+                    key={event.id}
+                    className="relative flex flex-col gap-1 text-sm"
                   >
-                    {formatJobDate(event.createdAt)}
-                  </time>
-                  {event.note ? (
-                    <p className="mt-1 whitespace-pre-wrap break-words">
-                      {event.note}
+                    {index < history.length - 1 ? (
+                      <span
+                        aria-hidden="true"
+                        className="pointer-events-none absolute top-2.5 -bottom-6.5 -left-4.25 w-0.5"
+                        style={{
+                          backgroundColor: `color-mix(in oklab, ${appearance.color} 35%, transparent)`,
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-1.25 -left-5.25 size-2.5 rounded-full ring-4 ring-card"
+                      style={{ backgroundColor: appearance.color }}
+                    />
+                    <p className="font-medium">{appearance.label}</p>
+                    <p className="break-words text-muted-foreground">
+                      {event.actorName}
                     </p>
-                  ) : null}
-                </li>
-              ))}
+                    <time
+                      dateTime={event.createdAt}
+                      className="text-xs text-muted-foreground"
+                    >
+                      {formatJobDate(event.createdAt)}
+                    </time>
+                    {event.note ? (
+                      <p className="mt-1 whitespace-pre-wrap break-words">
+                        {event.note}
+                      </p>
+                    ) : null}
+                  </li>
+                )
+              })}
             </ol>
           ) : (
             <p className="text-sm text-muted-foreground">

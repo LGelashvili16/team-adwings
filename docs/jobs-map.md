@@ -4,17 +4,23 @@ The jobs feature owns company-visible installation, measurement and other jobs w
 
 ## Workflow and permissions
 
+Planned employee crews, an optional team and a GPS device are editable in both detail views through the separate `jobs.assign` permission for administrators, owners and production supervisors. Execution claiming remains independent. See the [job assignment plan and implementation](job-assignments.md) for draft behavior, eligibility, authorization, persistence and rollout.
+
 All active, authenticated company accounts can read pins. Claiming a pending task through `მივდივარ ობიექტზე` requires the separate `jobs.claim` permission, granted to production specialists, administrators and owners. Job-management permission alone does not permit claiming; sales managers, supervisors, operations managers and ordinary employees cannot use this action unless they also hold an eligible role. Claiming records the current account as the responsible person. Only that person or an account with `jobs.manage` can advance an active task. No client-provided assignee is accepted.
 
-| Status      | Meaning                          | Next states                          |
-| ----------- | -------------------------------- | ------------------------------------ |
-| `pending`   | Unclaimed, planned work          | `en_route`; managers may also reject |
-| `en_route`  | Responsible person is travelling | `on_site`, `rejected`                |
-| `on_site`   | Responsible person has arrived   | `completed`, `rejected`              |
-| `completed` | Work finished                    | Managers may reopen as `pending`     |
-| `rejected`  | Work could not proceed           | Managers may reopen as `pending`     |
+| Status      | Meaning                          | Next states                                      |
+| ----------- | -------------------------------- | ------------------------------------------------ |
+| `pending`   | Unclaimed, planned work          | `en_route`; managers may also reject             |
+| `en_route`  | Responsible person is travelling | `on_site`, `rejected`                            |
+| `on_site`   | Responsible person has arrived   | `completed`, `rejected`                          |
+| `completed` | Work finished                    | Creator or administrator may reopen as `pending` |
+| `rejected`  | Work could not proceed           | Creator or administrator may reopen as `pending` |
 
-Managers may also return an active task to `pending`. Reopening removes its assignee. Rejection and reopening require a reason. Terminal jobs must be reopened before editing their location/instructions. A manager acting on a claimed task preserves its responsible person.
+Only the stored job creator or an account with `jobs.edit.all` may edit an active job or reopen a completed/rejected job. Administrators receive this explicit permission and owners retain all permissions. The general `jobs.manage` grant does not authorize editing or reopening somebody else's job. The UI and server share these rules; the server reads immutable `createdBy` from the database and rechecks current account state and grants before writing. Ownership is separate from the responsible person and is retained after completion and reopening.
+
+Managers may still return an active task to `pending` as part of execution. Reopening removes its assignee. Rejection and reopening require a reason. Terminal jobs must be reopened before editing their location/instructions. A manager acting on a claimed task preserves its responsible person. Existing production completion, claiming and assigned-worker progress remain available.
+
+The workspace relationship selector offers all jobs, `ჩემზე მინიჭებული` (`scope=mine`, current execution assignee or planned employee) and `ჩემთან დაკავშირებული` (`scope=related`, creator, current execution assignee or planned employee). The actor ID always comes from the authenticated server context. One shared SQL predicate applies the relationship together with date, kind, status and search filters to the list, pins and counts. A job satisfying multiple relationships counts once. Changing the filter resets the page and selected pin.
 
 Production leads (`supervisor`, წარმოების უფროსი) and owners have job-management grants. Sales managers (`sales_manager`, გაყიდვების მენეჯერი) retain only `manage.access` and `jobs.manage` and are available in employee creation. The retired operations role is no longer available; migration `0026_consolidate_employee_roles.sql` preserves its existing access as individual permission exceptions. Administrators can read shared work and have the separate claim grant. Platform administration alone does not grant job management. An account can hold multiple roles.
 
@@ -24,9 +30,17 @@ Creation, edits and status changes record the authenticated actor's ID atomicall
 
 ## Job types and deadlines
 
-Pins use type colors and matching icons: blue for installation, purple for measurement and neutral for other work. A separate corner badge shows the current status, including green completion and red rejection, without replacing the type's color. Both type and status appear in accessible marker names and the legend. Type badges use the same mapping in menus, details, cards and the list.
+Administrators, production supervisors and owners have the separate `jobs.complete.manage` permission to complete any unfinished job directly, across all categories. Completion preserves an existing responsible person or records the completing account when unassigned. It does not grant general editing or reopening. Existing assigned-worker progress remains available. Completed pins are shown by default in green while retaining their category icon; the completed-work map toggle can hide them. Completed jobs remain available in the list and history.
 
-The editor's optional deadline uses the shared Georgian shadcn calendar. It can be set during creation, changed or explicitly cleared while editing. Deadlines are PostgreSQL `date` values returned as ISO calendar-day strings, never UTC instants; display and selection preserve the chosen day across device timezones. Past dates are allowed for historical work. Normal job editing permissions, terminal-state restrictions, version checks and atomic history still apply. Edits must explicitly supply a date or null so an old client cannot silently erase a newer deadline.
+The map controls share one shadcn Card at the upper right, including zoom, fit, places, buildings, expanded view, completed work and authorized GPS controls. The card starts collapsed, and the expanded-view button is the first control at the top when opened. The top-left handle slides the card to the right in 200ms, with no transition for reduced motion. Collapsed controls are inert and hidden from assistive technology; the handle stays available to reopen them.
+
+Map controls use solid popover-colored button surfaces in both themes. Search starts collapsed; its mounted form reveals rightward from the search icon and retracts leftward on close using a 200ms clipped reveal, with no spatial transition for reduced motion. Collapsing preserves the query and returns focus to the search button. The legend groups job types, workflow states and attention indicators beneath a shared heading, with authorized GPS and battery keys in a separate footer.
+
+Enabled object and other layer toggles use the primary button color. Map HTML text, including GPS popups, reuses the existing app font; canvas street and place labels keep the provider's glyph fonts. The first job fit runs as soon as results exist, before map load when possible; markers attach only after load. Late initial results and deliberate show-all actions use a 500ms eased MapLibre camera transition, disabled for reduced motion. Live updates do not refit the camera, and transitions do not create per-frame React state or rebuild markers.
+
+Pins use type colors and matching icons: Sky blue (#38b8ff) for installation, vivid orange for measurement and Bright lavender (#ba8cff) for other work. Their rounded-square body ends in a short centered downward point anchored at the map location. A separate corner badge shows the current status, including green completion and red rejection, without replacing the type's color. Both type and status appear in accessible marker names and the legend. Type badges use the same mapping in menus, details, cards and the list.
+
+Creating and editing jobs require an explicitly selected deadline using the shared Georgian shadcn calendar. Both forms and server schemas reject missing, empty or null dates. Historical undated jobs remain readable, but saving an edit requires a deadline. Required date pickers cannot clear the selected date. Deadlines are PostgreSQL `date` values returned as ISO calendar-day strings, never UTC instants; display and selection preserve the chosen day across device timezones. Past dates are allowed for historical work. Normal job editing permissions, terminal-state restrictions, version checks and atomic history still apply.
 
 Context menus show the stored creator name and deadline, with an explicit empty state when no deadline exists. Details also show the deadline, and dated jobs include it in cards and the paginated list. Month/range filtering continues to use job creation dates. Migration `0015_job_deadline.sql` adds a nullable column and calendar bounds check; existing jobs remain undated. No reminder delivery or automatic status transition is implied by a deadline.
 
@@ -96,3 +110,9 @@ Only the entered search text or coordinates are sent to Photon, never job notes 
 ## Verification
 
 `jobs.rules.test.ts` exercises permissions, ownership and state transitions. `jobs.schemas.test.ts` checks coordinates, reasons and malformed URL/input state. `jobs.integration.test.ts` creates an isolated local database, applies all migrations and checks authorization, races, idempotency, filters, audits and constraints. Run it with `RUN_JOBS_DB_TESTS=1` and a local PostgreSQL 18 `DATABASE_URL`; it never runs against a remote database.
+
+## Job pin attention indicators
+
+Unfinished jobs due tomorrow in Asia/Tbilisi show a separate crimson calendar marker, with ვადა ხვალ in the map legend. Keep category colors and workflow status markers visible. New jobs retain a vivid red (#dc2626) ახალი badge with white text, matching across pins, cards, table titles and the legend, per account until that account successfully opens details. List cards and table titles show the same unread badge. The jobs sidebar red dot follows any unread job across the full authorized scope, independently of current filters or notification-role subscriptions. Persist receipts server-side and refresh all tabs through the existing jobs live topic. Queries, loaders, prefetches and context menus never acknowledge a job. Historical jobs before this feature are excluded; new jobs are unread for every authorized account until viewed.
+
+Pulse the whole new pin with a subtle 2.5-second scale/opacity animation for the first five minutes after creation. Scale around the pointed tip so its map anchor stays stationary. Stop after acknowledgement and keep the pin static for reduced motion. Place the new tag 28px above the pin body, leaving a small clear gap above the deadline indicator. When job pins overlap at any zoom, draw the selected job above all other jobs, then jobs with both new and due-tomorrow indicators, new jobs, due-tomorrow jobs and ordinary jobs. Apply priority to the outer MapLibre marker container so neighboring pins cannot cover these indicators. Unread labels continue after the pulse expires. Avoid replaying a full five-minute pulse on reload.

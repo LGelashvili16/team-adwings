@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-router', () => ({
   }: AnchorHTMLAttributes<HTMLAnchorElement> & {
     to: string
     search?: unknown
-  }) => <a href={to} {...props} />,
+  }) => <a href={to} data-search={JSON.stringify(_search)} {...props} />,
 }))
 const item: JobSummary = {
   id: '019aac01-0000-7000-8000-000000000001',
@@ -35,6 +35,44 @@ const item: JobSummary = {
 const search = jobSearchSchema.parse({ view: 'list', page: 2 })
 
 beforeEach(() => vi.clearAllMocks())
+it.each([
+  ['newest', 'deadline_asc', undefined],
+  ['deadline_asc', 'deadline_desc', 'ascending'],
+  ['deadline_desc', 'deadline_asc', 'descending'],
+] as const)(
+  'toggles deadline sorting from %s and resets pagination',
+  (sort, nextSort, direction) => {
+    const current = {
+      ...search,
+      sort,
+      q: 'თბილისი',
+      kind: 'measurement' as const,
+    }
+    render(<JobsList items={[item]} search={current} />)
+    const header = screen.getByRole('columnheader', { name: 'ჩაბარების ვადა' })
+    expect(
+      screen.getByRole('link', { name: 'ჩაბარების ვადა' }),
+    ).toHaveAttribute(
+      'data-search',
+      JSON.stringify({ ...current, sort: nextSort, page: 1 }),
+    )
+    if (direction) {
+      expect(header).toHaveAttribute('aria-sort', direction)
+      expect(
+        screen.getByRole('columnheader', { name: 'დამატების თარიღი' }),
+      ).not.toHaveAttribute('aria-sort')
+    } else {
+      expect(header).not.toHaveAttribute('aria-sort')
+    }
+  },
+)
+
+it('visually selects the job opened by its notification destination', () => {
+  render(<JobsList items={[item]} search={{ ...search, pin: item.id }} />)
+  const link = screen.getByRole('link', { name: /სატესტო სამუშაო/ })
+  expect(link).toHaveAttribute('aria-current', 'true')
+  expect(link.closest('tr')).toHaveAttribute('data-state', 'selected')
+})
 
 it('opens details from a row and preserves filters while retaining the keyboard-accessible link', () => {
   render(<JobsList items={[item]} search={search} />)

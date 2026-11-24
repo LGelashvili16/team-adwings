@@ -3,12 +3,21 @@ import {
   IconBellCheck,
   IconCheck,
   IconClock,
+  IconDots,
   IconMail,
   IconTrash,
 } from '@tabler/icons-react'
 import { cn } from 'cn'
 import { Link } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
 import type { NotificationItem } from '../notifications.types'
@@ -50,14 +59,26 @@ export function NotificationList({
         const deleting = deletingIds?.includes(item.id) ?? false
         const rowBusy = pendingIds.length > 0 || (deletingIds?.length ?? 0) > 0
         const linkTarget = resolveNotificationLink(item, actorId)
+        const timestamp = (
+          <time
+            dateTime={item.createdAt}
+            className={cn(
+              'flex items-center gap-1.5 text-xs text-muted-foreground',
+              variant === 'page' ? 'self-center' : 'mt-0.5',
+            )}
+          >
+            <IconClock className="size-3 shrink-0" aria-hidden="true" />
+            {formatGeorgianDateTime(item.createdAt, 'Asia/Tbilisi')}
+          </time>
+        )
         return (
           <li
             key={item.id}
             className={cn(
-              'group relative flex items-start gap-3 transition-colors motion-reduce:transition-none',
+              'group relative gap-3 transition-colors motion-reduce:transition-none',
               variant === 'page'
-                ? 'px-4 py-4 hover:bg-accent/55 focus-within:bg-accent/55 sm:px-6'
-                : 'rounded-xl px-3 py-3 hover:bg-accent/70 focus-within:bg-accent/70',
+                ? 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-start px-4 py-4 hover:bg-accent/55 focus-within:bg-accent/55 sm:px-6'
+                : 'flex items-start rounded-xl px-3 py-3 hover:bg-accent/70 focus-within:bg-accent/70',
               unseen && (variant === 'page' ? 'bg-muted/20' : 'bg-muted/35'),
             )}
           >
@@ -81,11 +102,20 @@ export function NotificationList({
                 />
               ) : null}
             </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {variant === 'page' ? timestamp : null}
+            <div
+              className={cn(
+                'flex min-w-0 flex-1 flex-col gap-1',
+                variant === 'page' && 'col-span-3 row-start-2 gap-2',
+              )}
+            >
               <p
                 className={cn(
                   'text-sm leading-5 font-medium wrap-anywhere',
-                  unseen ? 'text-foreground' : 'text-muted-foreground',
+                  variant === 'page' && 'leading-6 font-semibold',
+                  unseen || variant === 'page'
+                    ? 'text-foreground'
+                    : 'text-muted-foreground',
                 )}
               >
                 {linkTarget ? (
@@ -101,78 +131,141 @@ export function NotificationList({
                 )}
                 {unseen ? <span className="sr-only">, ახალი</span> : null}
               </p>
-              <p className="text-[0.8125rem] leading-5 wrap-anywhere text-muted-foreground">
+              <p
+                className={cn(
+                  'whitespace-pre-line wrap-anywhere text-muted-foreground',
+                  variant === 'page'
+                    ? 'text-sm leading-6'
+                    : 'text-[0.8125rem] leading-5',
+                )}
+              >
                 {item.body}
               </p>
-              <time
-                dateTime={item.createdAt}
-                className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground/85"
-              >
-                <IconClock className="size-3 shrink-0" aria-hidden="true" />
-                {formatGeorgianDateTime(item.createdAt, 'Asia/Tbilisi')}
-              </time>
+              {variant === 'popover' ? timestamp : null}
               {!unseen ? <span className="sr-only">ნანახია</span> : null}
             </div>
-            <div
-              className={cn(
-                'relative z-10 flex shrink-0 items-center justify-center self-center',
-                onDelete ? 'gap-1' : 'w-9',
-              )}
-            >
-              {unseen ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
-                  disabled={rowBusy}
-                  aria-busy={pending}
-                  aria-label={`ნანახად მონიშვნა: ${item.title}`}
-                  title="ნანახად მონიშვნა"
-                  onClick={() => onMarkSeen([item.id])}
-                >
-                  {pending ? (
-                    <Spinner aria-hidden="true" />
-                  ) : (
-                    <IconCheck data-icon="inline-start" aria-hidden="true" />
-                  )}
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
-                  disabled={rowBusy}
-                  aria-busy={pending}
-                  aria-label={`წაუკითხავად მონიშვნა: ${item.title}`}
-                  title="წაუკითხავად მონიშვნა"
-                  onClick={() => onMarkUnseen([item.id])}
-                >
-                  {pending ? (
-                    <Spinner aria-hidden="true" />
-                  ) : (
-                    <IconMail aria-hidden="true" />
-                  )}
-                </Button>
-              )}
-              {onDelete ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  disabled={rowBusy}
-                  aria-busy={deleting}
-                  aria-label={`წაშლა: ${item.title}`}
-                  title="წაშლა"
-                  onClick={() => onDelete(item)}
-                >
-                  {deleting ? (
-                    <Spinner aria-hidden="true" />
-                  ) : (
-                    <IconTrash aria-hidden="true" />
-                  )}
-                </Button>
-              ) : null}
-            </div>
+            {variant === 'page' ? (
+              <div className="relative z-10 col-start-3 row-start-1">
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        depth="raised"
+                        size="icon"
+                        className="size-11 text-muted-foreground max-sm:bg-transparent max-sm:shadow-none max-sm:hover:bg-transparent max-sm:aria-expanded:bg-transparent max-sm:active:shadow-none"
+                        disabled={rowBusy}
+                        aria-busy={pending || deleting}
+                        aria-label={`შეტყობინების მოქმედებები: ${item.title}`}
+                      >
+                        {pending || deleting ? (
+                          <Spinner aria-hidden="true" />
+                        ) : (
+                          <IconDots aria-hidden="true" />
+                        )}
+                      </Button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuGroup>
+                      <DropdownMenuItem
+                        disabled={rowBusy}
+                        onClick={() =>
+                          unseen
+                            ? onMarkSeen([item.id])
+                            : onMarkUnseen([item.id])
+                        }
+                        className="min-h-11"
+                      >
+                        {unseen ? (
+                          <IconCheck aria-hidden="true" />
+                        ) : (
+                          <IconMail aria-hidden="true" />
+                        )}
+                        {unseen ? 'ნანახად მონიშვნა' : 'წაუკითხავად მონიშვნა'}
+                      </DropdownMenuItem>
+                    </DropdownMenuGroup>
+                    {onDelete ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            disabled={rowBusy}
+                            onClick={() => onDelete(item)}
+                            className="min-h-11"
+                          >
+                            <IconTrash aria-hidden="true" />
+                            წაშლა
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  'relative z-10 flex shrink-0 items-center justify-center self-center',
+                  onDelete ? 'gap-1' : 'w-9',
+                )}
+              >
+                {unseen ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                    disabled={rowBusy}
+                    aria-busy={pending}
+                    aria-label={`ნანახად მონიშვნა: ${item.title}`}
+                    title="ნანახად მონიშვნა"
+                    onClick={() => onMarkSeen([item.id])}
+                  >
+                    {pending ? (
+                      <Spinner aria-hidden="true" />
+                    ) : (
+                      <IconCheck data-icon="inline-start" aria-hidden="true" />
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-9 rounded-lg text-muted-foreground hover:bg-background/80 hover:text-foreground"
+                    disabled={rowBusy}
+                    aria-busy={pending}
+                    aria-label={`წაუკითხავად მონიშვნა: ${item.title}`}
+                    title="წაუკითხავად მონიშვნა"
+                    onClick={() => onMarkUnseen([item.id])}
+                  >
+                    {pending ? (
+                      <Spinner aria-hidden="true" />
+                    ) : (
+                      <IconMail aria-hidden="true" />
+                    )}
+                  </Button>
+                )}
+                {onDelete ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="size-9 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    disabled={rowBusy}
+                    aria-busy={deleting}
+                    aria-label={`წაშლა: ${item.title}`}
+                    title="წაშლა"
+                    onClick={() => onDelete(item)}
+                  >
+                    {deleting ? (
+                      <Spinner aria-hidden="true" />
+                    ) : (
+                      <IconTrash aria-hidden="true" />
+                    )}
+                  </Button>
+                ) : null}
+              </div>
+            )}
           </li>
         )
       })}
@@ -180,25 +273,50 @@ export function NotificationList({
   )
 }
 
-export function NotificationsLoading() {
+export function NotificationsLoading({
+  variant = 'popover',
+}: {
+  variant?: 'popover' | 'page'
+}) {
   return (
     <div
       role="status"
       aria-busy="true"
-      className="flex flex-col gap-2 px-5 py-4"
+      className={cn(
+        'flex flex-col',
+        variant === 'page' ? 'divide-y px-4 sm:px-6' : 'gap-2 px-5 py-4',
+      )}
     >
       <span className="sr-only">შეტყობინებები იტვირთება</span>
       {[0, 1, 2].map((item) => (
         <div
           key={item}
           aria-hidden="true"
-          className="flex gap-3 rounded-xl py-3"
+          className={cn(
+            'gap-3',
+            variant === 'page'
+              ? 'grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center py-4'
+              : 'flex rounded-xl py-3',
+          )}
         >
           <Skeleton className="size-9 shrink-0 rounded-xl motion-reduce:animate-none" />
-          <div className="flex flex-1 flex-col gap-3">
+          {variant === 'page' ? (
+            <>
+              <Skeleton className="h-3 w-full max-w-40 motion-reduce:animate-none" />
+              <Skeleton className="size-11 rounded-lg motion-reduce:animate-none" />
+            </>
+          ) : null}
+          <div
+            className={cn(
+              'flex min-w-0 flex-1 flex-col gap-3',
+              variant === 'page' && 'col-span-3',
+            )}
+          >
             <Skeleton className="h-4 w-2/3 motion-reduce:animate-none" />
             <Skeleton className="h-4 w-full motion-reduce:animate-none" />
-            <Skeleton className="h-3 w-1/3 motion-reduce:animate-none" />
+            {variant === 'popover' ? (
+              <Skeleton className="h-3 w-1/3 motion-reduce:animate-none" />
+            ) : null}
           </div>
         </div>
       ))}
