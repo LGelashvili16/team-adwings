@@ -70,6 +70,10 @@
   --badge-blue: #dbeafe;
   --badge-blue-foreground: #1e40af;
   --badge-sky: #38b8ff;
+  --badge-crimson: #f52f66;
+  --badge-red-vivid: #dc2626;
+  --badge-red-vivid-foreground: #ffffff;
+  --badge-crimson-foreground: #ffffff;
   --badge-sky-foreground: #062d48;
   --badge-lavender: #ba8cff;
   --badge-lavender-foreground: #32105e;
@@ -648,6 +652,10 @@ a {
   --color-badge-blue: var(--badge-blue);
   --color-badge-blue-foreground: var(--badge-blue-foreground);
   --color-badge-sky: var(--badge-sky);
+  --color-badge-crimson: var(--badge-crimson);
+  --color-badge-red-vivid: var(--badge-red-vivid);
+  --color-badge-red-vivid-foreground: var(--badge-red-vivid-foreground);
+  --color-badge-crimson-foreground: var(--badge-crimson-foreground);
   --color-badge-sky-foreground: var(--badge-sky-foreground);
   --color-badge-lavender: var(--badge-lavender);
   --color-badge-lavender-foreground: var(--badge-lavender-foreground);
@@ -890,6 +898,11 @@ a {
 
 .schedule-work-block .schedule-work-end {
   color: #f1f5ff;
+}
+
+.app-map .maplibregl-map,
+.app-map .maplibregl-popup {
+  font-family: var(--font-sans);
 }
 
 .dark .maplibregl-ctrl.maplibregl-ctrl-attrib {

@@ -11,10 +11,12 @@ export function GpsMapToggleLayer({
   actorId,
   enabled,
   onEnabledChange,
+  showToggle = true,
 }: {
   actorId: string
   enabled: boolean
   onEnabledChange: (enabled: boolean) => void
+  showToggle?: boolean
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const query = useQuery({
@@ -26,24 +28,28 @@ export function GpsMapToggleLayer({
   const results = enabled && query.isSuccess ? query.data : undefined
   return (
     <>
-      <Button
-        variant={enabled ? 'default' : 'outline'}
-        depth="raised"
-        size="icon-lg"
-        className={
-          enabled
-            ? 'absolute top-52 right-4 z-10'
-            : 'absolute top-52 right-4 z-10 bg-background'
-        }
-        aria-label="GPS მოწყობილობების ჩვენება"
-        aria-pressed={enabled}
-        title={
-          enabled ? 'GPS მოწყობილობების დამალვა' : 'GPS მოწყობილობების ჩვენება'
-        }
-        onClick={() => onEnabledChange(!enabled)}
-      >
-        <IconGps aria-hidden="true" />
-      </Button>
+      {showToggle ? (
+        <Button
+          variant={enabled ? 'default' : 'outline'}
+          depth="raised"
+          size="icon-lg"
+          className={
+            enabled
+              ? 'absolute top-52 right-4 z-10'
+              : 'absolute top-52 right-4 z-10 bg-background'
+          }
+          aria-label="GPS მოწყობილობების ჩვენება"
+          aria-pressed={enabled}
+          title={
+            enabled
+              ? 'GPS მოწყობილობების დამალვა'
+              : 'GPS მოწყობილობების ჩვენება'
+          }
+          onClick={() => onEnabledChange(!enabled)}
+        >
+          <IconGps aria-hidden="true" />
+        </Button>
+      ) : null}
       {enabled && query.isError ? (
         <Alert
           variant="destructive"

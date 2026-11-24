@@ -2,6 +2,8 @@ import { lazy, Suspense, useRef, useState } from 'react'
 import { ClientOnly } from '@tanstack/react-router'
 
 import { Skeleton } from '#/components/ui/skeleton'
+import { Button } from '#/components/ui/button'
+import { IconGps } from '@tabler/icons-react'
 import {
   Dialog,
   DialogContent,
@@ -74,6 +76,7 @@ export function JobsMapPanel({
   const [showPlaces, setShowPlaces] = useState(false)
   const [showBuildings, setShowBuildings] = useState(false)
   const [showGps, setShowGps] = useState(true)
+  const [showCompleted, setShowCompleted] = useState(true)
   // The server also requires these permissions; this only decides whether to offer the layer.
   const canViewGps =
     hasPermission(actor, 'manage.access') && hasPermission(actor, 'gps.read')
@@ -109,6 +112,28 @@ export function JobsMapPanel({
           <Suspense fallback={<MapSkeleton />}>
             <JobsMap
               actor={actor}
+              showCompleted={showCompleted}
+              onCompletedChange={setShowCompleted}
+              controlExtras={
+                canViewGps ? (
+                  <Button
+                    type="button"
+                    variant={showGps ? 'default' : 'outline-solid'}
+                    depth="raised"
+                    size="icon-lg"
+                    aria-label="GPS მოწყობილობების ჩვენება"
+                    aria-pressed={showGps}
+                    title={
+                      showGps
+                        ? 'GPS მოწყობილობების დამალვა'
+                        : 'GPS მოწყობილობების ჩვენება'
+                    }
+                    onClick={() => setShowGps(!showGps)}
+                  >
+                    <IconGps aria-hidden="true" />
+                  </Button>
+                ) : undefined
+              }
               showPlaces={showPlaces}
               onPlacesChange={setShowPlaces}
               showBuildings={showBuildings}
@@ -130,7 +155,7 @@ export function JobsMapPanel({
               expanded={expanded}
               onExpand={toggleExpanded}
             >
-              <div className="absolute top-4 right-20 left-4 z-20 max-w-sm">
+              <div className="absolute top-4 right-32 left-4 z-20 max-w-sm">
                 <JobMapSearch
                   model={model}
                   onLocation={(result) => {
@@ -148,6 +173,7 @@ export function JobsMapPanel({
                 <GpsMapToggleLayer
                   actorId={actor.id}
                   enabled={showGps}
+                  showToggle={false}
                   onEnabledChange={setShowGps}
                 />
               ) : null}
@@ -197,7 +223,7 @@ export function JobsMapPanel({
             className="flex h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-none flex-col gap-3 p-3 sm:max-w-none"
             finalFocus={() =>
               inline.current?.querySelector<HTMLButtonElement>(
-                '[data-map-expand]',
+                '[aria-controls="jobs-map-controls"]',
               ) ??
               inline.current ??
               false

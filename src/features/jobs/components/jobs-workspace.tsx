@@ -179,7 +179,7 @@ export function JobsWorkspace({
         </TabsList>
         <TabsContent
           value={search.view}
-          className="flex min-w-0 flex-col gap-4 sm:gap-6"
+          className="flex min-w-0 flex-col gap-3"
         >
           <JobsFilters
             search={search}

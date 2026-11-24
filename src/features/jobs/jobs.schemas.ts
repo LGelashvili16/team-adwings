@@ -9,10 +9,10 @@ const jobDateSchema = z.iso
     'აირჩიეთ თარიღი 1900 და 2100 წლებს შორის.',
   )
 export const jobDeadlineSchema = jobDateSchema.nullable()
-const requiredJobDeadlineSchema = jobDeadlineSchema.refine(
-  (date) => date !== null,
-  'მიუთითეთ სამუშაოს ვადა.',
-)
+const requiredJobDeadlineSchema = z
+  .string({ error: 'მიუთითეთ სამუშაოს ვადა.' })
+  .min(1, 'მიუთითეთ სამუშაოს ვადა.')
+  .pipe(jobDateSchema)
 
 export const jobStatusSchema = z.enum(
   ['pending', 'en_route', 'on_site', 'completed', 'rejected'],
@@ -92,7 +92,7 @@ export const jobEditorSchema = jobFieldsSchema
     longitude: jobLocationSchema.shape.longitude.nullable(),
     latitude: jobLocationSchema.shape.latitude.nullable(),
     hasCoordinates: z.boolean({ error: 'მდებარეობის არჩევანი არასწორია.' }),
-    deadline: jobDeadlineSchema,
+    deadline: requiredJobDeadlineSchema,
   })
   .superRefine((value, context) => {
     if (!value.hasCoordinates) return
@@ -106,9 +106,6 @@ export const jobEditorSchema = jobFieldsSchema
         })
     }
   })
-export const jobCreateEditorSchema = jobEditorSchema.safeExtend({
-  deadline: requiredJobDeadlineSchema,
-})
 export const createJobSchema = jobFieldsSchema.safeExtend({
   deadline: requiredJobDeadlineSchema,
   requestId: z.uuid({ error: 'მოთხოვნა არასწორია.' }),
@@ -117,7 +114,7 @@ export const editJobSchema = jobFieldsSchema.safeExtend({
   id: jobIdSchema,
   version: versionSchema,
   // An omitted field must never silently clear a deadline saved by a newer client.
-  deadline: jobDeadlineSchema,
+  deadline: requiredJobDeadlineSchema,
 })
 export const jobLookupSchema = z.object({ id: jobIdSchema })
 export const jobTransitionSchema = z
@@ -162,7 +159,7 @@ export const jobFilterSchema = z
     kind: z.enum(['all', ...jobKindSchema.options], {
       error: 'ტიპი არასწორია.',
     }),
-    scope: z.enum(['all', 'mine'], { error: 'ფილტრი არასწორია.' }),
+    scope: z.enum(['all', 'mine', 'related'], { error: 'ფილტრი არასწორია.' }),
     sort: z.enum(
       ['newest', 'oldest', 'title', 'deadline_asc', 'deadline_desc'],
       {

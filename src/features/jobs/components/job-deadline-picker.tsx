@@ -71,29 +71,32 @@ export function JobDeadlinePicker({
         </PopoverHeader>
         <JobCalendar
           mode="single"
+          required={required}
           className="[--cell-size:--spacing(10)]"
-          defaultMonth={jobCalendarDate(value ?? jobsToday())}
+          defaultMonth={jobCalendarDate(value || jobsToday())}
           selected={value ? jobCalendarDate(value) : undefined}
-          onSelect={(date) => {
+          onSelect={(date: Date | undefined) => {
             onChange(date ? jobCalendarDateString(date) : null)
             setOpen(false)
             onBlur()
           }}
         />
-        <Button
-          type="button"
-          variant="outline"
-          depth="raised"
-          disabled={!value}
-          onClick={() => {
-            onChange(null)
-            setOpen(false)
-            onBlur()
-          }}
-        >
-          <IconX data-icon="inline-start" aria-hidden="true" />
-          ვადის გასუფთავება
-        </Button>
+        {!required ? (
+          <Button
+            type="button"
+            variant="outline"
+            depth="raised"
+            disabled={!value}
+            onClick={() => {
+              onChange(null)
+              setOpen(false)
+              onBlur()
+            }}
+          >
+            <IconX data-icon="inline-start" aria-hidden="true" />
+            ვადის გასუფთავება
+          </Button>
+        ) : null}
       </PopoverContent>
     </Popover>
   )

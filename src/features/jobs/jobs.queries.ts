@@ -3,11 +3,23 @@ import {
   findJobLocations,
   readJob,
   readJobs,
+  readUnreadJobs,
   suggestJobAddress,
 } from './jobs.functions'
 import type { JobMapPosition, JobSearch } from './jobs.types'
 
 export const jobsKeys = { all: (actorId: string) => ['jobs', actorId] as const }
+export const unreadJobsQueryOptions = (actorId: string) =>
+  queryOptions({
+    queryKey: [...jobsKeys.all(actorId), 'unread'],
+    queryFn: async () => {
+      const result = await readUnreadJobs()
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    staleTime: 15_000,
+    retry: false,
+  })
 export const jobsQueryOptions = (actorId: string, search: JobSearch) =>
   queryOptions({
     queryKey: [

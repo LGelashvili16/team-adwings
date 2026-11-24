@@ -28,12 +28,17 @@ export type JobSummary = {
   version: number
   createdAt: string
   updatedAt: string
+  isUnread?: boolean
 }
 export type JobMarker = Pick<JobSummary, 'id' | 'title' | 'kind' | 'status'> & {
+  deadline?: string | null
+  createdAt?: string
+  isUnread?: boolean
   longitude: number
   latitude: number
 }
 export type JobDetail = JobSummary & {
+  createdBy: string
   streetNameKa: string | null
   streetNameEn: string | null
   locationLabelKa: string | null

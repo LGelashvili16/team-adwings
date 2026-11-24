@@ -101,6 +101,222 @@ async function transition(id: string, status: string, by = worker, note = '') {
 }
 
 describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
+  it('permits only the stored creator or an administrator to edit and reopen, retaining production completion and audit', async () => {
+    await sql().query('UPDATE "user" SET roles=$1 WHERE id=$2', [
+      'sales_manager',
+      other.id,
+    ])
+    try {
+      const { id } = await service.createCompanyJob(other, {
+        ...fields,
+        requestId: randomUUID(),
+      })
+      for (const by of [
+        manager,
+        worker,
+        { ...worker, roles: ['admin'] as const },
+      ]) {
+        await expect(
+          service.editCompanyJob(
+            { ...by, roles: [...by.roles] },
+            { ...fields, id, version: 1, createdBy: by.id },
+          ),
+        ).rejects.toThrow('წვდომა')
+      }
+      expect(await detail(id)).toMatchObject({
+        createdBy: other.id,
+        version: 1,
+      })
+      expect((await detail(id)).history).toHaveLength(1)
+      await service.editCompanyJob(other, {
+        ...fields,
+        title: 'ავტორის ცვლილება',
+        id,
+        version: 1,
+      })
+      await service.editCompanyJob(platformAdmin, {
+        ...fields,
+        title: 'ადმინისტრატორის ცვლილება',
+        id,
+        version: 2,
+      })
+      await transition(id, 'completed', manager)
+      for (const by of [manager, worker])
+        await expect(
+          transition(id, 'pending', by, 'თავიდან დაგეგმვა'),
+        ).rejects.toThrow('წვდომა')
+      expect(await detail(id)).toMatchObject({
+        status: 'completed',
+        version: 4,
+      })
+      await expect(transition(id, 'pending', other)).rejects.toThrow(
+        'მოთხოვნა არასწორია',
+      )
+      await transition(id, 'pending', other, 'ავტორის გადაწყვეტილება')
+      expect(await detail(id)).toMatchObject({
+        status: 'pending',
+        assigneeId: null,
+        version: 5,
+      })
+      await transition(id, 'completed', manager)
+      await transition(
+        id,
+        'pending',
+        platformAdmin,
+        'ადმინისტრატორის გადაწყვეტილება',
+      )
+      const record = await detail(id)
+      expect(record).toMatchObject({
+        status: 'pending',
+        assigneeId: null,
+        version: 7,
+        createdBy: other.id,
+      })
+      expect(record.history).toHaveLength(7)
+      expect(
+        (
+          await sql().query(
+            'SELECT actor_id FROM job_event WHERE job_id=$1 ORDER BY created_at DESC, id DESC LIMIT 1',
+            [id],
+          )
+        ).rows[0].actor_id,
+      ).toBe(platformAdmin.id)
+      await sql().query(
+        'UPDATE "user" SET permission_overrides=$1 WHERE id=$2',
+        [
+          JSON.stringify({ allow: [], deny: ['jobs.edit.all'] }),
+          platformAdmin.id,
+        ],
+      )
+      try {
+        await expect(
+          service.editCompanyJob(platformAdmin, { ...fields, id, version: 7 }),
+        ).rejects.toThrow('წვდომა')
+      } finally {
+        await sql().query(
+          'UPDATE "user" SET permission_overrides=$1 WHERE id=$2',
+          [JSON.stringify({ allow: [], deny: [] }), platformAdmin.id],
+        )
+      }
+    } finally {
+      await sql().query('UPDATE "user" SET roles=$1 WHERE id=$2', [
+        'production_specialist',
+        other.id,
+      ])
+    }
+  })
+  it('filters related jobs by the trusted viewer as creator or current assignee without duplicate counts', async () => {
+    const own = await createPin()
+    const both = await createPin()
+    const unmapped = await createPin({ longitude: null, latitude: null })
+    await transition(both.id, 'completed', manager)
+    await sql().query('UPDATE "user" SET roles=$1 WHERE id=$2', [
+      'sales_manager',
+      other.id,
+    ])
+    let assigned: { id: string }
+    try {
+      assigned = await service.createCompanyJob(other, {
+        ...fields,
+        kind: 'measurement',
+        requestId: randomUUID(),
+      })
+      await service.createCompanyJob(other, {
+        ...fields,
+        requestId: randomUUID(),
+      })
+    } finally {
+      await sql().query('UPDATE "user" SET roles=$1 WHERE id=$2', [
+        'production_specialist',
+        other.id,
+      ])
+    }
+    await transition(assigned.id, 'completed', manager)
+    for (const view of ['map', 'list']) {
+      const result = await service.listCompanyJobs(manager, {
+        ...search,
+        scope: 'related',
+        view,
+      })
+      expect(result.total).toBe(4)
+      expect(result.unmappedTotal).toBe(1)
+      expect(result.items.map((item) => item.id).sort()).toEqual(
+        [own.id, assigned.id, both.id, unmapped.id].sort(),
+      )
+      expect(result.markers.map((pin) => pin.id).sort()).toEqual(
+        [own.id, assigned.id, both.id].sort(),
+      )
+    }
+    expect(
+      (await service.listCompanyJobs(manager, { ...search, scope: 'mine' }))
+        .total,
+    ).toBe(2)
+    expect(
+      (await service.listCompanyJobs(worker, { ...search, scope: 'related' }))
+        .total,
+    ).toBe(0)
+    expect(
+      (
+        await service.listCompanyJobs(manager, {
+          ...search,
+          scope: 'related',
+          kind: 'measurement',
+        })
+      ).total,
+    ).toBe(1)
+    expect(
+      (
+        await service.listCompanyJobs(manager, {
+          ...search,
+          scope: 'related',
+          actorId: other.id,
+        })
+      ).total,
+    ).toBe(4)
+  })
+  it.each(['installation', 'measurement', 'other'])(
+    'allows authorized direct completion of %s jobs with a trusted assignee and audit',
+    async (kind) => {
+      for (const by of [platformAdmin, manager]) {
+        const { id } = await createPin({ kind })
+        await service.transitionCompanyJob(by, {
+          id,
+          version: 1,
+          status: 'completed',
+          note: '',
+        })
+        expect(await detail(id)).toMatchObject({
+          status: 'completed',
+          assigneeId: by.id,
+          version: 2,
+        })
+        expect((await detail(id)).history[0]).toMatchObject({
+          status: 'completed',
+          actorName: by.name,
+        })
+      }
+    },
+  )
+  it('keeps new jobs unread independently and makes acknowledgement idempotent', async () => {
+    const { id } = await createPin()
+    expect(await service.getUnreadCompanyJobs(worker)).toEqual({
+      hasUnread: true,
+    })
+    await expect(service.acknowledgeCompanyJob(null, { id })).rejects.toThrow()
+    await expect(
+      service.acknowledgeCompanyJob(worker, { id: randomUUID() }),
+    ).rejects.toThrow()
+    await service.acknowledgeCompanyJob(worker, { id })
+    await service.acknowledgeCompanyJob(worker, { id })
+    expect(await service.getUnreadCompanyJobs(worker)).toEqual({
+      hasUnread: false,
+    })
+    expect(await service.getUnreadCompanyJobs(manager)).toEqual({
+      hasUnread: true,
+    })
+    const result = await service.listCompanyJobs(worker, { ...search })
+    expect(result.markers.find((pin) => pin.id === id)?.isUnread).toBe(false)
+  })
   beforeAll(async () => {
     if (!originalUrl) throw new Error('Local PostgreSQL configuration required')
     const target = new URL(originalUrl)
@@ -195,7 +411,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     )
   }, 30_000)
   beforeEach(async () => {
-    await sql().query('TRUNCATE job_event, job')
+    await sql().query('TRUNCATE job_read, job_event, job')
     await sql().query(
       'TRUNCATE notification, notification_policy, notification_policy_audit',
     )
@@ -561,7 +777,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     expect(record.title).toBe('ახალი აზომვა')
     expect(record.history[0].action).toBe('edited')
   })
-  it('persists calendar deadlines through reads, audited edits and explicit clearing without changing their day', async () => {
+  it('persists calendar deadlines through reads and audited edits and rejects clearing the date', async () => {
     const { id } = await createPin({ deadline: '2026-11-20' })
     expect(await detail(id)).toMatchObject({
       deadline: '2026-11-20',
@@ -599,7 +815,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
         ...fields,
         id,
         version: 2,
-        deadline: null,
+        deadline: '2026-12-15',
       }),
     ).rejects.toThrow('წვდომა')
     await expect(createPin({ deadline: '2026-02-30' })).rejects.toThrow(
@@ -609,14 +825,19 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       sql().query("UPDATE job SET deadline = '2101-01-01' WHERE id = $1", [id]),
     ).rejects.toThrow('job_deadline_valid')
     expect((await detail(id)).deadline).toBe('2026-12-15')
-    await service.editCompanyJob(manager, {
-      ...fields,
-      id,
+    await expect(
+      service.editCompanyJob(manager, {
+        ...fields,
+        id,
+        version: 2,
+        deadline: null,
+      }),
+    ).rejects.toThrow('მოთხოვნა არასწორია')
+    expect(await detail(id)).toMatchObject({
+      deadline: '2026-12-15',
       version: 2,
-      deadline: null,
     })
-    expect(await detail(id)).toMatchObject({ deadline: null, version: 3 })
-    expect((await detail(id)).history).toHaveLength(3)
+    expect((await detail(id)).history).toHaveLength(2)
     await expect(createPin({ deadline: null })).rejects.toThrow(
       'მოთხოვნა არასწორია',
     )
@@ -650,6 +871,9 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     const early = await createPin({ deadline: '2026-11-01' })
     const late = await createPin({ deadline: '2026-11-30' })
     const missing = await createPin()
+    await sql().query('UPDATE job SET deadline = null WHERE id = $1', [
+      missing.id,
+    ])
     const tiedIds = []
     for (let index = 0; index < 12; index++)
       tiedIds.push((await createPin({ deadline: '2026-11-15' })).id)
@@ -1074,7 +1298,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       ).toEqual(recipients.map((recipient) => recipient.id).sort())
     } finally {
       await Promise.all(readers.map((reader) => reader.cancel()))
-      await sql().query('TRUNCATE job_event, job, notification')
+      await sql().query('TRUNCATE job_read, job_event, job, notification')
       await sql().query('DELETE FROM "user" WHERE id=$1', [sales.id])
     }
   }, 15_000)

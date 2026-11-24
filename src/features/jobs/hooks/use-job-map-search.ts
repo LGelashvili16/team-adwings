@@ -16,7 +16,7 @@ export function useJobMapSearch(
   onQueryChange: (q: string) => void,
 ) {
   const [open, setOpen] = useState(false)
-  const [minimized, setMinimized] = useState(false)
+  const [minimized, setMinimized] = useState(true)
   const [settledQuery, setSettledQuery] = useState(search.q)
   const applied = useRef(search.q)
   const pending = useRef(new Set<string>())

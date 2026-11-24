@@ -6,7 +6,7 @@ import {
   IconX,
   IconTool,
   IconRulerMeasure,
-  IconBriefcase,
+  IconChecklist,
 } from '@tabler/icons-react'
 import type { JobKind, JobStatus } from './jobs.types'
 import { jobsTimeZone } from './jobs.dates'
@@ -84,11 +84,42 @@ export const jobKinds = {
   other: {
     label: 'სხვა სამუშაო',
     createLabel: 'სხვა სამუშაოს დამატება',
-    icon: IconBriefcase,
+    icon: IconChecklist,
     variant: 'lavender',
     markerStyle: markerStyle('badge-lavender'),
   },
 } as const satisfies Record<JobKind, unknown>
 export function formatJobDate(date: string) {
   return formatGeorgianDateTime(date, jobsTimeZone)
+}
+
+const historyStatusColors: Record<JobStatus, string> = {
+  pending: 'var(--badge-purple-foreground)',
+  en_route: 'var(--badge-blue-foreground)',
+  on_site: 'var(--badge-orange-foreground)',
+  completed: 'var(--badge-green-foreground)',
+  rejected: 'var(--badge-red-foreground)',
+}
+
+export function jobHistoryPresentation(event: {
+  action: string
+  status: JobStatus
+}) {
+  if (event.action === 'created')
+    return {
+      label: 'სამუშაო დამატებულია',
+      color: 'var(--badge-blue-foreground)',
+    }
+  if (event.action === 'edited')
+    return {
+      label: 'ინფორმაცია განახლებულია',
+      color: 'var(--muted-foreground)',
+    }
+  return {
+    label:
+      event.status === 'pending'
+        ? 'თავიდან დაგეგმილი'
+        : jobStatuses[event.status].label,
+    color: historyStatusColors[event.status],
+  }
 }

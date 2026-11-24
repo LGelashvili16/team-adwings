@@ -42,7 +42,6 @@ import { Switch } from '#/components/ui/switch'
 import { createJob, editJob } from '../jobs.functions'
 import {
   jobEditorSchema,
-  jobCreateEditorSchema,
   jobFieldsSchema,
   jobKindSchema,
 } from '../jobs.schemas'
@@ -82,7 +81,9 @@ export function JobEditor({
   const [conflict, setConflict] = useState(false)
   const [version, setVersion] = useState(job?.version)
   const mutation = useMutation({
-    mutationFn: (fields: z.infer<typeof jobFieldsSchema>) =>
+    mutationFn: (
+      fields: z.infer<typeof jobFieldsSchema> & { deadline: string },
+    ) =>
       job
         ? editJob({
             data: { ...fields, id: job.id, version: version ?? job.version },
@@ -96,7 +97,7 @@ export function JobEditor({
       address: job?.address ?? suggestedAddress ?? '',
       notes: job?.notes ?? '',
       kind: job?.kind ?? suggestedKind ?? 'installation',
-      deadline: job?.deadline ?? null,
+      deadline: job?.deadline ?? '',
       longitude: job?.longitude ?? position?.longitude ?? null,
       latitude: job?.latitude ?? position?.latitude ?? null,
       hasCoordinates: Boolean(
@@ -107,12 +108,15 @@ export function JobEditor({
       mode: 'submit',
       modeAfterSubmission: 'change',
     }),
-    validators: { onDynamic: job ? jobEditorSchema : jobCreateEditorSchema },
+    validators: { onDynamic: jobEditorSchema },
     onSubmit: async ({ value }) => {
       if (conflict) return
       setError('')
       try {
-        const result = await mutation.mutateAsync(jobFieldsSchema.parse(value))
+        const result = await mutation.mutateAsync({
+          ...jobFieldsSchema.parse(value),
+          deadline: value.deadline,
+        })
         if (!result.ok) {
           setError(result.message)
           setConflict(result.code === 'conflict')
@@ -143,6 +147,8 @@ export function JobEditor({
       }}
     >
       <DialogContent
+        // The map's dialog context also wraps inline details. Base UI otherwise omits this nested backdrop.
+        forceBackdrop
         className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
         aria-describedby={undefined}
         showCloseButton={!mutation.isPending}
@@ -369,19 +375,17 @@ export function JobEditor({
                   <Field data-invalid={!field.state.meta.isValid}>
                     <FieldLabel htmlFor="job-deadline" className="gap-1">
                       ვადა{' '}
-                      {!job ? (
-                        <span aria-hidden="true" className="text-destructive">
-                          *
-                        </span>
-                      ) : null}
+                      <span aria-hidden="true" className="text-destructive">
+                        *
+                      </span>
                     </FieldLabel>
                     <JobDeadlinePicker
                       value={field.state.value}
-                      onChange={field.handleChange}
+                      onChange={(date) => field.handleChange(date ?? '')}
                       onBlur={field.handleBlur}
                       disabled={mutation.isPending}
                       invalid={!field.state.meta.isValid}
-                      required={!job}
+                      required
                       describedBy={
                         field.state.meta.errors.length
                           ? 'job-deadline-error'

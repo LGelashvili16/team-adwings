@@ -18,6 +18,7 @@ import { formatJobDate } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { Badge } from '#/components/ui/badge'
 import type { JobSearch, JobSummary } from '../jobs.types'
 
 const features = tableFeatures({})
@@ -54,6 +55,11 @@ export function JobsList({
               className="block max-w-80 min-w-40 rounded font-medium break-words outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
               {row.original.title}
+              {row.original.isUnread ? (
+                <Badge variant="red-vivid" className="ml-2">
+                  ახალი
+                </Badge>
+              ) : null}
               <span className="mt-1 block text-sm font-normal text-muted-foreground">
                 {row.original.address || 'მისამართი არ არის მითითებული'}
               </span>

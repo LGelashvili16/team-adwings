@@ -64,6 +64,18 @@ function setup() {
   return { user, client }
 }
 
+async function openNotificationActions(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  const trigger = await screen.findByRole('button', {
+    name: 'შეტყობინების მოქმედებები: მოწყობილობის დადასტურება',
+  })
+  trigger.focus()
+  await user.keyboard('{Enter}')
+  await screen.findByRole('menu')
+  return trigger
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   items = [
@@ -93,16 +105,57 @@ beforeEach(() => {
     items = []
     return { ok: true, value: { deletedCount: count } }
   })
+  api.mark.mockImplementation(async () => {
+    items = items.map((item) => ({ ...item, seenAt: '2026-11-20T19:00:00Z' }))
+    return { ok: true, value: { updatedCount: items.length } }
+  })
+  api.unseen.mockImplementation(async () => {
+    items = items.map((item) => ({ ...item, seenAt: null }))
+    return { ok: true, value: { updatedCount: items.length } }
+  })
 })
 
-describe('notifications page deletion', () => {
+describe('notifications page actions', () => {
+  it('opens notification actions by keyboard and marks the selected notification unread and read', async () => {
+    const { user, client } = setup()
+    const trigger = await screen.findByRole('button', {
+      name: 'შეტყობინების მოქმედებები: მოწყობილობის დადასტურება',
+    })
+    trigger.focus()
+    await user.keyboard('{Enter}')
+    expect(
+      await screen.findByRole('menuitem', { name: 'წაუკითხავად მონიშვნა' }),
+    ).toBeVisible()
+    await user.keyboard('{Escape}')
+    await waitFor(() =>
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument(),
+    )
+    expect(trigger).toHaveFocus()
+    expect(api.unseen).not.toHaveBeenCalled()
+
+    await openNotificationActions(user)
+    await user.click(
+      screen.getByRole('menuitem', { name: 'წაუკითხავად მონიშვნა' }),
+    )
+    await waitFor(() =>
+      expect(api.unseen).toHaveBeenCalledWith({ data: { ids: [items[0].id] } }),
+    )
+    await waitFor(() => expect(trigger).toBeEnabled())
+    await openNotificationActions(user)
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'ნანახად მონიშვნა' }),
+    )
+    await waitFor(() =>
+      expect(api.mark).toHaveBeenCalledWith({ data: { ids: [items[0].id] } }),
+    )
+    expect(api.remove).not.toHaveBeenCalled()
+    client.clear()
+  })
+
   it('opens the global confirmation modal and deletes only after confirmation', async () => {
     const { user, client } = setup()
-    const deleteButton = await screen.findByRole('button', {
-      name: 'წაშლა: მოწყობილობის დადასტურება',
-    })
-
-    await user.click(deleteButton)
+    await openNotificationActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'წაშლა' }))
     const dialog = await screen.findByRole('dialog', {
       name: 'შეტყობინების წაშლა',
     })
@@ -119,11 +172,8 @@ describe('notifications page deletion', () => {
     expect(api.remove).not.toHaveBeenCalled()
 
     // Confirming deletes the notification and closes the modal.
-    await user.click(
-      screen.getByRole('button', {
-        name: 'წაშლა: მოწყობილობის დადასტურება',
-      }),
-    )
+    await openNotificationActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'წაშლა' }))
     const confirmDialog = await screen.findByRole('dialog', {
       name: 'შეტყობინების წაშლა',
     })
@@ -147,11 +197,8 @@ describe('notifications page deletion', () => {
       message: 'შეტყობინება ვერ წაიშალა. სცადეთ ხელახლა.',
     })
     const { user, client } = setup()
-    await user.click(
-      await screen.findByRole('button', {
-        name: 'წაშლა: მოწყობილობის დადასტურება',
-      }),
-    )
+    await openNotificationActions(user)
+    await user.click(screen.getByRole('menuitem', { name: 'წაშლა' }))
     const dialog = await screen.findByRole('dialog', {
       name: 'შეტყობინების წაშლა',
     })

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
   check,
+  boolean,
   date,
   doublePrecision,
   index,
@@ -43,6 +44,8 @@ export const job = pgTable(
     }),
     /** Stable work category: installation, measurement or other. */
     kind: text('kind').$type<JobKind>().notNull(),
+    /** Whether this job participates in per-account new indicators; pre-rollout jobs remain false. */
+    tracksReads: boolean('tracks_reads').notNull().default(true),
     /** Optional deadline as a calendar day, never a timezone-shifted instant. */
     deadline: date('deadline', { mode: 'string' }),
     /** Persisted workflow: pending, en_route, on_site, completed, or rejected. */

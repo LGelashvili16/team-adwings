@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react'
+import './job-map-search.css'
 import { IconSearch, IconMinus, IconX } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Field, FieldError, FieldLabel } from '#/components/ui/field'
@@ -29,26 +30,10 @@ export function JobMapSearch({
   const anchor = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const popup = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
   const popupId = useId()
-  const open = model.open && model.valid
-  if (model.minimized)
-    return (
-      <Button
-        variant="outline"
-        depth="raised"
-        size="icon-lg"
-        className="bg-background"
-        aria-label="რუკაზე ძიების გახსნა"
-        title="ძიება"
-        onClick={() => {
-          model.setMinimized(false)
-          model.setOpen(true)
-          requestAnimationFrame(() => input.current?.focus())
-        }}
-      >
-        <IconSearch aria-hidden="true" />
-      </Button>
-    )
+  const panelId = useId()
+  const open = model.open && model.valid && !model.minimized
   function select(item: MapSearchItem) {
     model.setOpen(false)
     if (item.type === 'location') onLocation(item.location)
@@ -56,111 +41,138 @@ export function JobMapSearch({
   }
   return (
     <Popover open={open} onOpenChange={model.setOpen} modal={false}>
-      <form
-        noValidate
-        onSubmit={(event) => {
-          event.preventDefault()
-          void model.form.handleSubmit()
-        }}
-      >
-        <model.form.Field name="q">
-          {(field) => (
-            <Field data-invalid={!field.state.meta.isValid}>
-              <FieldLabel htmlFor="job-map-search" className="sr-only">
-                მდებარეობის ან სამუშაოს ძიება
-              </FieldLabel>
-              <div ref={anchor}>
-                <InputGroup className="h-11 bg-background shadow-md dark:bg-background">
-                  <InputGroupAddon>
-                    <IconSearch aria-hidden="true" />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    ref={input}
-                    id="job-map-search"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    placeholder="ქუჩა, მისამართი ან სამუშაო"
-                    value={field.state.value}
-                    onChange={(event) => {
-                      field.handleChange(event.target.value)
-                      model.setOpen(true)
-                    }}
-                    onClick={() => model.setOpen(true)}
-                    onBlur={field.handleBlur}
-                    aria-haspopup="dialog"
-                    aria-expanded={open}
-                    aria-controls={open ? popupId : undefined}
-                    aria-invalid={!field.state.meta.isValid}
-                    aria-describedby={
-                      field.state.meta.errors.length
-                        ? 'job-map-search-error'
-                        : undefined
-                    }
-                    onKeyDown={(event) => {
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault()
+      <div className="job-map-search" data-collapsed={model.minimized}>
+        <Button
+          ref={trigger}
+          variant="outline-solid"
+          depth="raised"
+          size="icon-lg"
+          className="job-map-search-trigger"
+          inert={!model.minimized}
+          aria-hidden={!model.minimized || undefined}
+          aria-expanded={!model.minimized}
+          aria-controls={panelId}
+          aria-label="რუკაზე ძიების გახსნა"
+          title="ძიება"
+          onClick={() => {
+            model.setMinimized(false)
+            model.setOpen(true)
+            requestAnimationFrame(() => input.current?.focus())
+          }}
+        >
+          <IconSearch aria-hidden="true" />
+        </Button>
+        <form
+          id={panelId}
+          className="job-map-search-panel"
+          inert={model.minimized}
+          aria-hidden={model.minimized || undefined}
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault()
+            void model.form.handleSubmit()
+          }}
+        >
+          <model.form.Field name="q">
+            {(field) => (
+              <Field data-invalid={!field.state.meta.isValid}>
+                <FieldLabel htmlFor="job-map-search" className="sr-only">
+                  მდებარეობის ან სამუშაოს ძიება
+                </FieldLabel>
+                <div ref={anchor}>
+                  <InputGroup className="h-11 bg-background shadow-md dark:bg-background">
+                    <InputGroupAddon>
+                      <IconSearch aria-hidden="true" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      ref={input}
+                      id="job-map-search"
+                      role="combobox"
+                      aria-autocomplete="list"
+                      placeholder="ქუჩა, მისამართი ან სამუშაო"
+                      value={field.state.value}
+                      onChange={(event) => {
+                        field.handleChange(event.target.value)
                         model.setOpen(true)
-                        const first =
-                          popup.current?.querySelector<HTMLButtonElement>(
-                            '[data-search-result]',
-                          )
-                        if (first) first.focus()
-                        else
-                          requestAnimationFrame(() =>
-                            popup.current
-                              ?.querySelector<HTMLButtonElement>(
-                                '[data-search-result]',
-                              )
-                              ?.focus(),
-                          )
+                      }}
+                      onClick={() => model.setOpen(true)}
+                      onBlur={field.handleBlur}
+                      aria-haspopup="dialog"
+                      aria-expanded={open}
+                      aria-controls={open ? popupId : undefined}
+                      aria-invalid={!field.state.meta.isValid}
+                      aria-describedby={
+                        field.state.meta.errors.length
+                          ? 'job-map-search-error'
+                          : undefined
                       }
-                    }}
-                  />
-                  <InputGroupAddon
-                    align="inline-end"
-                    className="gap-1.5 pr-1.5 has-[>button]:mr-0"
-                  >
-                    {model.value ? (
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowDown') {
+                          event.preventDefault()
+                          model.setOpen(true)
+                          const first =
+                            popup.current?.querySelector<HTMLButtonElement>(
+                              '[data-search-result]',
+                            )
+                          if (first) first.focus()
+                          else
+                            requestAnimationFrame(() =>
+                              popup.current
+                                ?.querySelector<HTMLButtonElement>(
+                                  '[data-search-result]',
+                                )
+                                ?.focus(),
+                            )
+                        }
+                      }}
+                    />
+                    <InputGroupAddon
+                      align="inline-end"
+                      className="gap-1.5 pr-1.5 has-[>button]:mr-0"
+                    >
+                      {model.value ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          depth="raised"
+                          size="icon-sm"
+                          aria-label="რუკის ძიების გასუფთავება"
+                          onClick={() => {
+                            field.handleChange('')
+                            input.current?.focus()
+                          }}
+                        >
+                          <IconX aria-hidden="true" />
+                        </Button>
+                      ) : null}
                       <Button
                         type="button"
                         variant="secondary"
                         depth="raised"
                         size="icon-sm"
-                        aria-label="რუკის ძიების გასუფთავება"
+                        aria-label="რუკის ძიების ჩაკეცვა"
+                        title="ძიების ჩაკეცვა"
                         onClick={() => {
-                          field.handleChange('')
-                          input.current?.focus()
+                          model.setOpen(false)
+                          model.setMinimized(true)
+                          requestAnimationFrame(() => trigger.current?.focus())
                         }}
                       >
-                        <IconX aria-hidden="true" />
+                        <IconMinus aria-hidden="true" />
                       </Button>
-                    ) : null}
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      depth="raised"
-                      size="icon-sm"
-                      aria-label="რუკის ძიების ჩაკეცვა"
-                      title="ძიების ჩაკეცვა"
-                      onClick={() => {
-                        model.setOpen(false)
-                        model.setMinimized(true)
-                      }}
-                    >
-                      <IconMinus aria-hidden="true" />
-                    </Button>
-                  </InputGroupAddon>
-                </InputGroup>
-              </div>
-              <FieldError
-                id="job-map-search-error"
-                errors={field.state.meta.errors}
-                className="rounded-lg bg-background p-2"
-              />
-            </Field>
-          )}
-        </model.form.Field>
-      </form>
+                    </InputGroupAddon>
+                  </InputGroup>
+                </div>
+                <FieldError
+                  id="job-map-search-error"
+                  errors={field.state.meta.errors}
+                  className="rounded-lg bg-background p-2"
+                />
+              </Field>
+            )}
+          </model.form.Field>
+        </form>
+      </div>
       <PopoverContent
         id={popupId}
         ref={popup}
@@ -169,7 +181,11 @@ export function JobMapSearch({
         sideOffset={8}
         initialFocus={false}
         finalFocus={(interaction) =>
-          interaction === 'keyboard' ? input.current : false
+          interaction === 'keyboard'
+            ? model.minimized
+              ? trigger.current
+              : input.current
+            : false
         }
         className="w-(--anchor-width) max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-xl p-0"
       >

@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, render, screen, within } from '@testing-library/react'
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  within,
+  waitFor,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { JobMapSearch } from './job-map-search'
@@ -56,7 +63,7 @@ function Harness() {
     />
   )
 }
-function setup() {
+async function setup(open = true) {
   render(
     <QueryClientProvider
       client={
@@ -66,7 +73,12 @@ function setup() {
       <Harness />
     </QueryClientProvider>,
   )
-  return userEvent.setup()
+  const user = userEvent.setup()
+  if (open)
+    await user.click(
+      screen.getByRole('button', { name: 'რუკაზე ძიების გახსნა' }),
+    )
+  return user
 }
 beforeEach(() => {
   vi.resetAllMocks()
@@ -90,7 +102,7 @@ afterEach(() => {
 })
 
 it('waits 500ms, groups addresses before jobs, deduplicates street segments and selects with the keyboard', async () => {
-  const user = setup()
+  const user = await setup()
   const input = screen.getByRole('combobox', {
     name: 'მდებარეობის ან სამუშაოს ძიება',
   })
@@ -113,7 +125,7 @@ it('waits 500ms, groups addresses before jobs, deduplicates street segments and 
 })
 
 it('can collapse and reopen search and select a measurement job', async () => {
-  const user = setup()
+  const user = await setup()
   await user.type(screen.getByRole('combobox'), 'უნივერსიტეტის')
   await screen.findByRole(
     'button',
@@ -122,7 +134,13 @@ it('can collapse and reopen search and select a measurement job', async () => {
   )
   await user.click(screen.getByRole('button', { name: 'რუკის ძიების ჩაკეცვა' }))
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  await waitFor(() =>
+    expect(
+      screen.getByRole('button', { name: 'რუკაზე ძიების გახსნა' }),
+    ).toHaveFocus(),
+  )
   await user.click(screen.getByRole('button', { name: 'რუკაზე ძიების გახსნა' }))
+  expect(screen.getByRole('combobox')).toHaveValue('უნივერსიტეტის')
   await user.click(screen.getByRole('combobox'))
   await user.click(
     await screen.findByRole('button', { name: new RegExp(job.title) }),
@@ -131,7 +149,7 @@ it('can collapse and reopen search and select a measurement job', async () => {
 })
 
 it('rejects overlong input without calling either search endpoint', async () => {
-  const user = setup()
+  const user = await setup()
   await user.click(screen.getByRole('combobox'))
   await user.paste('ა'.repeat(101))
   await act(async () => {
@@ -140,4 +158,13 @@ it('rejects overlong input without calling either search endpoint', async () => 
   expect(calls.locations).not.toHaveBeenCalled()
   expect(calls.jobs).not.toHaveBeenCalled()
   expect(screen.getByText('საძიებო ტექსტი ძალიან გრძელია.')).toBeInTheDocument()
+})
+
+it('starts collapsed without search requests and focuses the field when opened', async () => {
+  const user = await setup(false)
+  expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  expect(calls.locations).not.toHaveBeenCalled()
+  expect(calls.jobs).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'რუკაზე ძიების გახსნა' }))
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveFocus())
 })

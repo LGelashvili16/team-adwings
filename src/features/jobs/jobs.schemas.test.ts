@@ -9,6 +9,12 @@ import {
 } from './jobs.schemas'
 
 const id = '019a365d-37cc-7a5c-bfe1-1e0752235b68'
+it('validates the related-to-me URL filter and rejects unknown relationship scopes', () => {
+  expect(jobSearchSchema.parse({ scope: 'related' }).scope).toBe('related')
+  expect(jobSearchSchema.safeParse({ scope: 'someone-else' }).success).toBe(
+    false,
+  )
+})
 const fields = {
   title: 'ახალი მონტაჟი',
   address: 'თბილისი',
@@ -43,7 +49,7 @@ it.each(['', '   ', '\t\n'])(
     ).toBe('თბილისი')
   },
 )
-it('requires a valid creation deadline and preserves explicit clearing for edits', () => {
+it('requires a valid calendar deadline for both creation and edits', () => {
   const { deadline: _deadline, ...withoutDeadline } = fields
   expect(
     createJobSchema.safeParse({ ...withoutDeadline, requestId: id }).success,
@@ -60,8 +66,9 @@ it('requires a valid creation deadline and preserves explicit clearing for edits
     editJobSchema.safeParse({ ...withoutDeadline, id, version: 1 }).success,
   ).toBe(false)
   expect(
-    editJobSchema.parse({ ...fields, deadline: null, id, version: 1 }).deadline,
-  ).toBeNull()
+    editJobSchema.safeParse({ ...fields, deadline: null, id, version: 1 })
+      .success,
+  ).toBe(false)
   for (const deadline of [
     '2026-02-30',
     '2026-11-07T10:00:00Z',

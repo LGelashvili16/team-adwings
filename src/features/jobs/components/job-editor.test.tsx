@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JobEditor } from './job-editor'
 import { JobTransitionDialog } from './job-transition-dialog'
+import { Dialog } from '#/components/ui/dialog'
 import type { JobDetail } from '../jobs.types'
 import type { Actor } from '#/lib/authorization/actor'
 
@@ -35,7 +36,7 @@ const job: JobDetail = {
   locationResolvedAt: null,
   address: 'ვაკე',
   kind: 'installation',
-  deadline: null,
+  deadline: '2026-11-20',
   status: 'pending',
   longitude: 44.8,
   latitude: 41.7,
@@ -45,6 +46,7 @@ const job: JobDetail = {
   createdAt: '2026-11-06T10:00:00Z',
   updatedAt: '2026-11-06T10:00:00Z',
   creatorName: 'მენეჯერი',
+  createdBy: actor.id,
   history: [],
   hasMoreHistory: false,
 }
@@ -78,6 +80,23 @@ async function selectDeadline() {
     screen.getByRole('button', { name: '20 ნოემბერი 2026' }),
   )
 }
+
+it('renders the editor backdrop even under the inline map dialog context', async () => {
+  provider(
+    <Dialog open={false}>
+      <JobEditor
+        actorId={actor.id}
+        job={job}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    </Dialog>,
+  )
+  await screen.findByRole('dialog', { name: 'სამუშაოს რედაქტირება' })
+  expect(
+    document.querySelector('[data-slot="dialog-overlay"]'),
+  ).toBeInTheDocument()
+})
 describe('job forms and conflict recovery', () => {
   beforeEach(() => vi.resetAllMocks())
   it('revalidates a late address suggestion after the first submit attempt', async () => {
@@ -217,26 +236,28 @@ describe('job forms and conflict recovery', () => {
       deadline: '2026-11-20',
     })
   })
-  it('allows clearing a saved deadline explicitly when editing', async () => {
+  it('requires a deadline when editing an older undated job', async () => {
     functions.editJob.mockResolvedValue({ ok: true, value: { id: job.id } })
     provider(
       <JobEditor
         actorId={actor.id}
-        job={{ ...job, deadline: '2026-11-20' }}
+        job={{ ...job, deadline: null }}
         onClose={vi.fn()}
         onSaved={vi.fn()}
       />,
     )
-    await userEvent.click(
-      screen.getByRole('button', { name: 'ვადა: 20 ნოემბერი, 2026' }),
+    expect(screen.getByRole('button', { name: 'ვადა' })).toHaveAttribute(
+      'aria-required',
+      'true',
     )
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'ვადის გასუფთავება' }),
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'შენახვა' }))
+    expect(await screen.findByText('მიუთითეთ სამუშაოს ვადა.')).toBeVisible()
+    expect(functions.editJob).not.toHaveBeenCalled()
+    await selectDeadline()
     await userEvent.click(screen.getByRole('button', { name: 'შენახვა' }))
     await waitFor(() => expect(functions.editJob).toHaveBeenCalledOnce())
     expect(functions.editJob.mock.calls[0][0].data).toMatchObject({
-      deadline: null,
+      deadline: '2026-11-20',
     })
   })
   it('preselects and submits a generic job from the map menu', async () => {

@@ -16,7 +16,7 @@ import {
 import { jobsTimeZone } from '../jobs.dates'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '#/db'
-import { employee, job, jobEvent, user } from '#/db/schema'
+import { employee, job, jobEvent, jobRead, user } from '#/db/schema'
 import { jobsMapLimit, jobsPageSize } from '../jobs.schemas'
 import { hasJobCoordinates } from '../jobs.rules'
 import type { JobSearch } from '../jobs.types'
@@ -25,6 +25,27 @@ export type JobsTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0]
 export const transactJobs = db.transaction.bind(db)
+function unreadJob(actorId: string) {
+  return sql<boolean>`${job.tracksReads} and not exists (select 1 from ${jobRead} where ${jobRead.userId} = ${actorId} and ${jobRead.jobId} = ${job.id})`
+}
+export async function hasUnreadJobs(tx: JobsTransaction, actorId: string) {
+  const rows = await tx
+    .select({ id: job.id })
+    .from(job)
+    .where(unreadJob(actorId))
+    .limit(1)
+  return rows.length > 0
+}
+export async function markJobRead(
+  tx: JobsTransaction,
+  actorId: string,
+  jobId: string,
+) {
+  await tx
+    .insert(jobRead)
+    .values({ userId: actorId, jobId })
+    .onConflictDoNothing()
+}
 /** Selected roles opt in to all job notifications; active-account and job-read checks remain independent. */
 export async function jobNotificationCandidates(
   tx: JobsTransaction,
@@ -141,6 +162,9 @@ export async function listJobs(
     search.status !== 'all' ? eq(job.status, search.status) : undefined,
     search.kind !== 'all' ? eq(job.kind, search.kind) : undefined,
     search.scope === 'mine' ? eq(job.assigneeId, actorId) : undefined,
+    search.scope === 'related'
+      ? or(eq(job.createdBy, actorId), eq(job.assigneeId, actorId))
+      : undefined,
   )
   const order =
     search.sort === 'title'
@@ -153,7 +177,7 @@ export async function listJobs(
             ? [sql`${job.deadline} desc nulls last`, asc(job.id)]
             : [desc(job.createdAt), desc(job.id)]
   const items = await tx
-    .select(summaryColumns)
+    .select({ ...summaryColumns, isUnread: unreadJob(actorId) })
     .from(job)
     .leftJoin(assignee, eq(job.assigneeId, assignee.id))
     .where(where)
@@ -166,6 +190,9 @@ export async function listJobs(
       title: job.title,
       kind: job.kind,
       status: job.status,
+      deadline: job.deadline,
+      createdAt: job.createdAt,
+      isUnread: unreadJob(actorId),
       longitude: job.longitude,
       latitude: job.latitude,
     })
@@ -192,6 +219,7 @@ export async function readJob(tx: JobsTransaction, id: string) {
       .select({
         ...summaryColumns,
         notes: job.notes,
+        createdBy: job.createdBy,
         creatorName: creator.name,
         streetNameKa: job.streetNameKa,
         streetNameEn: job.streetNameEn,

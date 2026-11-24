@@ -1,7 +1,11 @@
 import '@tanstack/react-start/server-only'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { currentAuthorization } from '#/lib/authorization/permissions'
-import { allowedJobTransitions, canManageJobs } from '../jobs.rules'
+import {
+  allowedJobTransitions,
+  canManageJobs,
+  canManageJobDetails,
+} from '../jobs.rules'
 import { currentIdentity } from './jobs.repository.server'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobsTransaction } from './jobs.repository.server'
@@ -24,9 +28,12 @@ export async function requireJobActor(
 export function assertJobManager(actor: Actor) {
   if (!canManageJobs(actor)) throw new AuthorizationError()
 }
+export function assertJobEditor(actor: Actor, record: { createdBy: string }) {
+  if (!canManageJobDetails(actor, record)) throw new AuthorizationError()
+}
 export function assertJobTransition(
   actor: Actor,
-  record: { status: JobStatus; assigneeId: string | null },
+  record: { status: JobStatus; assigneeId: string | null; createdBy: string },
   status: JobStatus,
 ) {
   if (!allowedJobTransitions(actor, record).includes(status))

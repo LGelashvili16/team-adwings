@@ -19,6 +19,8 @@ import {
 } from './server/job-locations.service.server'
 import {
   createCompanyJob,
+  getUnreadCompanyJobs,
+  acknowledgeCompanyJob,
   editCompanyJob,
   getCompanyJob,
   listCompanyJobs,
@@ -49,6 +51,15 @@ export const readJobs = createServerFn({ method: 'GET' })
   .validator(jobSearchSchema)
   .handler(({ context, data }) =>
     safely(() => listCompanyJobs(context.actor, data)),
+  )
+export const readUnreadJobs = createServerFn({ method: 'GET' })
+  .middleware([authenticatedMiddleware])
+  .handler(({ context }) => safely(() => getUnreadCompanyJobs(context.actor)))
+export const markJobRead = createServerFn({ method: 'POST' })
+  .middleware([authenticatedMiddleware])
+  .validator(jobLookupSchema)
+  .handler(({ context, data }) =>
+    safely(() => acknowledgeCompanyJob(context.actor, data)),
   )
 // Search may populate a shared cache and reserve provider capacity, so it is an explicit POST action.
 export const findJobLocations = createServerFn({ method: 'POST' })

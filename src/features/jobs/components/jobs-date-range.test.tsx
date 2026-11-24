@@ -28,7 +28,7 @@ it('keeps the portalled calendar submission separate from the filter form', asyn
   await userEvent.click(
     screen.getByRole('button', { name: /სამუშაოების შექმნის პერიოდი/ }),
   )
-  await userEvent.click(screen.getByRole('button', { name: 'გამოყენება' }))
+  await userEvent.click(screen.getByRole('button', { name: 'პერიოდის არჩევა' }))
   expect(onChange).toHaveBeenCalledExactlyOnceWith({
     from: '2026-11-01',
     to: '2026-11-30',
@@ -73,7 +73,7 @@ it('applies a custom range only after confirmation and restores external URL ran
     screen.getByRole('button', { name: '14 ნოემბერი 2026' }),
   )
   expect(onChange).not.toHaveBeenCalled()
-  await userEvent.click(screen.getByRole('button', { name: 'გამოყენება' }))
+  await userEvent.click(screen.getByRole('button', { name: 'პერიოდის არჩევა' }))
   expect(onChange).toHaveBeenCalledWith(
     {
       ...search,
@@ -93,7 +93,7 @@ it('applies a custom range only after confirmation and restores external URL ran
   )
   view.rerender(<JobsFilters search={restored} onChange={onChange} />)
   expect(
-    screen.queryByRole('button', { name: 'გამოყენება' }),
+    screen.queryByRole('button', { name: 'პერიოდის არჩევა' }),
   ).not.toBeInTheDocument()
   expect(
     screen.getByRole('button', {

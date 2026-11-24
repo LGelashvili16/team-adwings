@@ -16,6 +16,7 @@ import {
 } from '../jobs.rules'
 import {
   assertJobManager,
+  assertJobEditor,
   assertJobTransition,
   requireJobActor,
 } from './jobs.policy.server'
@@ -52,6 +53,10 @@ export async function listCompanyJobs(
       const result = await repository.listJobs(tx, current.id, search)
       return {
         ...result,
+        markers: result.markers.map((marker) => ({
+          ...marker,
+          createdAt: marker.createdAt.toISOString(),
+        })),
         items: result.items.map((item) => ({
           ...item,
           createdAt: item.createdAt.toISOString(),
@@ -85,6 +90,29 @@ export async function getCompanyJob(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
+}
+export async function getUnreadCompanyJobs(actor: Actor | null) {
+  return repository.transactJobs(
+    async (tx) => {
+      const current = await requireJobActor(tx, actor)
+      return { hasUnread: await repository.hasUnreadJobs(tx, current.id) }
+    },
+    { accessMode: 'read only' },
+  )
+}
+export async function acknowledgeCompanyJob(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { id } = validateInput(jobLookupSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    const record = await repository.readJob(tx, id)
+    if (!record) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
+    await repository.markJobRead(tx, current.id, id)
+    await signalRealtime(tx, { topic: 'jobs', recipientId: current.id })
+    return { id }
+  })
 }
 export async function createCompanyJob(actor: Actor | null, input: unknown) {
   const data = validateInput(createJobSchema, input)
@@ -146,8 +174,9 @@ async function currentJob(
 export async function editCompanyJob(actor: Actor | null, input: unknown) {
   const data = validateInput(editJobSchema, input)
   const before = await repository.transactJobs(async (tx) => {
-    assertJobManager(await requireJobActor(tx, actor))
+    const current = await requireJobActor(tx, actor)
     const record = await currentJob(tx, data.id, data.version)
+    assertJobEditor(current, record)
     if (record.status === 'completed' || record.status === 'rejected')
       throw new JobWorkflowError('რედაქტირებამდე სამუშაო თავიდან დაგეგმეთ.')
     return record
@@ -160,8 +189,8 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
     needsLookup && hasJobCoordinates(data) ? await resolveJobStreet(data) : null
   return repository.transactJobs(async (tx) => {
     const current = await requireJobActor(tx, actor, true)
-    assertJobManager(current)
     const record = await currentJob(tx, data.id, data.version)
+    assertJobEditor(current, record)
     if (record.status === 'completed' || record.status === 'rejected')
       throw new JobWorkflowError('რედაქტირებამდე სამუშაო თავიდან დაგეგმეთ.')
     const materialChange =
@@ -237,7 +266,9 @@ export async function transitionCompanyJob(
         ? null
         : record.status === 'pending' && data.status === 'en_route'
           ? current.id
-          : record.assigneeId
+          : data.status === 'completed' && record.assigneeId === null
+            ? current.id
+            : record.assigneeId
     await repository.updateJob(tx, record.id, {
       status: data.status,
       assigneeId,

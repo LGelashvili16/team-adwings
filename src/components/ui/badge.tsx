@@ -23,6 +23,8 @@ const badgeVariants = cva(
           'bg-badge-orange-vivid text-badge-orange-vivid-foreground [a]:hover:bg-badge-orange-vivid/80',
         blue: 'bg-badge-blue text-badge-blue-foreground [a]:hover:bg-badge-blue/80',
         sky: 'bg-badge-sky text-badge-sky-foreground [a]:hover:bg-badge-sky/80',
+        'red-vivid':
+          'bg-badge-red-vivid text-badge-red-vivid-foreground [a]:hover:bg-badge-red-vivid/80',
         lavender:
           'bg-badge-lavender text-badge-lavender-foreground [a]:hover:bg-badge-lavender/80',
         purple:
