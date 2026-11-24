@@ -1,4 +1,7 @@
-import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
+import {
+  deliverNotificationBatch,
+  deliverNotifications,
+} from '#/features/notifications/server/notifications.service.server'
 import { readJobNotificationRoles } from '#/features/notifications/server/notification-settings.service.server'
 import { signalRealtime } from '#/lib/realtime/postgres-events.server'
 import '@tanstack/react-start/server-only'
@@ -164,6 +167,7 @@ export async function saveCompanyJobAssignments(
       eventKey: `job:${record.id}:${record.version + 1}:assignments`,
       title: 'სამუშაოს შემსრულებლები შეიცვალა',
       body: 'გადაამოწმეთ სამუშაოზე დამატებული თანამშრომლები, გუნდი და GPS მოწყობილობა.',
+      assignmentChange: { before, after },
     })
     return { id: record.id }
   })
@@ -433,7 +437,7 @@ const jobStatusNotificationTitles = {
   rejected: 'სამუშაო უარყოფილია',
 }
 
-/** Each job change uses one policy and one deduplicated delivery path inside the owning transaction. */
+/** Personal assignment alerts and configured broadcasts share one transaction and event identity. */
 async function notifyJobEvent(
   tx: repository.JobsTransaction,
   actor: Actor,
@@ -442,21 +446,48 @@ async function notifyJobEvent(
     eventKey: string
     title: string
     body: string
+    assignmentChange?: { before: JobAssignments; after: JobAssignments }
   },
 ) {
   const roles = await readJobNotificationRoles(tx)
-  if (!roles.length) return
+  if (!roles.length && !event.assignmentChange) return
   const job = await repository.jobNotificationDetails(tx, event.jobId)
   if (!job) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
-  const body = [
+  const details = [
     `სამუშაო: ${job.title}`,
     `შემქმნელი: ${job.creatorName}`,
     `მისამართი: ${job.address || 'არ არის მითითებული'}`,
     ...(job.deadline ? [`ვადა: ${formatJobDay(job.deadline)}`] : []),
-    event.body,
   ]
-    .join('\n')
-    .slice(0, 2000)
+  const destination = { kind: 'job' as const, jobId: event.jobId }
+  if (event.assignmentChange) {
+    const { before, after } = event.assignmentChange
+    const beforeIds = new Set(before.employees.map((person) => person.id))
+    const afterIds = new Set(after.employees.map((person) => person.id))
+    const personal = {
+      eventKey: event.eventKey,
+      actorId: actor.id,
+      body: [...details, `ცვლილება შეასრულა: ${actor.name}`]
+        .join('\n')
+        .slice(0, 2000),
+      destination,
+    }
+    // Deliver personal messages first; event deduplication suppresses the generic message for the same recipient.
+    await deliverNotificationBatch(tx, [
+      {
+        ...personal,
+        recipientIds: [...afterIds].filter((id) => !beforeIds.has(id)),
+        title: 'სამუშაოზე დაგამატეს',
+      },
+      {
+        ...personal,
+        recipientIds: [...beforeIds].filter((id) => !afterIds.has(id)),
+        title: 'სამუშაოდან მოგხსნეს',
+      },
+    ])
+  }
+  if (!roles.length) return
+  const body = [...details, event.body].join('\n').slice(0, 2000)
   const includeOwn = actor.roles.some(
     (role) => role === 'admin' || role === 'owner',
   )
@@ -467,7 +498,7 @@ async function notifyJobEvent(
       eventKey: event.eventKey,
       title: event.title,
       body,
-      destination: { kind: 'job' as const, jobId: event.jobId },
+      destination,
     }
     await deliverNotifications(tx, {
       ...delivery,

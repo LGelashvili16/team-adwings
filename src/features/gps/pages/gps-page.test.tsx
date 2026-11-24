@@ -391,7 +391,7 @@ it('shows the Georgian search placeholder and clears the search input', async ()
   expect(onSearch).toHaveBeenCalledWith({ q: '' }, true)
 })
 
-it('validates optional phone numbers when editing a GPS device', async () => {
+it('requires a valid phone number when editing a GPS device', async () => {
   const withPhone = { ...tracker, phone: '+995 555 12 34 56', version: 2 }
   getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
   saveDevice.mockReset().mockImplementation(async () => {
@@ -409,8 +409,13 @@ it('validates optional phone numbers when editing a GPS device', async () => {
   const phoneInput = within(editor).getByRole('textbox', {
     name: 'ტელეფონის ნომერი',
   })
-  expect(phoneInput).not.toBeRequired()
+  expect(phoneInput).toBeRequired()
   expect(within(editor).getByText('+995')).toBeVisible()
+  await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
+  expect(
+    await within(editor).findByText('მიუთითეთ ტელეფონის ნომერი.'),
+  ).toBeVisible()
+  expect(saveDevice).not.toHaveBeenCalled()
   await user.type(phoneInput, '123')
   await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
   expect(

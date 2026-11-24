@@ -63,8 +63,9 @@ export type JobAssignmentPerson = {
   name: string
   jobTitle: string | null
 }
-/** Device metadata is returned only for authorized GPS picker candidates. */
+/** Picker metadata is returned only for authorized assignment candidates. */
 export type JobAssignmentCandidate = JobAssignmentPerson & {
+  memberCount?: number
   reportedId?: string
   phone?: string | null
 }

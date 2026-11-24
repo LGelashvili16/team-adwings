@@ -114,7 +114,22 @@ export async function assignmentCandidates(
       ilike(productionTeam.name, term),
     )
     const items = await tx
-      .select({ id: productionTeam.id, name: productionTeam.name })
+      .select({
+        id: productionTeam.id,
+        name: productionTeam.name,
+        memberCount: sql<number>`(${tx
+          .select({ value: count() })
+          .from(teamMembership)
+          .innerJoin(employee, eq(employee.userId, teamMembership.userId))
+          .innerJoin(user, eq(user.id, employee.userId))
+          .where(
+            and(
+              eq(teamMembership.teamId, productionTeam.id),
+              isNull(teamMembership.endedAt),
+              eligibleEmployee,
+            ),
+          )})`.mapWith(Number),
+      })
       .from(productionTeam)
       .where(where)
       .orderBy(asc(productionTeam.name), asc(productionTeam.id))

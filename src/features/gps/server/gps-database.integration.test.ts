@@ -31,7 +31,7 @@ const reportedId = '009590038494'
 const settings = {
   name: 'საცდელი მოწყობილობა',
   reportedId,
-  phone: '',
+  phone: '+995 555 12 34 56',
   enabled: true,
 }
 const all = (input: { q?: string } = {}) =>

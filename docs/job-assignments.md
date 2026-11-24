@@ -8,6 +8,10 @@ Individual employees are the primary assignment. Each job can also reference one
 
 Eligible employees follow the existing production-team rule: active employment and account, with employee, production specialist, supervisor or sales manager roles; HR, admin and owner accounts are excluded even if they hold another eligible role. Only active teams and enabled GPS devices can be selected. A tracker may be associated with multiple jobs; this feature does not reserve devices or enforce scheduling conflicts.
 
+Each team picker row shows its current eligible member count, including zero for an empty team. Counts follow the same eligibility rules as team selection and exclude ended memberships.
+
+Saving a crew sends a personal in-app notification to each employee added to or removed from the saved crew, including employees added through team selection. These alerts are independent of the configured general job-notification roles. Unchanged members receive no personal assignment alert, and unsaved drafts and no-op saves send none. The notification links to the job and identifies it and the actor. Active-account and employment checks and actor self-notification suppression still apply. Personal alerts take precedence over a generic job-update alert for the same recipient and revision. Assignment changes, audit records, notifications and live inbox signals commit or roll back together.
+
 ## Implementation sequence
 
 1. Add `job_employee` with a composite primary key and an employee/job lookup index, plus nullable job team/device foreign keys. Extend immutable job events with before/after assignment snapshots.
