@@ -16,6 +16,7 @@ import type * as Service from './jobs.service.server'
 import type { db as Database } from '#/db'
 import type { Actor } from '#/lib/authorization/actor'
 import type { LocationFeature } from '../job-locations.types'
+import { defaultJobNotificationRoles } from '#/features/notifications/notification-settings.schemas'
 
 vi.mock('@tanstack/react-start/server-only', () => ({}))
 const geocoder = vi.hoisted(() => ({ enabled: false, request: vi.fn() }))
@@ -62,7 +63,7 @@ const fields = {
   notes: 'ინსტრუქცია',
   address: 'თბილისი',
   kind: 'installation',
-  deadline: null,
+  deadline: '2026-11-20',
   longitude: 44.8,
   latitude: 41.7,
 }
@@ -123,13 +124,52 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     await connection.connect()
     for (const file of readdirSync('drizzle')
       .filter((value) => /^\d+.*\.sql$/.test(value))
-      .sort())
+      .sort()) {
+      if (file === '0051_job_notification_roles.sql') {
+        await sql().query(
+          `INSERT INTO "user" (id, name, email, roles) VALUES ('migration-auditor', 'Migration test', 'migration@jobs.invalid', 'admin')`,
+        )
+        await sql().query(
+          `INSERT INTO notification_policy (id, job_created_enabled) VALUES ('company', false)`,
+        )
+        await sql().query(
+          `INSERT INTO notification_policy_audit (actor_id, before_enabled, after_enabled) VALUES ('migration-auditor', true, false)`,
+        )
+      }
       await sql().query(
         readFileSync(`drizzle/${file}`, 'utf8').replaceAll(
           '--> statement-breakpoint',
           '',
         ),
       )
+      if (file === '0051_job_notification_roles.sql') {
+        expect(
+          (
+            await sql().query(
+              'SELECT job_notification_roles FROM notification_policy',
+            )
+          ).rows,
+        ).toEqual([{ job_notification_roles: [] }])
+        expect(
+          (
+            await sql().query(
+              'SELECT before_enabled, after_enabled, before_roles, after_roles FROM notification_policy_audit',
+            )
+          ).rows,
+        ).toEqual([
+          {
+            before_enabled: true,
+            after_enabled: false,
+            before_roles: null,
+            after_roles: null,
+          },
+        ])
+        await sql().query(
+          'TRUNCATE notification_policy, notification_policy_audit',
+        )
+        await sql().query(`DELETE FROM "user" WHERE id='migration-auditor'`)
+      }
+    }
     process.env.DATABASE_URL = target.toString()
     service = await import('./jobs.service.server')
     database = (await import('#/db')).db
@@ -156,6 +196,9 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
   }, 30_000)
   beforeEach(async () => {
     await sql().query('TRUNCATE job_event, job')
+    await sql().query(
+      'TRUNCATE notification, notification_policy, notification_policy_audit',
+    )
     await sql().query('TRUNCATE job_geocoding_cache, job_geocoding_gate')
     geocoder.enabled = false
     geocoder.request.mockReset()
@@ -201,6 +244,32 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       }),
     ).rejects.toThrow('წვდომა')
   })
+  it.each(['', '   '])(
+    'rejects a blank address on direct create and edit calls: %j',
+    async (address) => {
+      const { id } = await createPin()
+      await expect(
+        service.createCompanyJob(manager, {
+          ...fields,
+          address,
+          requestId: randomUUID(),
+        }),
+      ).rejects.toThrow()
+      await expect(
+        service.editCompanyJob(manager, {
+          ...fields,
+          address,
+          longitude: null,
+          latitude: null,
+          id,
+          version: 1,
+        }),
+      ).rejects.toThrow()
+      expect((await sql().query('SELECT id FROM job')).rows).toHaveLength(1)
+      expect((await detail(id)).address).toBe(fields.address)
+      expect((await detail(id)).history).toHaveLength(1)
+    },
+  )
   it('stores unlocated jobs without geocoding and permits production staff to read and progress their own work', async () => {
     geocoder.enabled = true
     const { id } = await createPin({ longitude: null, latitude: null })
@@ -548,7 +617,15 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     })
     expect(await detail(id)).toMatchObject({ deadline: null, version: 3 })
     expect((await detail(id)).history).toHaveLength(3)
-    expect((await detail((await createPin()).id)).deadline).toBeNull()
+    await expect(createPin({ deadline: null })).rejects.toThrow(
+      'მოთხოვნა არასწორია',
+    )
+    await expect(
+      service.createCompanyJob(manager, {
+        ...withoutDeadline,
+        requestId: randomUUID(),
+      }),
+    ).rejects.toThrow('მოთხოვნა არასწორია')
   })
   it('blocks foreign creates and location edits through direct service calls', async () => {
     const { id } = await createPin()
@@ -568,6 +645,38 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     expect(record.version).toBe(1)
     expect(record.history).toHaveLength(1)
     expect((await service.listCompanyJobs(worker, search)).total).toBe(1)
+  })
+  it('sorts deadlines across pages in both directions with missing deadlines last', async () => {
+    const early = await createPin({ deadline: '2026-11-01' })
+    const late = await createPin({ deadline: '2026-11-30' })
+    const missing = await createPin()
+    const tiedIds = []
+    for (let index = 0; index < 12; index++)
+      tiedIds.push((await createPin({ deadline: '2026-11-15' })).id)
+    tiedIds.sort()
+
+    for (const sort of ['deadline_asc', 'deadline_desc']) {
+      const first = await service.listCompanyJobs(worker, {
+        ...search,
+        view: 'list',
+        sort,
+      })
+      const second = await service.listCompanyJobs(worker, {
+        ...search,
+        view: 'list',
+        sort,
+        page: 2,
+      })
+      expect(first.total).toBe(15)
+      expect(first.items).toHaveLength(12)
+      expect(second.items).toHaveLength(3)
+      expect([...first.items, ...second.items].map((item) => item.id)).toEqual([
+        sort === 'deadline_asc' ? early.id : late.id,
+        ...tiedIds,
+        sort === 'deadline_asc' ? late.id : early.id,
+        missing.id,
+      ])
+    }
   })
   it('filters, sorts and paginates in SQL with consistent counts and escaped wildcards', async () => {
     for (let index = 0; index < 14; index++)
@@ -829,47 +938,242 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     )
     expect(await repository.reserveLocationRequest('test-provider')).toBeNull()
   })
-  it('notifies only the currently permitted creator and affected assignee, including prior assignee on reopen', async () => {
-    await sql().query('DELETE FROM notification')
+  it('notifies selected roles for status changes and applies changes to the policy immediately', async () => {
+    const settings =
+      await import('#/features/notifications/server/notification-settings.service.server')
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: ['supervisor'],
+    })
     const { id } = await createPin()
-    expect(
-      (await sql().query('SELECT id FROM notification')).rows,
-    ).toHaveLength(0)
     await transition(id, 'en_route')
     expect(
       (await sql().query('SELECT recipient_id FROM notification')).rows,
     ).toEqual([{ recipient_id: manager.id }])
-    await transition(id, 'on_site', manager)
-    expect(
-      (await sql().query('SELECT recipient_id FROM notification')).rows.map(
-        (row) => row.recipient_id,
-      ),
-    ).toEqual([manager.id, worker.id])
-    await transition(id, 'pending', manager, 'ხელახლა დაგეგმვა')
-    const notices = (
-      await sql().query('SELECT recipient_id, title FROM notification')
-    ).rows
-    expect(notices.at(-1)).toEqual({
-      recipient_id: worker.id,
-      title: 'სამუშაო თავიდან დაიგეგმა',
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: ['production_specialist'],
     })
+    await transition(id, 'on_site', manager)
+    const recipients = (
+      await sql().query(
+        "SELECT recipient_id FROM notification WHERE title='თანამშრომელი ადგილზე მივიდა' ORDER BY recipient_id",
+      )
+    ).rows.map((row) => row.recipient_id)
+    expect(recipients).toEqual([other.id, production.id, worker.id].sort())
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: [],
+    })
+    const count = (await sql().query('SELECT id FROM notification')).rows.length
+    await transition(id, 'pending', manager, 'ხელახლა დაგეგმვა')
+    expect(
+      (await sql().query('SELECT id FROM notification')).rows,
+    ).toHaveLength(count)
+  })
+  it('defaults creation alerts on, excludes the creator and readers, and deduplicates retries', async () => {
+    const requestId = randomUUID()
+    const result = await service.createCompanyJob(manager, {
+      ...fields,
+      requestId,
+    })
+    await service.createCompanyJob(manager, { ...fields, requestId })
+    const notices = (
+      await sql().query(
+        'SELECT recipient_id, event_key, destination, body FROM notification ORDER BY recipient_id',
+      )
+    ).rows
+    expect(notices.map((row) => row.recipient_id)).toEqual(
+      [platformAdmin.id, other.id, production.id, worker.id].sort(),
+    )
+    expect(
+      notices.every(
+        (row) =>
+          row.event_key === `job:${result.id}:created` &&
+          row.destination.jobId === result.id,
+      ),
+    ).toBe(true)
+    expect(
+      notices.every(
+        (row) =>
+          row.body.includes(`სამუშაო: ${fields.title}`) &&
+          row.body.includes(`შემქმნელი: ${manager.name}`) &&
+          row.body.includes(`მისამართი: ${fields.address}`),
+      ),
+    ).toBe(true)
+    expect(
+      (await service.listCompanyJobs(worker, search)).items.some(
+        (item) => item.id === result.id,
+      ),
+    ).toBe(true)
+  })
+  it('delivers a sales-manager job to every selected account through independent live inbox streams', async () => {
+    const sales = actor('jobs-live-sales', ['sales_manager'])
     await sql().query(
-      `UPDATE "user" SET permission_overrides='{"allow":[],"deny":["jobs.manage"]}' WHERE id=$1`,
-      [manager.id],
+      'INSERT INTO "user" (id,name,email,roles) VALUES ($1,$1,$2,$3)',
+      [sales.id, 'live-sales@jobs.invalid', 'sales_manager'],
+    )
+    const { eventStreamResponse } =
+      await import('#/lib/realtime/event-stream.server')
+    const { notificationRealtimeHandler } =
+      await import('#/features/notifications/server/notifications-stream.server')
+    const recipients = [manager, platformAdmin, worker, other, production]
+    const readers: Array<ReadableStreamDefaultReader<Uint8Array>> = []
+    const ready: Array<Promise<void>> = []
+    try {
+      for (const recipient of recipients) {
+        let snapshots = 0
+        let connected = () => {}
+        ready.push(
+          new Promise<void>((resolve) => {
+            connected = resolve
+          }),
+        )
+        const response = eventStreamResponse(
+          new Request('http://localhost/api/events'),
+          {
+            authorized: async () => true,
+            accepts: (signal) => signal.recipientId === recipient.id,
+            snapshot: async () => {
+              if (++snapshots === 2) connected()
+              return null
+            },
+            changed: (signal) =>
+              notificationRealtimeHandler.changed(recipient, signal),
+          },
+        )
+        if (!response.body) throw new Error('Missing event stream')
+        const reader = response.body.getReader()
+        readers.push(reader)
+        await reader.read()
+      }
+      // The first stream waits for the shared PostgreSQL listener; later streams may attach after it is already connected.
+      await ready[0]
+      const { id } = await service.createCompanyJob(sales, {
+        ...fields,
+        longitude: null,
+        latitude: null,
+        requestId: randomUUID(),
+      })
+      for (let index = 0; index < readers.length; index++) {
+        const frame = new TextDecoder().decode(
+          (await readers[index].read()).value,
+        )
+        expect(frame).toContain('event: notifications')
+        const data = JSON.parse(frame.split('data: ')[1])
+        expect(data.recipientId).toBe(recipients[index].id)
+        expect(data.notification.destination).toEqual({
+          kind: 'job',
+          jobId: id,
+        })
+        expect(data.notification.liveToast).toBe(true)
+      }
+      expect(
+        (
+          await sql().query(
+            'SELECT recipient_id FROM notification ORDER BY recipient_id',
+          )
+        ).rows.map((row) => row.recipient_id),
+      ).toEqual(recipients.map((recipient) => recipient.id).sort())
+    } finally {
+      await Promise.all(readers.map((reader) => reader.cancel()))
+      await sql().query('TRUNCATE job_event, job, notification')
+      await sql().query('DELETE FROM "user" WHERE id=$1', [sales.id])
+    }
+  }, 15_000)
+  it('respects selected roles and active account and employment status without granting job permissions', async () => {
+    await sql().query(
+      `UPDATE "user" SET permission_overrides='{"allow":[],"deny":["jobs.claim"]}' WHERE id=$1`,
+      [other.id],
+    )
+    await sql().query(`UPDATE "user" SET access_state='invited' WHERE id=$1`, [
+      production.id,
+    ])
+    await sql().query(
+      `UPDATE employee SET status='inactive' WHERE user_id=$1`,
+      [worker.id],
+    )
+    await sql().query(
+      `UPDATE "user" SET permission_overrides='{"allow":["jobs.manage"],"deny":[]}' WHERE id=$1`,
+      [ordinaryEmployee.id],
     )
     try {
-      await transition(id, 'en_route')
+      await createPin()
       expect(
-        (await sql().query('SELECT id FROM notification')).rows,
-      ).toHaveLength(3)
+        (
+          await sql().query(
+            'SELECT recipient_id FROM notification ORDER BY recipient_id',
+          )
+        ).rows.map((row) => row.recipient_id),
+      ).toEqual([platformAdmin.id, other.id].sort())
     } finally {
       await sql().query(
-        `UPDATE "user" SET permission_overrides='{"allow":[],"deny":[]}' WHERE id=$1`,
-        [manager.id],
+        `UPDATE "user" SET permission_overrides='{"allow":[],"deny":[]}', access_state='active' WHERE id=ANY($1::text[])`,
+        [[other.id, production.id, ordinaryEmployee.id]],
+      )
+      await sql().query(
+        `UPDATE employee SET status='active' WHERE user_id=$1`,
+        [worker.id],
       )
     }
   })
-  it('does not notify unchanged edits and emits one material edit notice without notifying unrelated managers', async () => {
+  it('allows only notification administrators to configure alerts and audits changes without hiding jobs', async () => {
+    const settings =
+      await import('#/features/notifications/server/notification-settings.service.server')
+    await expect(settings.readNotificationSettings(worker)).rejects.toThrow()
+    await expect(
+      settings.saveNotificationSettings(manager, { jobNotificationRoles: [] }),
+    ).rejects.toThrow()
+    await expect(
+      settings.saveNotificationSettings(platformAdmin, {
+        jobNotificationRoles: ['unknown-role'],
+      }),
+    ).rejects.toThrow()
+    expect(await settings.readNotificationSettings(platformAdmin)).toEqual({
+      jobNotificationRoles: defaultJobNotificationRoles,
+    })
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: [],
+    })
+    const { id } = await createPin()
+    expect(
+      (await sql().query('SELECT id FROM notification')).rows,
+    ).toHaveLength(0)
+    expect(
+      (await service.listCompanyJobs(worker, search)).items.some(
+        (item) => item.id === id,
+      ),
+    ).toBe(true)
+    expect(
+      (
+        await sql().query(
+          'SELECT actor_id, before_roles, after_roles FROM notification_policy_audit',
+        )
+      ).rows,
+    ).toEqual([
+      {
+        actor_id: platformAdmin.id,
+        before_roles: defaultJobNotificationRoles,
+        after_roles: [],
+      },
+    ])
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: [],
+    })
+    expect(
+      (await sql().query('SELECT id FROM notification_policy_audit')).rows,
+    ).toHaveLength(1)
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: defaultJobNotificationRoles,
+    })
+    await createPin()
+    expect(
+      (await sql().query('SELECT id FROM notification')).rows.length,
+    ).toBeGreaterThan(0)
+  })
+  it('does not notify unchanged edits and broadcasts edits to selected roles only', async () => {
+    const settings =
+      await import('#/features/notifications/server/notification-settings.service.server')
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: ['employee'],
+    })
     const { id } = await createPin({ longitude: null, latitude: null })
     await transition(id, 'en_route')
     await sql().query('DELETE FROM notification')
@@ -893,7 +1197,10 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       (await sql().query('SELECT recipient_id, destination FROM notification'))
         .rows,
     ).toEqual([
-      { recipient_id: worker.id, destination: { kind: 'job', jobId: id } },
+      {
+        recipient_id: ordinaryEmployee.id,
+        destination: { kind: 'job', jobId: id },
+      },
     ])
     await expect(
       service.editCompanyJob(manager, { ...edit, notes: 'სხვა' }),
@@ -902,6 +1209,117 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       (await sql().query('SELECT id FROM notification')).rows,
     ).toHaveLength(1)
   })
+  it('delivers every job event once for overlapping selected roles without granting mutation access', async () => {
+    const settings =
+      await import('#/features/notifications/server/notification-settings.service.server')
+    await settings.saveNotificationSettings(platformAdmin, {
+      jobNotificationRoles: ['employee', 'production_specialist'],
+    })
+    await sql().query(
+      `UPDATE "user" SET roles='employee,production_specialist' WHERE id=$1`,
+      [ordinaryEmployee.id],
+    )
+    try {
+      const { id } = await createPin({ longitude: null, latitude: null })
+      await service.editCompanyJob(manager, {
+        ...fields,
+        longitude: null,
+        latitude: null,
+        id,
+        version: 1,
+        title: 'განახლებული სათაური',
+      })
+      await transition(id, 'en_route')
+      const notices = (
+        await sql().query(
+          'SELECT event_key FROM notification WHERE recipient_id=$1',
+          [ordinaryEmployee.id],
+        )
+      ).rows
+      expect(notices).toHaveLength(3)
+      expect(new Set(notices.map((row) => row.event_key)).size).toBe(3)
+    } finally {
+      await sql().query(`UPDATE "user" SET roles='employee' WHERE id=$1`, [
+        ordinaryEmployee.id,
+      ])
+    }
+    const { id } = await createPin({ longitude: null, latitude: null })
+    await expect(
+      service.transitionCompanyJob(ordinaryEmployee, {
+        id,
+        version: 1,
+        status: 'en_route',
+        note: '',
+      }),
+    ).rejects.toThrow()
+  })
+  it.each(['admin', 'owner'] as const)(
+    'includes %s own actions in the inbox when selected, without duplicate action toasts',
+    async (role) => {
+      const settings =
+        await import('#/features/notifications/server/notification-settings.service.server')
+      await sql().query(
+        `UPDATE "user" SET roles=$1, permission_overrides='{"allow":["jobs.manage"],"deny":[]}' WHERE id=$2`,
+        [role, platformAdmin.id],
+      )
+      const current = actor(platformAdmin.id, [role])
+      try {
+        await settings.saveNotificationSettings(current, {
+          jobNotificationRoles: [role],
+        })
+        const input = {
+          ...fields,
+          longitude: null,
+          latitude: null,
+          requestId: randomUUID(),
+        }
+        const { id } = await service.createCompanyJob(current, input)
+        await service.createCompanyJob(current, input)
+        await service.editCompanyJob(current, {
+          ...fields,
+          longitude: null,
+          latitude: null,
+          id,
+          version: 1,
+          notes: 'შეცვლილი ინსტრუქცია',
+        })
+        await transition(id, 'en_route', current)
+        const notices = (
+          await sql().query(
+            'SELECT event_key, live_toast FROM notification WHERE recipient_id=$1',
+            [current.id],
+          )
+        ).rows
+        expect(notices).toHaveLength(3)
+        expect(new Set(notices.map((row) => row.event_key)).size).toBe(3)
+        expect(notices.every((row) => row.live_toast === false)).toBe(true)
+        await settings.saveNotificationSettings(current, {
+          jobNotificationRoles: ['employee'],
+        })
+        await service.editCompanyJob(current, {
+          ...fields,
+          longitude: null,
+          latitude: null,
+          id,
+          version: 3,
+          notes: 'შემდგომი ცვლილება',
+        })
+        expect(
+          (
+            await sql().query(
+              'SELECT id FROM notification WHERE recipient_id=$1',
+              [current.id],
+            )
+          ).rows,
+        ).toHaveLength(3)
+      } finally {
+        await sql().query(
+          `UPDATE "user" SET roles='admin', permission_overrides='{"allow":[],"deny":[]}' WHERE id=$1`,
+          [platformAdmin.id],
+        )
+      }
+    },
+  )
   it('rolls back a job claim and its history if notification delivery fails', async () => {
     const { id } = await createPin()
     await sql().query(
@@ -925,7 +1343,9 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     await sql().query('DELETE FROM notification')
     await transition(id, 'rejected', worker, 'ა'.repeat(2000))
     const notice = (
-      await sql().query('SELECT recipient_id, body FROM notification')
+      await sql().query(
+        "SELECT recipient_id, body FROM notification WHERE recipient_id = 'jobs-manager'",
+      )
     ).rows[0]
     expect(notice.recipient_id).toBe(manager.id)
     expect(notice.body.length).toBe(2000)

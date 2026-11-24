@@ -1,0 +1,38 @@
+<div id="pin-color-options" aria-label="Installation pin color alternatives">
+  <style>
+    #pin-color-options { color-scheme:light dark; color:light-dark(#303030,#eeeeee); font:14px/1.5 system-ui,sans-serif; }
+    #pin-color-options .options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:20px; }
+    #pin-color-options section { min-width:0; }
+    #pin-color-options h3 { font-size:14px; font-weight:500; margin:0 0 10px; }
+    #pin-color-options .sample { background:light-dark(#e6ecee,#304254); border-radius:14px; display:flex; align-items:center; justify-content:center; gap:24px; padding:28px 14px 34px; }
+    #pin-color-options .pin { position:relative; display:flex; align-items:center; justify-content:center; width:44px; height:44px; border:2px solid var(--ink); border-radius:16px; background:var(--fill); color:var(--ink); box-sizing:border-box; flex-shrink:0; }
+    #pin-color-options .pin::after { content:""; position:absolute; width:14px; height:14px; background:var(--fill); border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); border-bottom-right-radius:3px; bottom:-7px; left:50%; transform:translateX(-50%) rotate(45deg); box-sizing:border-box; }
+    #pin-color-options .pin svg { position:relative; z-index:1; width:20px; height:20px; }
+    #pin-color-options .measure { --fill:#ff8a1f; --ink:#431407; }
+    #pin-color-options .other { --fill:light-dark(#ede9fe,#2e1065); --ink:light-dark(#5b21b6,#c4b5fd); }
+    #pin-color-options .cyan { --fill:#00d5ff; --ink:#083344; }
+    #pin-color-options .blue { --fill:#2563eb; --ink:#ffffff; }
+    #pin-color-options .turquoise { --fill:#00e5bd; --ink:#043d36; }
+    #pin-color-options .mint { --fill:#32ed8b; --ink:#073c25; }
+    #pin-color-options .lime { --fill:#b6f51b; --ink:#243706; }
+    #pin-color-options .lemon { --fill:#ffe600; --ink:#422900; }
+    #pin-color-options .pink { --fill:#ff3c9e; --ink:#500724; }
+    #pin-color-options .fuchsia { --fill:#e832ee; --ink:#3b0764; }
+    #pin-color-options .cherry { --fill:#fb3b57; --ink:#4c0519; }
+    #pin-color-options .legend { display:flex; flex-wrap:wrap; gap:8px 20px; margin-top:18px; color:light-dark(#575757,#bdbdbd); font-size:12px; }
+    #pin-color-options .legend span { display:inline-flex; align-items:center; gap:7px; }
+    #pin-color-options .dot { display:inline-block; width:10px; height:10px; border-radius:50%; }
+  </style>
+  <div class="options">
+    <section><h3>Electric blue</h3><div class="sample" role="img" aria-label="Electric blue installation, orange measurement, violet other work"><span class="pin blue"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Neon cyan</h3><div class="sample" role="img" aria-label="Neon cyan installation, orange measurement, violet other work"><span class="pin cyan"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Turquoise</h3><div class="sample" role="img" aria-label="Turquoise installation, orange measurement, violet other work"><span class="pin turquoise"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Mint green</h3><div class="sample" role="img" aria-label="Mint green installation, orange measurement, violet other work"><span class="pin mint"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Lime</h3><div class="sample" role="img" aria-label="Lime installation, orange measurement, violet other work"><span class="pin lime"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Lemon</h3><div class="sample" role="img" aria-label="Lemon installation, orange measurement, violet other work"><span class="pin lemon"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Hot pink</h3><div class="sample" role="img" aria-label="Hot pink installation, orange measurement, violet other work"><span class="pin pink"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Fuchsia</h3><div class="sample" role="img" aria-label="Fuchsia installation, orange measurement, violet other work"><span class="pin fuchsia"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+    <section><h3>Cherry red</h3><div class="sample" role="img" aria-label="Cherry red installation, orange measurement, violet other work"><span class="pin cherry"><i data-lucide="wrench" aria-hidden="true"></i></span><span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span><span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span></div></section>
+  </div>
+  <div class="legend"><span>Wrench: installation</span><span><b class="dot" style="background:#ff8a1f"></b>Ruler: measurement</span><span><b class="dot" style="background:light-dark(#5b21b6,#c4b5fd)"></b>Briefcase: other work</span></div>
+</div>

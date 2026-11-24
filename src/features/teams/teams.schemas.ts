@@ -57,13 +57,11 @@ export const teamRevisionSchema = teamLookupSchema.extend({
 })
 export const teamCandidatesSchema = z.object({
   q: teamSearchSchema.shape.q,
-  jobTitle: teamSearchSchema.shape.q,
   page: teamSearchSchema.shape.page,
   roles: teamRoleFilterSchema.default(['production_specialist']),
 })
 export const teamCandidateFiltersSchema = z.object({
   q: teamSearchFormSchema.shape.q,
-  jobTitle: teamSearchFormSchema.shape.q,
   roles: teamRoleFilterSchema,
 })
 export type TeamCandidateSearch = z.infer<typeof teamCandidatesSchema>

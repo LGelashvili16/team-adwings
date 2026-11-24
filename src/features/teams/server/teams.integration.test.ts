@@ -346,7 +346,7 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
       )
     }
   })
-  it('returns the first 20 eligible specialists and filters job titles on the server', async () => {
+  it('paginates eligible specialists and searches names, usernames or job titles on the server', async () => {
     for (let index = 0; index < 25; index++) {
       const id = `teams-scroll-${index}`
       await connection.query(
@@ -364,15 +364,17 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
     await connection.query(
       "UPDATE \"user\" SET access_state = 'suspended' WHERE id = 'teams-scroll-1'",
     )
+    await connection.query(
+      'UPDATE employee SET full_name = $1, username = $2 WHERE user_id = $3',
+      ['სახელის უნიკალური ნიმუში', 'unique-worker-login', 'teams-scroll-2'],
+    )
     const first = await service.readTeamCandidates(actor, {
       q: '',
-      jobTitle: '',
       roles: ['production_specialist'],
       page: 1,
     })
     const second = await service.readTeamCandidates(actor, {
       q: '',
-      jobTitle: '',
       roles: ['production_specialist'],
       page: 2,
     })
@@ -391,8 +393,7 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
       ),
     ).toBe(false)
     const filtered = await service.readTeamCandidates(actor, {
-      q: 'teams-scroll',
-      jobTitle: 'მემონტაჟე',
+      q: 'მემონტაჟე',
       roles: ['production_specialist'],
       page: 1,
     })
@@ -400,11 +401,20 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
     expect(filtered.items.every((item) => item.jobTitle === 'მემონტაჟე')).toBe(
       true,
     )
+    for (const q of ['სახელის უნიკალური', 'unique-worker-login']) {
+      const matches = await service.readTeamCandidates(actor, {
+        q,
+        roles: ['production_specialist'],
+        page: 1,
+      })
+      expect(matches.items.map((item) => item.userId)).toEqual([
+        'teams-scroll-2',
+      ])
+    }
     expect(
       (
         await service.readTeamCandidates(actor, {
           q: '%',
-          jobTitle: '',
           roles: ['production_specialist'],
           page: 1,
         })
@@ -413,14 +423,13 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
     await expect(
       service.readTeamCandidates(
         { ...actor, id: 'teams-sales' },
-        { q: '', jobTitle: '', roles: ['production_specialist'], page: 1 },
+        { q: '', roles: ['production_specialist'], page: 1 },
       ),
     ).rejects.toThrow()
   })
   it('filters operational roles and rejects privileged members at the save boundary', async () => {
     const listed = await service.readTeamCandidates(actor, {
       q: '',
-      jobTitle: '',
       roles: [
         'employee',
         'production_specialist',
@@ -438,7 +447,6 @@ describe.runIf(enabled)('production teams against isolated PostgreSQL', () => {
       (
         await service.readTeamCandidates(actor, {
           q: '',
-          jobTitle: '',
           roles: [],
           page: 1,
         })

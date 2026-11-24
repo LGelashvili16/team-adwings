@@ -1,4 +1,5 @@
 import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
+import { readJobNotificationRoles } from '#/features/notifications/server/notification-settings.service.server'
 import { signalRealtime } from '#/lib/realtime/postgres-events.server'
 import '@tanstack/react-start/server-only'
 import {
@@ -23,6 +24,7 @@ import { resolveJobStreet } from './job-locations.service.server'
 import type { ResolvedLocation } from '../job-locations.types'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobDetail, JobsWorkspace } from '../jobs.types'
+import { formatJobDay } from '../jobs.dates'
 
 function validateInput<T>(
   schema: {
@@ -113,6 +115,12 @@ export async function createCompanyJob(actor: Actor | null, input: unknown) {
         action: 'created',
         status: 'pending',
       })
+      await notifyJobEvent(tx, current, {
+        jobId: record.id,
+        eventKey: `job:${record.id}:created`,
+        title: 'ახალი სამუშაო დაემატა',
+        body: 'ახალი სამუშაო ხელმისაწვდომია. დეტალების სანახავად გახსენით სამუშაო.',
+      })
     }
     return {
       id: record.id,
@@ -189,14 +197,12 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
       status: record.status,
     })
     await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
-    if (materialChange && record.assigneeId)
-      await deliverNotifications(tx, {
+    if (changed)
+      await notifyJobEvent(tx, current, {
         eventKey: `job:${record.id}:${record.version + 1}:edited`,
-        recipientIds: [record.assigneeId],
-        actorId: current.id,
+        jobId: record.id,
         title: 'სამუშაოს დეტალები შეიცვალა',
         body: 'გადაამოწმეთ სამუშაოს მისამართი, ვადა და ინსტრუქცია.',
-        destination: { kind: 'job', jobId: record.id },
       })
     return {
       id: record.id,
@@ -245,25 +251,14 @@ export async function transitionCompanyJob(
       note: data.note,
     })
     await signalRealtime(tx, { topic: 'jobs', subjectId: record.id })
-    const recipients = await repository.notificationCreator(
-      tx,
-      record.createdBy,
-    )
-    await deliverNotifications(tx, {
+    await notifyJobEvent(tx, current, {
+      jobId: record.id,
       eventKey: `job:${record.id}:${record.version + 1}:${data.status}`,
-      recipientIds: [
-        ...recipients,
-        ...[record.assigneeId, assigneeId].filter((id): id is string =>
-          Boolean(id),
-        ),
-      ],
-      actorId: current.id,
       title: jobStatusNotificationTitles[data.status],
       body: `${record.title}${data.note ? `. ${data.note}` : ''}`.slice(
         0,
         2000,
       ),
-      destination: { kind: 'job', jobId: record.id },
     })
     return { id: record.id }
   })
@@ -275,4 +270,57 @@ const jobStatusNotificationTitles = {
   on_site: 'თანამშრომელი ადგილზე მივიდა',
   completed: 'სამუშაო დასრულდა',
   rejected: 'სამუშაო უარყოფილია',
+}
+
+/** Each job change uses one policy and one deduplicated delivery path inside the owning transaction. */
+async function notifyJobEvent(
+  tx: repository.JobsTransaction,
+  actor: Actor,
+  event: {
+    jobId: string
+    eventKey: string
+    title: string
+    body: string
+  },
+) {
+  const roles = await readJobNotificationRoles(tx)
+  if (!roles.length) return
+  const job = await repository.jobNotificationDetails(tx, event.jobId)
+  if (!job) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
+  const body = [
+    `სამუშაო: ${job.title}`,
+    `შემქმნელი: ${job.creatorName}`,
+    `მისამართი: ${job.address || 'არ არის მითითებული'}`,
+    ...(job.deadline ? [`ვადა: ${formatJobDay(job.deadline)}`] : []),
+    event.body,
+  ]
+    .join('\n')
+    .slice(0, 2000)
+  const includeOwn = actor.roles.some(
+    (role) => role === 'admin' || role === 'owner',
+  )
+  let afterId: string | undefined
+  do {
+    const page = await repository.jobNotificationCandidates(tx, roles, afterId)
+    const delivery = {
+      eventKey: event.eventKey,
+      title: event.title,
+      body,
+      destination: { kind: 'job' as const, jobId: event.jobId },
+    }
+    await deliverNotifications(tx, {
+      ...delivery,
+      recipientIds: page.recipientIds,
+      actorId: actor.id,
+    })
+    if (includeOwn && page.recipientIds.includes(actor.id)) {
+      // The existing action toast confirms the write; keep the administrator's own inbox entry without a second toast.
+      await deliverNotifications(tx, {
+        ...delivery,
+        recipientIds: [actor.id],
+        liveToast: false,
+      })
+    }
+    afterId = page.afterId
+  } while (afterId)
 }

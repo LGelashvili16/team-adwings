@@ -23,6 +23,7 @@ export function JobDeadlinePicker({
   disabled,
   invalid,
   describedBy,
+  required = false,
 }: {
   value: string | null
   onChange: (date: string | null) => void
@@ -30,6 +31,7 @@ export function JobDeadlinePicker({
   disabled: boolean
   invalid: boolean
   describedBy?: string
+  required?: boolean
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -45,6 +47,7 @@ export function JobDeadlinePicker({
         id="job-deadline"
         disabled={disabled}
         aria-invalid={invalid}
+        aria-required={required}
         aria-describedby={describedBy}
         aria-label={value ? `ვადა: ${formatJobDay(value)}` : 'ვადა'}
         render={

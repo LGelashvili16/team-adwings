@@ -64,17 +64,131 @@ function provider(children: React.ReactNode) {
     </QueryClientProvider>,
   )
 }
+async function selectDeadline() {
+  await userEvent.click(screen.getByRole('button', { name: 'ვადა' }))
+  await userEvent.selectOptions(
+    await screen.findByRole('combobox', { name: 'წელი' }),
+    '2026',
+  )
+  await userEvent.selectOptions(
+    screen.getByRole('combobox', { name: 'თვე' }),
+    '10',
+  )
+  await userEvent.click(
+    screen.getByRole('button', { name: '20 ნოემბერი 2026' }),
+  )
+}
 describe('job forms and conflict recovery', () => {
   beforeEach(() => vi.resetAllMocks())
+  it('revalidates a late address suggestion after the first submit attempt', async () => {
+    let resolveLookup:
+      ((value: { ok: true; value: string }) => void) | undefined
+    functions.suggestJobAddress.mockImplementation(
+      () =>
+        new Promise<{ ok: true; value: string }>((resolve) => {
+          resolveLookup = resolve
+        }),
+    )
+    provider(
+      <JobEditor
+        actorId={actor.id}
+        position={{ longitude: 44.8, latitude: 41.7 }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    )
+    const user = userEvent.setup()
+    await user.type(
+      screen.getByRole('textbox', { name: 'სათაური' }),
+      'ახალი სამუშაო',
+    )
+    await user.click(screen.getByRole('button', { name: 'სამუშაოს დამატება' }))
+    expect(await screen.findByText('მიუთითეთ მისამართი.')).toBeVisible()
+    await act(async () => {
+      resolveLookup?.({ ok: true, value: 'თბილისი, ვაკე' })
+    })
+    await waitFor(() =>
+      expect(screen.queryByText('მიუთითეთ მისამართი.')).not.toBeInTheDocument(),
+    )
+    expect(screen.getByRole('textbox', { name: 'მისამართი' })).toHaveValue(
+      'თბილისი, ვაკე',
+    )
+  })
+  it('waits for submit before validating, then clears errors as the form is corrected', async () => {
+    provider(
+      <JobEditor actorId={actor.id} onClose={vi.fn()} onSaved={vi.fn()} />,
+    )
+    const user = userEvent.setup()
+    const title = screen.getByRole('textbox', { name: 'სათაური' })
+    const address = screen.getByRole('textbox', { name: 'მისამართი' })
+    await user.type(title, 'ა')
+    await user.tab()
+    expect(screen.queryByText('მიუთითეთ მისამართი.')).not.toBeInTheDocument()
+    expect(title).toHaveAttribute('aria-invalid', 'false')
+    await user.click(screen.getByRole('button', { name: 'სამუშაოს დამატება' }))
+    expect(await screen.findByText('მიუთითეთ მისამართი.')).toBeVisible()
+    await user.type(title, 'ხალი სამუშაო')
+    await user.type(address, 'თბილისი')
+    await waitFor(() =>
+      expect(screen.queryByText('მიუთითეთ მისამართი.')).not.toBeInTheDocument(),
+    )
+    expect(title).toHaveAttribute('aria-invalid', 'false')
+    expect(functions.createJob).not.toHaveBeenCalled()
+  })
+  it.each([false, true])(
+    'rejects an empty address when map coordinates are enabled: %s',
+    async (withCoordinates) => {
+      provider(
+        <JobEditor
+          actorId={actor.id}
+          job={withCoordinates ? { ...job, address: '' } : undefined}
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+        />,
+      )
+      const address = screen.getByRole('textbox', { name: 'მისამართი' })
+      expect(address).toBeRequired()
+      if (!withCoordinates)
+        await userEvent.type(
+          screen.getByRole('textbox', { name: 'სათაური' }),
+          'სატესტო სამუშაო',
+        )
+      await userEvent.type(address, '   ')
+      await userEvent.click(
+        screen.getByRole('button', {
+          name: withCoordinates ? 'შენახვა' : 'სამუშაოს დამატება',
+        }),
+      )
+      expect(await screen.findByText('მიუთითეთ მისამართი.')).toBeVisible()
+      expect(functions.createJob).not.toHaveBeenCalled()
+      expect(functions.editJob).not.toHaveBeenCalled()
+    },
+  )
   it('creates a job with a calendar deadline without submitting when a date is selected', async () => {
     functions.createJob.mockResolvedValue({ ok: true, value: { id: job.id } })
     provider(
       <JobEditor actorId={actor.id} onClose={vi.fn()} onSaved={vi.fn()} />,
     )
     await userEvent.type(
+      screen.getByRole('textbox', { name: 'მისამართი' }),
+      'თბილისი',
+    )
+    await userEvent.type(
       screen.getByRole('textbox', { name: 'სათაური' }),
       'აზომვის სამუშაო',
     )
+    expect(screen.getByRole('button', { name: 'ვადა' })).toHaveAttribute(
+      'aria-required',
+      'true',
+    )
+    expect(
+      screen.queryByText('მიუთითეთ სამუშაოს ვადა.'),
+    ).not.toBeInTheDocument()
+    await userEvent.click(
+      screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
+    )
+    expect(await screen.findByText('მიუთითეთ სამუშაოს ვადა.')).toBeVisible()
+    expect(functions.createJob).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'ვადა' }))
     // Navigate through the visible year/month controls instead of depending on today's month.
     await userEvent.selectOptions(
@@ -92,6 +206,9 @@ describe('job forms and conflict recovery', () => {
       screen.getByRole('button', { name: 'ვადა: 20 ნოემბერი, 2026' }),
     ).toBeInTheDocument()
     expect(functions.createJob).not.toHaveBeenCalled()
+    expect(
+      screen.queryByText('მიუთითეთ სამუშაოს ვადა.'),
+    ).not.toBeInTheDocument()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -136,9 +253,14 @@ describe('job forms and conflict recovery', () => {
       screen.getByRole('combobox', { name: 'სამუშაოს ტიპი' }),
     ).toHaveTextContent('სხვა სამუშაო')
     await userEvent.type(
+      screen.getByRole('textbox', { name: 'მისამართი' }),
+      'თბილისი',
+    )
+    await userEvent.type(
       screen.getByRole('textbox', { name: 'სათაური' }),
       'სატესტო სხვა სამუშაო',
     )
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -183,6 +305,7 @@ describe('job forms and conflict recovery', () => {
       screen.getByRole('textbox', { name: 'სათაური' }),
       'ახალი მონტაჟი',
     )
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -300,6 +423,7 @@ describe('job forms and conflict recovery', () => {
       screen.getByRole('textbox', { name: 'სათაური' }),
       'ახალი მონტაჟი',
     )
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -378,6 +502,10 @@ describe('job forms and conflict recovery', () => {
     provider(
       <JobEditor actorId={actor.id} onClose={vi.fn()} onSaved={vi.fn()} />,
     )
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'მისამართი' }),
+      'თბილისი',
+    )
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -400,6 +528,7 @@ describe('job forms and conflict recovery', () => {
       screen.getByRole('spinbutton', { name: 'გრძედი' }),
       '44.8',
     )
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -416,9 +545,14 @@ describe('job forms and conflict recovery', () => {
     )
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
     await userEvent.type(
+      screen.getByRole('textbox', { name: 'მისამართი' }),
+      'თბილისი',
+    )
+    await userEvent.type(
       screen.getByRole('textbox', { name: 'სათაური' }),
       'ახალი აზომვა',
     )
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )
@@ -432,6 +566,10 @@ describe('job forms and conflict recovery', () => {
     functions.createJob.mockResolvedValue({ ok: true, value: { id: job.id } })
     provider(
       <JobEditor actorId={actor.id} onClose={vi.fn()} onSaved={vi.fn()} />,
+    )
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'მისამართი' }),
+      'თბილისი',
     )
     await userEvent.type(
       screen.getByRole('textbox', { name: 'სათაური' }),
@@ -456,6 +594,7 @@ describe('job forms and conflict recovery', () => {
     )
     await userEvent.click(toggle)
     expect(screen.queryByRole('spinbutton')).not.toBeInTheDocument()
+    await selectDeadline()
     await userEvent.click(
       screen.getByRole('button', { name: 'სამუშაოს დამატება' }),
     )

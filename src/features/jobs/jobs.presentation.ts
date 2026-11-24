@@ -16,11 +16,12 @@ const markerStyle = (
   token:
     | 'badge-yellow'
     | 'badge-orange'
+    | 'badge-orange-vivid'
     | 'badge-green'
     | 'badge-red'
     | 'primary'
-    | 'badge-blue'
-    | 'badge-purple'
+    | 'badge-sky'
+    | 'badge-lavender'
     | 'secondary',
 ) => ({
   backgroundColor: `var(--${token})`,
@@ -70,22 +71,22 @@ export const jobKinds = {
     label: 'მონტაჟი',
     createLabel: 'მონტაჟის დამატება',
     icon: IconTool,
-    variant: 'blue',
-    markerStyle: markerStyle('badge-blue'),
+    variant: 'sky',
+    markerStyle: markerStyle('badge-sky'),
   },
   measurement: {
     label: 'აზომვა',
     createLabel: 'აზომვის დამატება',
     icon: IconRulerMeasure,
-    variant: 'purple',
-    markerStyle: markerStyle('badge-purple'),
+    variant: 'orange-vivid',
+    markerStyle: markerStyle('badge-orange-vivid'),
   },
   other: {
     label: 'სხვა სამუშაო',
     createLabel: 'სხვა სამუშაოს დამატება',
     icon: IconBriefcase,
-    variant: 'secondary',
-    markerStyle: markerStyle('secondary'),
+    variant: 'lavender',
+    markerStyle: markerStyle('badge-lavender'),
   },
 } as const satisfies Record<JobKind, unknown>
 export function formatJobDate(date: string) {

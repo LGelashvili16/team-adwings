@@ -1,0 +1,63 @@
+<div id="job-palette-pairs" aria-label="Vivid color combinations for installation and other job pins">
+  <style>
+    #job-palette-pairs { color-scheme:light dark; font:14px/1.5 system-ui,sans-serif; color:light-dark(#303030,#eee); }
+    #job-palette-pairs .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:22px; }
+    #job-palette-pairs h3 { margin:0 0 10px; font-size:14px; font-weight:500; }
+    #job-palette-pairs .stage { display:flex; gap:24px; justify-content:center; align-items:center; padding:26px 14px 34px; border-radius:14px; background:light-dark(#e6ecee,#304254); }
+    #job-palette-pairs .pin { width:44px; height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; position:relative; border:2px solid var(--ink); border-radius:16px; background:var(--fill); color:var(--ink); box-sizing:border-box; }
+    #job-palette-pairs .pin::after { content:""; width:14px; height:14px; position:absolute; bottom:-7px; left:50%; transform:translateX(-50%) rotate(45deg); background:var(--fill); border-right:2px solid var(--ink); border-bottom:2px solid var(--ink); border-bottom-right-radius:3px; box-sizing:border-box; }
+    #job-palette-pairs .pin svg { position:relative; z-index:1; width:20px; height:20px; }
+    #job-palette-pairs .measure { --fill:#ff8a1f; --ink:#431407; }
+    #job-palette-pairs .legend { display:flex; flex-wrap:wrap; gap:6px 20px; margin-bottom:18px; color:light-dark(#575757,#bdbdbd); font-size:12px; }
+    #job-palette-pairs .names { display:flex; justify-content:space-between; gap:8px; margin-top:12px; font-size:12px; color:light-dark(#575757,#bdbdbd); }
+  </style>
+  <div class="legend"><span>Left: installation</span><span>Center: measurement</span><span>Right: other jobs</span></div>
+  <div class="grid"></div>
+  <template>
+    <section>
+      <h3></h3>
+      <div class="stage" role="img">
+        <span class="pin installation"><i data-lucide="wrench" aria-hidden="true"></i></span>
+        <span class="pin measure"><i data-lucide="ruler" aria-hidden="true"></i></span>
+        <span class="pin other"><i data-lucide="briefcase" aria-hidden="true"></i></span>
+      </div>
+      <div class="names"><span class="installation-name"></span><span class="other-name"></span></div>
+    </section>
+  </template>
+  <script>
+    (() => {
+      const root = document.getElementById('job-palette-pairs');
+      const grid = root.querySelector('.grid');
+      const template = root.querySelector('template');
+      const pairs = [
+        ['Lagoon + Candy', 'Lagoon', '#00b8e6', '#003344', 'Candy pink', '#ff61c7', '#4a0935'],
+        ['Sky + Acid lime', 'Sky blue', '#38b8ff', '#062d48', 'Acid lime', '#c8fa00', '#2c3500'],
+        ['Ultramarine + Bubblegum', 'Ultramarine', '#334dff', '#ffffff', 'Bubblegum', '#ff7cda', '#450b36'],
+        ['Jade + Electric violet', 'Jade', '#00db99', '#003d29', 'Electric violet', '#9347ff', '#ffffff'],
+        ['Ocean + Golden yellow', 'Ocean blue', '#007fe8', '#ffffff', 'Golden yellow', '#ffdf00', '#3c2d00'],
+        ['Glacier + Raspberry', 'Glacier blue', '#67e8ff', '#073746', 'Raspberry', '#ff197a', '#3d061f'],
+        ['Spring + Orchid', 'Spring green', '#62ef38', '#163b09', 'Orchid', '#de64ff', '#3e104b'],
+        ['Indigo + Emerald', 'Indigo', '#5b3dff', '#ffffff', 'Emerald', '#00df83', '#003b25'],
+        ['Aqua + Crimson', 'Aqua', '#00f0dc', '#003c38', 'Crimson', '#f52f66', '#400419'],
+        ['Lime + Royal blue', 'Lime', '#b0ef16', '#263b04', 'Royal blue', '#2362f2', '#ffffff'],
+        ['Pink + Cyan', 'Hot pink', '#ff40ab', '#430b2a', 'Cyan', '#00d9ff', '#063646'],
+        ['Sapphire + Bright lavender', 'Sapphire', '#1547ed', '#ffffff', 'Bright lavender', '#ba8cff', '#32105e']
+      ];
+      for (const [title, installationName, installationFill, installationInk, otherName, otherFill, otherInk] of pairs) {
+        const section = template.content.cloneNode(true);
+        section.querySelector('h3').textContent = title;
+        section.querySelector('.installation-name').textContent = installationName;
+        section.querySelector('.other-name').textContent = otherName;
+        section.querySelector('.stage').setAttribute('aria-label', `${installationName} installation, orange measurement, ${otherName} other jobs`);
+        const installation = section.querySelector('.installation');
+        installation.style.setProperty('--fill', installationFill);
+        installation.style.setProperty('--ink', installationInk);
+        const other = section.querySelector('.other');
+        other.style.setProperty('--fill', otherFill);
+        other.style.setProperty('--ink', otherInk);
+        grid.appendChild(section);
+      }
+      if (globalThis.lucide) globalThis.lucide.createIcons({attrs:{width:20,height:20}});
+    })();
+  </script>
+</div>

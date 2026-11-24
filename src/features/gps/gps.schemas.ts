@@ -93,9 +93,15 @@ export const gpsDeviceSchema = z.object({
   phone: gpsPhoneSchema,
   enabled: z.boolean({ error: 'მიუთითეთ მოწყობილობის სტატუსი.' }),
 })
+export const gpsCreateDeviceSchema = gpsDeviceSchema.extend({
+  phone: gpsPhoneSchema.refine(
+    (value) => value !== '',
+    'მიუთითეთ ტელეფონის ნომერი.',
+  ),
+})
 export const gpsSaveSchema = z.union(
   [
-    gpsDeviceSchema.extend({ id: z.null(), version: z.null() }),
+    gpsCreateDeviceSchema.extend({ id: z.null(), version: z.null() }),
     gpsDeviceSchema.extend({
       id: z.uuid({ error: 'მოწყობილობა არასწორია.' }),
       version: z

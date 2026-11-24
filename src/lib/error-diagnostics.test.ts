@@ -46,3 +46,26 @@ it('does not log arbitrary error codes', () => {
     'sensitive employee data',
   )
 })
+
+it('classifies connection failures inside Drizzle and aggregate error causes', () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const connection = Object.assign(new Error('private address'), {
+    code: 'ECONNREFUSED',
+  })
+  const error = new Error('private SQL query', {
+    cause: new AggregateError([connection], 'private connection details'),
+  })
+  expect(reportError('network-access', error, 503).diagnostic).toBe(
+    'ECONNREFUSED',
+  )
+  expect(JSON.stringify(log.mock.calls)).not.toMatch(/private|SQL|address/)
+})
+
+it('terminates cyclic error causes without exposing arbitrary codes', () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  const error = { code: 'private code', cause: {} }
+  error.cause = error
+  expect(reportError('network-access', error, 503).diagnostic).toBe(
+    'UNCLASSIFIED',
+  )
+})

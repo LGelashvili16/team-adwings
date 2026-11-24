@@ -149,7 +149,7 @@ Use variants from `src/components/ui/badge.tsx`. Map each feature's states to la
 - Keep colors consistent across features, labels explicit, and contrast sufficient in both themes. Never rely on color alone.
 - A count is not inherently success or danger. Reserve strong color for meaningful state rather than coloring every number.
 - Do not invent colors for every status. If a new semantic variant is necessary, implement it once in the shared component and verify both themes.
-- Job map pins identify installation with blue, measurement with purple and other work with neutral tokens. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend; include type and status in accessible labels.
+- Job map pins identify installation with Sky blue (#38b8ff), measurement with vivid orange and other work with Bright lavender (#ba8cff) tokens. Measurement pins and type badges use a saturated orange fill with dark readable icons and labels in both themes. Use the same saturated Sky blue and Bright lavender fills with dark readable outlines and icons in both themes. Preserve the rounded-square body with a short centered downward point, anchored at its tip. Selected job pins use a prominent 4px translucent white halo with a 2px dark separation, preserving their category fill and status badge. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend; include type and status in accessible labels.
 
 ### Alerts
 
@@ -384,6 +384,36 @@ Complaint table rows open the detail sheet when clicked on non-interactive conte
 
 ## Job details
 
+Creating a job also requires an explicitly selected valid calendar deadline, with a visible required marker and inline Georgian validation. Enforce it in the creation form and on the server; preserve undated historical jobs and the existing edit behavior.
+
+Creating or editing a job requires a trimmed, nonempty address, even when exact
+map coordinates are supplied. Mark the field required and show its Georgian
+validation error inline. Failed address lookup still permits manual entry;
+coordinates never substitute for the readable address.
+
+Job forms validate on the first submit attempt, then revalidate on change.
+Untouched fields stay free of validation errors before submission, including
+during address suggestions. A late suggestion must clear a submitted address
+error when it supplies a valid value.
+
+Job notifications show the job title, creator, address and any deadline in the
+bell popup and inbox. Preserve readable line breaks and safe bounded previews.
+Their links open the exact job in list-view details, with its title in the sheet
+header and its visible row highlighted through the shared selected-row state.
+
+New jobs refresh authorized lists and maps through the existing shared live connection,
+respecting the viewer's filters. At `/admin/settings/notifications`, notification
+administrators select which roles receive all job events: creation, detail edits
+and status changes. Use a labeled shadcn Checkbox group with an explicit Save
+action. Production specialists, supervisors, sales managers, administrators and
+owners are selected by default; an empty selection disables all job notifications.
+Notify active accounts in any selected role once per event, excluding inactive
+employees. Administrators and owners also receive their own job actions in the
+inbox when selected; retain their existing action toast instead of duplicating it
+with a live notification toast. Other roles do not receive their own actions.
+Role selection never changes job visibility or grants job
+permissions. Preserve Georgian outcome toasts and atomic before/after audits.
+
 Group job information, nonempty instructions and change history in separate cards in both the map panel and list sheet. Keep the next permitted progress action visible, and place editing, directions and other permitted transitions in an accessible actions menu. Show the latest three history entries by default and let users expand the remaining loaded entries. Do not repeat the latest change in the information card.
 
 ## Notification acknowledgement
@@ -430,6 +460,14 @@ Personal-space and management sections use static shadcn SidebarGroupLabel title
 
 ## Application loading layout
 
+Application updates preserve unsaved work. Production checks for a new release
+on registration, every five minutes while online and visible, and on focus or
+reconnection. Keep the existing Georgian update prompt and require confirmation
+before reloading. HTML responses remain private and uncached; versioned assets
+retain their own cache policy. Development removes only this app's service
+worker and named caches, without clearing cookies, account settings or unrelated
+site storage.
+
 Private-route reload fallbacks reserve the responsive inset shell, sidebar width, header height and content gutters with shared shadcn Skeleton primitives. Keep the authenticated shell mounted while page data loads. Dashboard route and data fallbacks reuse the attendance overview skeleton and its widget grid. Public route fallbacks remain separate. Announce loading once in Georgian, hide decorative placeholders and respect reduced motion; never mount private subscriptions or sample employee records to measure loading layouts.
 
 The management attendance directory shows employee name, company-maintained job position and username, with a link to attendance details. Omit lifetime session counts and the account-status column. Display არ არის მითითებული for missing positions. This directory selects employees; period-based attendance records and worked-hour totals belong in their attendance detail views.
@@ -444,6 +482,13 @@ The seven-column attendance activity grid runs Monday through Sunday. Offset the
 
 Correction reasons are optional; blank reasons still retain the full actor/timestamp/before-and-after audit. Manual attendance entry uses a separate attendance.record.manage permission for administrators, owners and HR, and stays separate from device-verified punches. Its Sheet shows employee identity, check-in date/time, an off-by-default checkout Switch and optional note. Enabled checkout requires a valid later time. Reject future times, overlaps and daily-limit violations; mark entries as ხელით აღრიცხული and leave them pending review.
 
+## Account code issuance
+
+Activation-code and password-recovery-code issuance allow an empty reason.
+Keep the plain reason label and audit every issuance with its actor, target and
+timestamp even when no reason is supplied. Account suspension and restoration
+continue to require a reason.
+
 ## Network access error documents
 
 Network-blocked document requests show a centered, Georgian Team Adwings error card with the correct 403 status and guidance to use an allowed network or contact an administrator. Access-check failures show a separate 503 message and retry action. These pre-app documents use shadcn Card/Button, Tabler icons and self-contained fallback CSS because application assets may also be blocked. They work without JavaScript, respect the system color scheme and expose no session, IP or database details. API and server-function failures keep their plain-text response contract and all errors remain private and uncached.
@@ -456,7 +501,7 @@ Use the jobs map for future crew locations. `/manage/teams` owns team names, spe
 
 Version 70 (2026-11-17): Added the authorized production-team management workflow and navigation.
 
-Version 71 (2026-11-17): Employee navigation uses a single-person icon; teams retain the multi-person icon. Team creation and management share one right-side sheet with a fixed header/footer and scrollable sections. Transfers are confirmed inline within the sheet, without nested modals.
+Version 71 (2026-11-17): Employee navigation uses a single-person icon; teams retain the multi-person icon. Team creation and management share one right-side sheet with a fixed header/footer and scrollable sections. Employees already in another team show an orange team badge. Adding them opens a local confirmation dialog identifying the employee and previous team. Confirmation adds them to the draft; the transfer takes effect only when the team is saved.
 
 Version 72 (2026-11-17): Team creation and editing use one complete draft containing the name, roster and optional leader. One footer Save commits all changes atomically. Member selection, transfers, leader changes and deactivation remain local until Save; cancellation discards the draft.
 
@@ -465,5 +510,9 @@ Version 73 (2026-11-17): Team sheets group team information, selected members an
 Version 74 (2026-11-17): The team employee picker starts with production specialists selected and offers a labeled checkbox group for Employee, Production Supervisor and Sales Manager roles. Roles combine with name and job-title filters and restart infinite results at page one. HR and platform-administration accounts remain excluded even when they hold another selectable role.
 
 Version 75 (2026-11-17): Place employee role checkboxes in a shadcn filter popover with an icon trigger and selected-role count. Keep name search and job-title inputs compact, icon-assisted and individually clearable, with accessible Georgian labels.
+
+Team member search uses one input matching employee name, username or job title on the server, combined with the separate role filter.
+
+Team member role filters apply on checkbox changes without a Done or Apply button. Keep the default-reset action and the popover's standard outside-click, Escape and trigger-toggle dismissal.
 
 Version 76 (2026-11-17): Preserve the teams directory while an editor loads. Team removal and deactivation use destructive styling and Tabler icons; permanent deletion requires a clear confirmation, retains an audit snapshot and releases members. Disabled teams can be restored. Team history uses the shared collapsible with a Tabler disclosure icon.

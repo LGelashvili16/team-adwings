@@ -1,7 +1,5 @@
-import {
-  currentAuthorization,
-  hasPermission,
-} from '#/lib/authorization/permissions'
+import { parseRoles } from '#/lib/authorization/permissions'
+import type { Role } from '#/lib/authorization/permissions'
 import '@tanstack/react-start/server-only'
 import {
   and,
@@ -9,6 +7,7 @@ import {
   count,
   desc,
   eq,
+  gt,
   ilike,
   isNotNull,
   or,
@@ -26,8 +25,56 @@ export type JobsTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0]
 export const transactJobs = db.transaction.bind(db)
+/** Selected roles opt in to all job notifications; active-account and job-read checks remain independent. */
+export async function jobNotificationCandidates(
+  tx: JobsTransaction,
+  roles: ReadonlyArray<Role>,
+  afterId?: string,
+) {
+  if (!roles.length) return { recipientIds: [], afterId: undefined }
+  const rows = await tx
+    .select({ id: user.id, roles: user.roles })
+    .from(user)
+    .leftJoin(employee, eq(employee.userId, user.id))
+    .where(
+      and(
+        eq(user.accessState, 'active'),
+        sql`(${employee.id} is null or ${employee.status} = 'active')`,
+        afterId ? gt(user.id, afterId) : undefined,
+        sql`string_to_array(${user.roles}, ',') && array[${sql.join(
+          roles.map((role) => sql`${role}`),
+          sql`, `,
+        )}]::text[]`,
+      ),
+    )
+    .orderBy(asc(user.id))
+    .limit(1000)
+  return {
+    recipientIds: rows
+      .filter((row) =>
+        parseRoles(row.roles).some((role) => roles.includes(role)),
+      )
+      .map((row) => row.id),
+    afterId: rows.length === 1000 ? rows.at(-1)?.id : undefined,
+  }
+}
 const assignee = alias(user, 'job_assignee')
 const creator = alias(user, 'job_creator')
+/** A small authorized notification snapshot, without loading the detail history. */
+export async function jobNotificationDetails(tx: JobsTransaction, id: string) {
+  return (
+    await tx
+      .select({
+        title: job.title,
+        address: job.address,
+        deadline: job.deadline,
+        creatorName: creator.name,
+      })
+      .from(job)
+      .innerJoin(creator, eq(job.createdBy, creator.id))
+      .where(eq(job.id, id))
+  ).at(0)
+}
 const summaryColumns = {
   id: job.id,
   title: job.title,
@@ -100,7 +147,11 @@ export async function listJobs(
       ? [asc(job.title), asc(job.id)]
       : search.sort === 'oldest'
         ? [asc(job.createdAt), asc(job.id)]
-        : [desc(job.createdAt), desc(job.id)]
+        : search.sort === 'deadline_asc'
+          ? [sql`${job.deadline} asc nulls last`, asc(job.id)]
+          : search.sort === 'deadline_desc'
+            ? [sql`${job.deadline} desc nulls last`, asc(job.id)]
+            : [desc(job.createdAt), desc(job.id)]
   const items = await tx
     .select(summaryColumns)
     .from(job)
@@ -235,20 +286,4 @@ export async function appendJobEvent(
   values: typeof jobEvent.$inferInsert,
 ) {
   await tx.insert(jobEvent).values(values)
-}
-
-/** Only the responsible creator's current job-management grant permits progress notifications. */
-export async function notificationCreator(tx: JobsTransaction, id: string) {
-  const { identity, person } = await currentIdentity(tx, id, false)
-  if (
-    !identity ||
-    identity.state !== 'active' ||
-    (person && person.status !== 'active')
-  )
-    return []
-  const authorization = currentAuthorization(identity)
-  return authorization.roles.length &&
-    hasPermission(authorization, 'jobs.manage')
-    ? [id]
-    : []
 }

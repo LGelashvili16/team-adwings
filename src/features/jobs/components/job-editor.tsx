@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -42,6 +42,7 @@ import { Switch } from '#/components/ui/switch'
 import { createJob, editJob } from '../jobs.functions'
 import {
   jobEditorSchema,
+  jobCreateEditorSchema,
   jobFieldsSchema,
   jobKindSchema,
 } from '../jobs.schemas'
@@ -102,7 +103,11 @@ export function JobEditor({
         position || (job?.longitude != null && job.latitude != null),
       ),
     } satisfies z.infer<typeof jobEditorSchema>,
-    validators: { onChange: jobEditorSchema, onSubmit: jobEditorSchema },
+    validationLogic: revalidateLogic({
+      mode: 'submit',
+      modeAfterSubmission: 'change',
+    }),
+    validators: { onDynamic: job ? jobEditorSchema : jobCreateEditorSchema },
     onSubmit: async ({ value }) => {
       if (conflict) return
       setError('')
@@ -268,7 +273,7 @@ export function JobEditor({
                           return
                         fieldApi.setValue(address, {
                           dontUpdateMeta: true,
-                          dontValidate: true,
+                          dontValidate: current.submissionAttempts === 0,
                         })
                       })
                       .catch(() => {
@@ -286,7 +291,12 @@ export function JobEditor({
                       field.state.value === addressLookup.data)
                   return (
                     <Field data-invalid={!field.state.meta.isValid}>
-                      <FieldLabel htmlFor="job-address">მისამართი</FieldLabel>
+                      <FieldLabel htmlFor="job-address" className="gap-1">
+                        მისამართი{' '}
+                        <span aria-hidden="true" className="text-destructive">
+                          *
+                        </span>
+                      </FieldLabel>
                       <InputGroup
                         aria-busy={
                           shouldSuggestAddress && addressLookup.isFetching
@@ -294,6 +304,7 @@ export function JobEditor({
                       >
                         <InputGroupInput
                           id="job-address"
+                          required
                           maxLength={300}
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -356,13 +367,21 @@ export function JobEditor({
               <form.Field name="deadline">
                 {(field) => (
                   <Field data-invalid={!field.state.meta.isValid}>
-                    <FieldLabel htmlFor="job-deadline">ვადა</FieldLabel>
+                    <FieldLabel htmlFor="job-deadline" className="gap-1">
+                      ვადა{' '}
+                      {!job ? (
+                        <span aria-hidden="true" className="text-destructive">
+                          *
+                        </span>
+                      ) : null}
+                    </FieldLabel>
                     <JobDeadlinePicker
                       value={field.state.value}
                       onChange={field.handleChange}
                       onBlur={field.handleBlur}
                       disabled={mutation.isPending}
                       invalid={!field.state.meta.isValid}
+                      required={!job}
                       describedBy={
                         field.state.meta.errors.length
                           ? 'job-deadline-error'

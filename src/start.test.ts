@@ -125,6 +125,43 @@ it('shows temporary failure if IP extraction fails instead of denying the accoun
   expect(response.status).toBe(503)
   expect(await response.text()).not.toContain('invalid private setting')
 })
+it('shows a specific safe cause for wrapped database failures', async () => {
+  calls.networkAllowed.mockRejectedValue(
+    new Error('private SQL', {
+      cause: Object.assign(new Error('private database hostname'), {
+        code: '42P01',
+      }),
+    }),
+  )
+  const response = await calls.middleware({ request: request(), next: vi.fn() })
+  const html = await response.text()
+  expect(response.status).toBe(503)
+  expect(html).toContain('42P01')
+  expect(html).toContain('მონაცემთა ბაზაში საჭირო ცხრილი ვერ მოიძებნა')
+  expect(html).not.toMatch(/private|SQL|hostname/)
+})
+it.each<Record<string, string>>([
+  { 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'empty' },
+  { 'sec-fetch-dest': 'iframe' },
+])('renders navigation errors as documents for %j', async (headers) => {
+  const response = await calls.middleware({
+    request: request(headers),
+    next: vi.fn(),
+  })
+  expect(response.headers.get('content-type')).toContain('text/html')
+})
+it.each(['/api/auth/get-session', '/_serverFn/example'])(
+  'keeps %s failures plain text even for HTML navigation requests',
+  async (path) => {
+    const response = await calls.middleware({
+      request: new Request(`http://localhost${path}`, {
+        headers: { accept: 'text/html', 'sec-fetch-dest': 'document' },
+      }),
+      next: vi.fn(),
+    })
+    expect(response.headers.get('content-type')).toContain('text/plain')
+  },
+)
 it.each([
   [
     'http://localhost/auth/login?identifier=admin&password=secret',

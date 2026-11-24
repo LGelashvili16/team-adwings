@@ -134,10 +134,8 @@ export async function candidateMembers(
     or(
       ilike(employee.fullName, contains(search.q)),
       ilike(employee.username, contains(search.q)),
+      ilike(employee.jobTitle, contains(search.q)),
     ),
-    search.jobTitle
-      ? ilike(employee.jobTitle, contains(search.jobTitle))
-      : undefined,
   )
   const [total] = await tx
     .select({ value: count() })

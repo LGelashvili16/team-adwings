@@ -101,7 +101,7 @@ export function NotificationList({
                 )}
                 {unseen ? <span className="sr-only">, ახალი</span> : null}
               </p>
-              <p className="text-[0.8125rem] leading-5 wrap-anywhere text-muted-foreground">
+              <p className="text-[0.8125rem] leading-5 whitespace-pre-line wrap-anywhere text-muted-foreground">
                 {item.body}
               </p>
               <time

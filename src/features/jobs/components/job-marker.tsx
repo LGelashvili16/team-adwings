@@ -52,14 +52,14 @@ export function JobMarker({
   return (
     <>
       <ContextMenu open={open} onOpenChange={setOpen}>
-        <ContextMenuTrigger {...hold} data-job-marker>
+        <ContextMenuTrigger {...hold} data-job-marker className="pb-2.5">
           <Button
             variant="outline"
             depth="raised"
             className={cn(
               'relative size-11 rounded-2xl border-2 p-0 shadow-md',
               selected &&
-                'ring-4 ring-ring/40 ring-offset-2 ring-offset-background',
+                'ring-4 ring-white/75 ring-offset-2 ring-offset-black/50',
             )}
             style={kind.markerStyle}
             aria-label={`${pin.title}, ${kind.label}, ${status.label}`}
@@ -71,10 +71,15 @@ export function JobMarker({
               if (!open) onSelect(pin.id)
             }}
           >
-            <Icon className="size-5" aria-hidden="true" />
             <span
               aria-hidden="true"
-              className="absolute -right-1 -bottom-1 flex size-5 items-center justify-center rounded-full border-2"
+              className="pointer-events-none absolute -bottom-1.75 left-1/2 size-3.5 -translate-x-1/2 rotate-45 rounded-br-sm border-r-2 border-b-2"
+              style={kind.markerStyle}
+            />
+            <Icon className="relative size-5" aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              className="absolute -right-1 -bottom-1 z-10 flex size-5 items-center justify-center rounded-full border-2"
               style={{
                 ...status.markerStyle,
                 borderColor: 'var(--background)',

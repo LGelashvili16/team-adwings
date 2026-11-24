@@ -45,6 +45,7 @@ export function AccountActionDialog({
   const content = accountActionContent[action]
   const Icon = content.icon
   const ConfirmIcon = content.confirmIcon
+  const reasonRequired = action === 'suspend' || action === 'restore'
   const mutation = useMutation({
     mutationFn: (data: z.infer<typeof accountActionSchema>) =>
       updateEmployeeAccount({ data }),
@@ -124,11 +125,14 @@ export function AccountActionDialog({
                 <Field data-invalid={!field.state.meta.isValid}>
                   <FieldLabel htmlFor="account-action-reason">
                     მოქმედების მიზეზი
+                    {reasonRequired && <span aria-hidden="true"> *</span>}
                   </FieldLabel>
                   <Textarea
                     id="account-action-reason"
                     name="reason"
                     rows={3}
+                    required={reasonRequired}
+                    maxLength={500}
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(event) => field.handleChange(event.target.value)}
@@ -136,7 +140,7 @@ export function AccountActionDialog({
                     aria-describedby="account-action-error"
                   />
                   <FieldDescription>
-                    მიზეზი ჩაიწერება აუდიტის ჟურნალში.
+                    მითითებული მიზეზი ჩაიწერება აუდიტის ჟურნალში.
                   </FieldDescription>
                   <FieldError
                     id="account-action-error"

@@ -9,6 +9,10 @@ const jobDateSchema = z.iso
     'აირჩიეთ თარიღი 1900 და 2100 წლებს შორის.',
   )
 export const jobDeadlineSchema = jobDateSchema.nullable()
+const requiredJobDeadlineSchema = jobDeadlineSchema.refine(
+  (date) => date !== null,
+  'მიუთითეთ სამუშაოს ვადა.',
+)
 
 export const jobStatusSchema = z.enum(
   ['pending', 'en_route', 'on_site', 'completed', 'rejected'],
@@ -54,8 +58,9 @@ export const jobFieldsSchema = z
       .trim()
       .max(4000, 'შენიშვნა ძალიან გრძელია.'),
     address: z
-      .string({ error: 'მისამართი არასწორია.' })
+      .string({ error: 'მიუთითეთ მისამართი.' })
       .trim()
+      .min(1, 'მიუთითეთ მისამართი.')
       .max(300, 'მისამართი ძალიან გრძელია.'),
     kind: jobKindSchema,
     deadline: jobDeadlineSchema.default(null),
@@ -101,7 +106,11 @@ export const jobEditorSchema = jobFieldsSchema
         })
     }
   })
+export const jobCreateEditorSchema = jobEditorSchema.safeExtend({
+  deadline: requiredJobDeadlineSchema,
+})
 export const createJobSchema = jobFieldsSchema.safeExtend({
+  deadline: requiredJobDeadlineSchema,
   requestId: z.uuid({ error: 'მოთხოვნა არასწორია.' }),
 })
 export const editJobSchema = jobFieldsSchema.safeExtend({
@@ -154,9 +163,12 @@ export const jobFilterSchema = z
       error: 'ტიპი არასწორია.',
     }),
     scope: z.enum(['all', 'mine'], { error: 'ფილტრი არასწორია.' }),
-    sort: z.enum(['newest', 'oldest', 'title'], {
-      error: 'დალაგება არასწორია.',
-    }),
+    sort: z.enum(
+      ['newest', 'oldest', 'title', 'deadline_asc', 'deadline_desc'],
+      {
+        error: 'დალაგება არასწორია.',
+      },
+    ),
   })
   .refine((range) => range.from <= range.to, {
     path: ['to'],

@@ -31,6 +31,7 @@ import { Switch } from '#/components/ui/switch'
 import { updateGpsDevice } from '../gps.functions'
 import {
   GPS_PHONE_PREFIX,
+  gpsCreateDeviceSchema,
   gpsDeviceSchema,
   stripGpsPhonePrefix,
 } from '../gps.schemas'
@@ -52,6 +53,7 @@ export function GpsDeviceEditor({
   const client = useQueryClient()
   const save = useServerFn(updateGpsDevice)
   const [error, setError] = useState('')
+  const schema = device ? gpsDeviceSchema : gpsCreateDeviceSchema
   const defaultValues: z.input<typeof gpsDeviceSchema> = {
     name: device?.name ?? '',
     reportedId: device?.reportedId ?? '',
@@ -60,12 +62,12 @@ export function GpsDeviceEditor({
   }
   const form = useForm({
     defaultValues,
-    validators: { onSubmit: gpsDeviceSchema },
+    validators: { onSubmit: schema },
     onSubmit: async ({ value }) => {
       setError('')
       onBusyChange(true)
       try {
-        const parsed = gpsDeviceSchema.parse(value)
+        const parsed = schema.parse(value)
         const result = await save({
           data: device
             ? { ...parsed, id: device.id, version: device.version }
@@ -190,6 +192,14 @@ export function GpsDeviceEditor({
                         <Field data-invalid={!field.state.meta.isValid}>
                           <FieldLabel htmlFor="gps-phone">
                             ტელეფონის ნომერი
+                            {!device && (
+                              <span
+                                aria-hidden="true"
+                                className="text-destructive"
+                              >
+                                *
+                              </span>
+                            )}
                           </FieldLabel>
                           <InputGroup>
                             <InputGroupAddon>
@@ -213,6 +223,7 @@ export function GpsDeviceEditor({
                               onBlur={field.handleBlur}
                               aria-invalid={!field.state.meta.isValid}
                               aria-describedby="gps-phone-error"
+                              required={!device}
                               maxLength={27}
                               disabled={pending}
                             />

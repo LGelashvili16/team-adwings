@@ -95,6 +95,8 @@ const filterFields = [
       { value: 'newest', label: 'ჯერ ახალი' },
       { value: 'oldest', label: 'ჯერ ძველი' },
       { value: 'title', label: 'სათაურით' },
+      { value: 'deadline_asc', label: 'ჯერ ახლო ვადა' },
+      { value: 'deadline_desc', label: 'ჯერ შორი ვადა' },
     ],
   },
 ] as const
@@ -190,22 +192,11 @@ export function JobsFilters({
           : 'flex flex-row flex-wrap items-start gap-3',
       )}
     >
-      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
-        <JobsDateRange
-          key={`${search.from}:${search.to}`}
-          value={{ from: search.from, to: search.to }}
-          onChange={(range) => {
-            form.setFieldValue('from', range.from)
-            form.setFieldValue('to', range.to)
-            commit({ ...form.state.values, ...range }, false)
-          }}
-        />
-      </Field>
       {showSearch ? (
         <form.Field name="q">
           {(field) => (
             <Field
-              className={cn(isMobile ? 'w-full' : 'min-w-48 flex-1')}
+              className={cn(isMobile ? 'w-full' : 'w-full md:w-80')}
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel className="sr-only" htmlFor="jobs-search">
@@ -217,7 +208,7 @@ export function JobsFilters({
                 </InputGroupAddon>
                 <InputGroupInput
                   id="jobs-search"
-                  placeholder="სამუშაოს სათაური, შენახული მისამართი ან შენიშვნა"
+                  placeholder="სამუშაოს ძიება"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   onBlur={field.handleBlur}
@@ -237,6 +228,17 @@ export function JobsFilters({
           )}
         </form.Field>
       ) : null}
+      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
+        <JobsDateRange
+          key={`${search.from}:${search.to}`}
+          value={{ from: search.from, to: search.to }}
+          onChange={(range) => {
+            form.setFieldValue('from', range.from)
+            form.setFieldValue('to', range.to)
+            commit({ ...form.state.values, ...range }, false)
+          }}
+        />
+      </Field>
       {filterFields.map(({ name, label, options }) => (
         <form.Field key={name} name={name}>
           {(field) => (

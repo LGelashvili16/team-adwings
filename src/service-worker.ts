@@ -33,7 +33,7 @@ registerRoute(
   async ({ request }) => {
     try {
       // Preserve server redirects, session checks, and errors on every navigation.
-      return await fetch(request)
+      return await fetch(request, { cache: 'no-store' })
     } catch {
       return (await matchPrecache('/offline.html')) ?? Response.error()
     }
