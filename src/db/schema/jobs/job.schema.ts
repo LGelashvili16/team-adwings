@@ -55,6 +55,8 @@ export const job = pgTable(
     tracksReads: boolean('tracks_reads').notNull().default(true),
     /** Optional deadline as a calendar day, never a timezone-shifted instant. */
     deadline: date('deadline', { mode: 'string' }),
+    /** Legacy per-job diameter in metres. Retained for mapped jobs saved before the fixed map zone. */
+    geofenceDiameter: integer('geofence_diameter').$type<100 | 200>(),
     /** Persisted workflow: pending, en_route, on_site, completed, or rejected. */
     status: text('status').$type<JobStatus>().notNull().default('pending'),
     /** WGS84 longitude in degrees; null together with latitude when the exact site is unknown. */
@@ -110,6 +112,10 @@ export const job = pgTable(
       sql`${table.deadline} is null or ${table.deadline} between date '1900-01-01' and date '2100-12-31'`,
     ),
     check(
+      'job_geofence_valid',
+      sql`${table.geofenceDiameter} is null or (${table.geofenceDiameter} in (100, 200) and ${table.longitude} is not null and ${table.latitude} is not null)`,
+    ),
+    check(
       'job_location_labels_valid',
       sql`char_length(${table.streetNameKa}) <= 300 and char_length(${table.streetNameEn}) <= 300 and char_length(${table.locationLabelKa}) <= 300 and char_length(${table.locationLabelEn}) <= 300`,
     ),
@@ -138,7 +144,7 @@ export const jobEvent = pgTable(
     action: text('action').notNull(),
     /** Status after this event. */
     status: text('status').$type<JobStatus>().notNull(),
-    /** User's progress note or rejection/reopening reason; empty for ordinary creation/edit. */
+    /** Progress note, workflow reason or geofence change summary. Empty for ordinary creation/edit. */
     note: text('note').notNull().default(''),
     /** Immutable crew evidence, including names at the time of the change. */
     assignmentChange: jsonb('assignment_change').$type<{

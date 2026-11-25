@@ -1449,6 +1449,33 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       }),
     ).rejects.toThrow('მოთხოვნა არასწორია')
   })
+  it('keeps legacy diameters on edit and clears them when removing the mapped location', async () => {
+    const { id } = await createPin()
+    await sql().query('UPDATE job SET geofence_diameter = 100 WHERE id = $1', [
+      id,
+    ])
+    const legacyDiameter = async () =>
+      (
+        await sql().query('SELECT geofence_diameter FROM job WHERE id = $1', [
+          id,
+        ])
+      ).rows[0].geofence_diameter
+    await service.editCompanyJob(manager, {
+      ...fields,
+      id,
+      version: 1,
+      title: 'განახლებული სათაური',
+    })
+    expect(await legacyDiameter()).toBe(100)
+    await service.editCompanyJob(manager, {
+      ...fields,
+      id,
+      version: 2,
+      longitude: null,
+      latitude: null,
+    })
+    expect(await legacyDiameter()).toBeNull()
+  })
   it('blocks foreign creates and location edits through direct service calls', async () => {
     const { id } = await createPin()
     const foreign = { longitude: 44.681, latitude: 43.024 }

@@ -15,7 +15,10 @@ const api = vi.hoisted(() => ({
   remove: vi.fn(),
   removeAll: vi.fn(),
   navigate: vi.fn(),
+  isMobile: vi.fn(),
 }))
+
+vi.mock('#/hooks/use-mobile', () => ({ useIsMobile: api.isMobile }))
 
 vi.mock('../notifications.functions', () => ({
   getOwnNotifications: api.read,
@@ -78,6 +81,7 @@ async function openNotificationActions(
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.isMobile.mockReturnValue(true)
   items = [
     {
       id: '019aac01-0000-7000-8000-000000000001',
@@ -152,10 +156,30 @@ describe('notifications page actions', () => {
     client.clear()
   })
 
-  it('opens the global confirmation modal and deletes only after confirmation', async () => {
+  it('shows direct desktop actions and deletes only after confirmation', async () => {
+    api.isMobile.mockReturnValue(false)
     const { user, client } = setup()
-    await openNotificationActions(user)
-    await user.click(screen.getByRole('menuitem', { name: 'წაშლა' }))
+    const deleteButton = await screen.findByRole('button', {
+      name: 'წაშლა: მოწყობილობის დადასტურება',
+    })
+    expect(
+      screen.queryByRole('button', { name: /შეტყობინების მოქმედებები/ }),
+    ).toBeNull()
+    await user.click(
+      screen.getByRole('button', {
+        name: 'წაუკითხავად მონიშვნა: მოწყობილობის დადასტურება',
+      }),
+    )
+    const markReadButton = await screen.findByRole('button', {
+      name: 'ნანახად მონიშვნა: მოწყობილობის დადასტურება',
+    })
+    await waitFor(() => expect(markReadButton).toBeEnabled())
+    await user.click(markReadButton)
+    await waitFor(() => expect(deleteButton).toBeEnabled())
+    expect(api.unseen).toHaveBeenCalledWith({ data: { ids: [items[0].id] } })
+    expect(api.mark).toHaveBeenCalledWith({ data: { ids: [items[0].id] } })
+
+    await user.click(deleteButton)
     const dialog = await screen.findByRole('dialog', {
       name: 'შეტყობინების წაშლა',
     })
@@ -172,8 +196,7 @@ describe('notifications page actions', () => {
     expect(api.remove).not.toHaveBeenCalled()
 
     // Confirming deletes the notification and closes the modal.
-    await openNotificationActions(user)
-    await user.click(screen.getByRole('menuitem', { name: 'წაშლა' }))
+    await user.click(deleteButton)
     const confirmDialog = await screen.findByRole('dialog', {
       name: 'შეტყობინების წაშლა',
     })

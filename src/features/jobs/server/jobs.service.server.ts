@@ -348,6 +348,8 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
       address: data.address,
       kind: data.kind,
       deadline: data.deadline,
+      // The legacy diameter constraint still requires coordinates.
+      ...(hasJobCoordinates(data) ? {} : { geofenceDiameter: null }),
       longitude: data.longitude,
       latitude: data.latitude,
       version: record.version + 1,

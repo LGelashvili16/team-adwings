@@ -16,6 +16,20 @@ const map = vi.hoisted(() => ({
   fitBounds: vi.fn(),
   flyTo: vi.fn(),
   getZoom: () => 11,
+  isStyleLoaded: () => true,
+  getSource: vi.fn(),
+  getLayer: vi.fn(),
+  getStyle: () => ({
+    layers: [
+      { id: 'early-label', type: 'symbol' },
+      { id: 'buildings', type: 'fill-extrusion' },
+      { id: 'place-label', type: 'symbol' },
+    ],
+  }),
+  addSource: vi.fn(),
+  addLayer: vi.fn(),
+  on: vi.fn(),
+  off: vi.fn(),
 }))
 const bounds = vi.hoisted(() => ({ extend: vi.fn() }))
 vi.mock('#/components/ui/map', () => ({
@@ -167,13 +181,15 @@ it('refocuses deliberate repeat selections and preserves focus across dialog rem
   expect(map.flyTo).toHaveBeenCalledTimes(2)
 })
 
-it('fits all pins on reload with a selected job and still focuses a later selection', () => {
+it('frames default geofences and can hide or show them without changing the camera', async () => {
   vi.stubGlobal(
     'matchMedia',
     vi.fn(() => ({ matches: false })),
   )
   map.fitBounds.mockClear()
   map.flyTo.mockClear()
+  map.addSource.mockClear()
+  map.addLayer.mockClear()
   const first = {
     id: 'first',
     title: 'პირველი',
@@ -208,11 +224,59 @@ it('fits all pins on reload with a selected job and still focuses a later select
     onPlacesChange: vi.fn(),
     showBuildings: false,
     onBuildingsChange: vi.fn(),
+    onGeofencesChange: vi.fn(),
   }
   const view = render(<JobsMap {...props} />)
   expect(map.fitBounds).toHaveBeenCalledTimes(1)
+  expect(map.fitBounds).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ maxZoom: 17 }),
+  )
+  expect(map.addSource).toHaveBeenLastCalledWith(
+    'jobs-geofences',
+    expect.objectContaining({
+      type: 'geojson',
+      data: expect.objectContaining({
+        features: [
+          expect.objectContaining({ properties: { selected: true } }),
+          expect.objectContaining({ properties: { selected: false } }),
+        ],
+      }),
+    }),
+  )
+  expect(map.addLayer).toHaveBeenCalledTimes(3)
+  expect(map.addLayer.mock.calls.map(([, before]) => before)).toEqual([
+    'place-label',
+    'place-label',
+    'place-label',
+  ])
+  await userEvent.click(
+    screen.getByRole('button', { name: 'რუკის ხელსაწყოების ჩვენება' }),
+  )
+  const toggle = screen.getByRole('button', { name: 'გეოზონების ჩვენება' })
+  expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await userEvent.click(toggle)
+  expect(props.onGeofencesChange).toHaveBeenCalledWith(false)
+  const source = { setData: vi.fn() }
+  map.getSource.mockReturnValueOnce(source)
+  view.rerender(<JobsMap {...props} showGeofences={false} />)
+  expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  expect(source.setData).toHaveBeenCalledWith({
+    type: 'FeatureCollection',
+    features: [],
+  })
+  expect(map.fitBounds).toHaveBeenCalledTimes(1)
   expect(map.flyTo).not.toHaveBeenCalled()
-  view.rerender(<JobsMap {...props} selected={second} focusRequest={1} />)
+  await userEvent.click(toggle)
+  expect(props.onGeofencesChange).toHaveBeenLastCalledWith(true)
+  view.rerender(
+    <JobsMap
+      {...props}
+      selected={second}
+      focusRequest={1}
+      showGeofences={false}
+    />,
+  )
   expect(map.flyTo).toHaveBeenCalledWith(
     expect.objectContaining({ center: [42.7, 42.2] }),
   )

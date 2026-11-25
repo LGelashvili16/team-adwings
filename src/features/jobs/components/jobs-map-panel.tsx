@@ -75,6 +75,7 @@ export function JobsMapPanel({
   const [expanded, setExpanded] = useState(false)
   const [showPlaces, setShowPlaces] = useState(false)
   const [showBuildings, setShowBuildings] = useState(false)
+  const [showGeofences, setShowGeofences] = useState(true)
   const [showGps, setShowGps] = useState(true)
   const [showCompleted, setShowCompleted] = useState(true)
   // The server also requires these permissions; this only decides whether to offer the layer.
@@ -138,6 +139,8 @@ export function JobsMapPanel({
               onPlacesChange={setShowPlaces}
               showBuildings={showBuildings}
               onBuildingsChange={setShowBuildings}
+              showGeofences={showGeofences}
+              onGeofencesChange={setShowGeofences}
               pins={pins}
               pinsReady={pinsReady}
               initialPin={initialPin.current}

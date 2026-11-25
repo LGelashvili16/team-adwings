@@ -484,6 +484,13 @@
       "when": 1795611303959,
       "tag": "0068_payroll_employee_history_index",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795616775564,
+      "tag": "0069_job_geofence_diameter",
+      "breakpoints": true
     }
   ]
 }

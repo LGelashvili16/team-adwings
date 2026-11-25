@@ -179,11 +179,10 @@ types. Do not introduce separate competing task or measurement modules.
 
 ### Areas and device presence
 
-- [ ] Add a configurable geofence to a mapped job/task location. A point marker
-      needs a defined area before entry/exit can be evaluated. Start with a center
-      and configurable radius in meters; add polygon areas if required by actual use.
-- [ ] Jobs without coordinates or an enabled area must show geofencing as
-      unconfigured. Do not silently apply an arbitrary radius to every map pin.
+- [x] Display a circular geofence at every mapped job location. The job
+  coordinates give its center and the standard diameter is 200 m.
+- [x] Jobs without map coordinates have no zone. The map tools can hide or show
+  the geofence layer, which is visible initially.
 - [ ] Define eligible devices/targets and their relationship explicitly. Track
       presence per device and area, rather than one global status on the device.
 - [ ] Evaluate all relevant enabled areas. Overlapping areas can legitimately

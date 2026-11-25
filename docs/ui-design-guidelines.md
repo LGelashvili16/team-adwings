@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 81. Last updated: 2026-11-25.
+Status: required project instructions. Version: 85. Last updated: 2026-11-25.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -91,6 +91,8 @@ Dark country borders use a distinct high-contrast stroke, full opacity, and a no
 The jobs map starts with flat buildings. Its separate 3D buildings control exposes a pressed state and toggles building height without changing the camera or hiding footprints. Preserve the choice across theme/POI changes and full-screen map remounts.
 
 Map cartography has its own reference palette, maintained in `src/components/ui/map-styles.ts`. Dark maps use the approved slate terrain (`#314256`), deep blue water (`#1c347a`), teal parks (`#00615e`), and muted gray road/building hierarchy with colored place labels. Apply the palette to geographic layers rather than tinting the canvas with a CSS filter. Map controls, search, dialogs, job markers and statuses continue to use the existing application tokens. Light map colors remain provider-owned.
+
+Every mapped job gets a 200 m translucent violet ring. Draw the rings above building footprints and 3D buildings, keeping the top map labels and pins clear. The map tools include a geofence toggle, on by default, that preserves camera position and carries over to fullscreen. When enabled, frame the selected ring and use a stronger outlined edge. Respect reduced-motion preferences. Show the diameter in the job information card and include the ring in the map legend.
 
 ## Shared components are the default
 
@@ -448,7 +450,7 @@ The jobs date-range popover is compact: 512px wide on desktop with two 32px-cell
 
 ## Notification acknowledgement
 
-The notifications page stacks the mark-all-read and delete-all actions in separate full-width rows on mobile, with single-line labels; desktop keeps them side by side. Both filter tabs share the full content width on mobile and use the compact strip on desktop. Each notification places its icon, timestamp and three-dot actions menu above its full-width title and description. Mobile menu triggers have no background or shadow, including when open or hovered, while retaining their touch target and focus ring. Keep read/unread and delete actions in the shared shadcn dropdown menu, with the existing delete confirmation, Georgian labels, pending feedback and keyboard access. Preserve the compact notification bell preview layout.
+The notifications page stacks the mark-all-read and delete-all actions in separate full-width rows on mobile, with single-line labels. Desktop keeps them side by side. Both filter tabs share the full content width on mobile and use the compact strip on desktop. Each notification places its icon, timestamp and actions above its full-width title and description. On desktop, show direct read/unread and delete buttons with transparent backgrounds at rest and the shared shadcn ghost hover style. Keep both states flat. Preserve visible focus rings, Georgian accessible names and tooltips. Below the application shell's 768 px mobile breakpoint, use a three-dot shadcn dropdown menu with the same actions. Mobile menu triggers have no background or shadow, including when open or hovered, while retaining their touch target and focus ring. Both layouts retain delete confirmation, Georgian labels, pending feedback and keyboard access. Preserve the compact notification bell preview layout.
 
 The notification bell toolbar uses ყველა შეტყობინების ნანახად მონიშვნა and marks all of the signed-in account's unread notifications read, including older pages. Its enabled state follows the full unread count. The bell dot remains only while unread notifications exist; row controls continue to mark individual entries.
 

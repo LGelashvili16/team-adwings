@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   IconCalendarDue,
+  IconCircleDashed,
   IconChevronDown,
   IconDots,
   IconExternalLink,
@@ -30,6 +31,7 @@ import {
   jobStatuses,
 } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
+import { jobGeofenceDiameter } from '../jobs.geofence'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
 import { JobOverdueBadge } from './job-overdue-badge'
@@ -158,6 +160,20 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
                   (located
                     ? `${job.latitude.toFixed(6)}, ${job.longitude.toFixed(6)}`
                     : 'არ არის მითითებული')}
+              </dd>
+            </div>
+            <div>
+              <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
+                <IconCircleDashed
+                  className="size-4 shrink-0"
+                  aria-hidden="true"
+                />
+                გეოზონა
+              </dt>
+              <dd className="pl-7">
+                {located
+                  ? `დიამეტრი ${jobGeofenceDiameter} მ`
+                  : 'რუკაზე მდებარეობა არ არის მითითებული'}
               </dd>
             </div>
             <div>

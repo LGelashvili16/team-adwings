@@ -334,6 +334,7 @@ export async function updateJob(
       | 'address'
       | 'kind'
       | 'deadline'
+      | 'geofenceDiameter'
       | 'longitude'
       | 'latitude'
       | 'status'
