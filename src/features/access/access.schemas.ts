@@ -70,6 +70,11 @@ export const editableEmployeeCodeSchema = z
   .trim()
   .toLowerCase()
   .pipe(z.union([z.literal(''), employeeCodeSchema]))
+export const provisionableRolesSchema = z
+  .array(provisionableRoleSchema, { error: 'მიუთითეთ როლების სია.' })
+  .min(1, 'აირჩიეთ მინიმუმ ერთი როლი.')
+  .max(provisionableRoleSchema.options.length, 'როლების რაოდენობა არასწორია.')
+
 export const provisionAccountSchema = z.object({
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
@@ -78,25 +83,39 @@ export const provisionAccountSchema = z.object({
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
   employmentStartDate: employmentDateSchema.optional(),
-  role: provisionableRoleSchema,
+  roles: provisionableRolesSchema,
 })
 export const bootstrapOwnerSchema = z.object({
   code: employeeCodeSchema,
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
 })
-/** Administrative update of an existing employee's details, username, and single role. */
-export const employeeDetailsSchema = z.object({
-  userId: accountIdSchema,
-  code: editableEmployeeCodeSchema.optional(),
-  role: provisionableRoleSchema.optional(),
-  name: fullNameSchema,
-  contactEmail: contactEmailSchema,
-  jobTitle: jobTitleSchema,
-  phone: phoneSchema,
-  /** Omitted leaves the schedule untouched, null returns to the company schedule, an array assigns a custom week. */
-  workingWeek: employeeWorkingWeekSchema.nullable().optional(),
-})
+/** Administrative update of an existing employee's details, username, and roles. */
+export const employeeDetailsSchema = z
+  .object({
+    userId: accountIdSchema,
+    code: editableEmployeeCodeSchema.optional(),
+    roles: provisionableRolesSchema.optional(),
+    expectedRoles: z
+      .string({ error: 'ანგარიშის როლები არასწორია.' })
+      .min(1, 'ანგარიშის როლები არასწორია.')
+      .max(512, 'ანგარიშის როლები არასწორია.')
+      .optional(),
+    name: fullNameSchema,
+    contactEmail: contactEmailSchema,
+    jobTitle: jobTitleSchema,
+    phone: phoneSchema,
+    /** Omitted leaves the schedule untouched, null returns to the company schedule, an array assigns a custom week. */
+    workingWeek: employeeWorkingWeekSchema.nullable().optional(),
+  })
+  .strict()
+  .refine(
+    (input) => input.roles === undefined || input.expectedRoles !== undefined,
+    {
+      path: ['roles'],
+      message: 'განაახლეთ თანამშრომლის მონაცემები და სცადეთ ხელახლა.',
+    },
+  )
 /** The only field employees may change themselves; everything else is administrator-controlled. */
 export const ownPhoneSchema = z.object({ phone: phoneSchema })
 export const accountActionSchema = z

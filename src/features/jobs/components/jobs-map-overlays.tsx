@@ -2,6 +2,7 @@ import {
   IconPlus,
   IconX,
   IconCalendarDue,
+  IconExclamationMark,
   IconCheck,
   IconMap2,
 } from '@tabler/icons-react'
@@ -149,6 +150,12 @@ export function JobsMapLegend({ showGps = false }: { showGps?: boolean }) {
                 <IconCalendarDue className="size-3.5" aria-hidden="true" />
               </span>
               ვადა ხვალ
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-badge-red-vivid text-badge-red-vivid-foreground">
+                <IconExclamationMark className="size-3.5" aria-hidden="true" />
+              </span>
+              ვადაგადაცილებული
             </span>
             <span className="flex items-center gap-2">
               <Badge variant="red-vivid">ახალი</Badge>ჯერ არ გაგიხსნიათ

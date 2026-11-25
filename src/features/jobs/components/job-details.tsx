@@ -32,6 +32,7 @@ import {
 import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { JobOverdueBadge } from './job-overdue-badge'
 import { JobActionDialog } from './job-actions'
 import { JobAssignmentsCard } from './job-assignments-card'
 import type { JobAction } from './job-actions'
@@ -174,7 +175,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
                 />
                 ვადა
               </dt>
-              <dd className="pl-7">
+              <dd className="flex flex-wrap items-center gap-2 pl-7">
                 {job.deadline ? (
                   <time dateTime={job.deadline} className="tabular-nums">
                     {formatJobDay(job.deadline)}
@@ -182,6 +183,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
                 ) : (
                   'არ არის მითითებული'
                 )}
+                {job.isOverdue ? <JobOverdueBadge /> : null}
               </dd>
             </div>
           </dl>

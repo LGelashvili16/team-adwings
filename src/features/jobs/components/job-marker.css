@@ -1,3 +1,10 @@
+.job-pin-trigger {
+  --job-pin-tip-height: 8px;
+  padding-bottom: var(--job-pin-tip-height);
+}
+.job-pin-shape {
+  height: calc(100% + var(--job-pin-tip-height));
+}
 @keyframes job-new-pulse {
   0%,
   100% {
@@ -10,7 +17,7 @@
   }
 }
 .job-new-pulse {
-  transform-origin: 50% calc(100% + 10px);
+  transform-origin: 50% calc(100% + var(--job-pin-tip-height));
   animation: job-new-pulse 2.5s ease-in-out 120 forwards;
 }
 @media (prefers-reduced-motion: reduce) {

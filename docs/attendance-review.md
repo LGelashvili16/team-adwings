@@ -40,7 +40,7 @@ The company attendance page is an account directory at `/manage/attendance`, inc
 
 HR managers, administrators, and owners can view all employees through the `/manage/attendance` directory and its employee detail tabs for attendance and monthly hours without reviewer assignments. This separate `attendance.read.all` grant covers reads only. HR and owners additionally receive `attendance.correct.all`, permitting company-wide time corrections without assignments. Administrators need an explicit correction grant. Approval continues to require an assignment.
 
-1. Give the reviewer an existing role with `attendance.read.team` and `attendance.review.team`, such as supervisor or HR manager.
+1. Give the reviewer an existing role with `attendance.read.team` and `attendance.review.team`, such as HR manager.
 2. An account with `attendance.configure` assigns that reviewer to the relevant employee in `/manage/schedule`.
 3. The reviewer opens `/manage/attendance`, selects an assigned employee, and uses that employee's attendance tab for session history, pending reviews, corrections and overdue-session warnings.
 

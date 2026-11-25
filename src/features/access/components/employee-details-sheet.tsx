@@ -13,14 +13,6 @@ import {
   FieldLabel,
 } from '#/components/ui/field'
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
-import {
   Sheet,
   SheetClose,
   SheetContent,
@@ -35,8 +27,10 @@ import {
   employeeDetailsSchema,
   employeeRoleSchema,
   provisionableRoleSchema,
+  provisionableRolesSchema,
 } from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
+import { AccountRoleFields } from './account-authorization-fields'
 import type { z } from 'zod'
 import type { EmployeeAccountRecord } from '../access.types'
 
@@ -72,21 +66,22 @@ export function EmployeeDetailsSheet({
     gcTime: 0,
   })
   const targetRoles = parseRoles(target.roles)
-  const singleRole =
-    targetRoles.length === 1
-      ? provisionableRoleSchema.safeParse(targetRoles[0])
-      : null
-  const editableRole = singleRole?.success ? singleRole.data : undefined
   const availableRoles = canAssignAdmin
     ? provisionableRoleSchema.options
     : employeeRoleSchema.options
-  const allowedRoleSchema = canAssignAdmin
-    ? provisionableRoleSchema
-    : employeeRoleSchema
+  const parsedRoles = provisionableRolesSchema.safeParse(targetRoles)
+  const editableRoles =
+    parsedRoles.success &&
+    parsedRoles.data.every((role) =>
+      availableRoles.some((item) => item === role),
+    )
+      ? parsedRoles.data
+      : undefined
   const defaultValues: z.input<typeof employeeDetailsSchema> = {
     userId: target.userId,
     code: target.code ?? '',
-    role: editableRole,
+    roles: editableRoles,
+    expectedRoles: editableRoles ? target.roles : undefined,
     name: target.name,
     contactEmail: target.contactEmail ?? '',
     jobTitle: target.jobTitle ?? '',
@@ -100,7 +95,15 @@ export function EmployeeDetailsSheet({
     onSubmit: async ({ value }) => {
       setError('')
       try {
-        const result = await mutation.mutateAsync(value)
+        const { roles, expectedRoles, ...details } = value
+        const originalRoles = parseRoles(expectedRoles ?? '')
+        const rolesChanged =
+          roles &&
+          (roles.length !== originalRoles.length ||
+            roles.some((role) => !originalRoles.includes(role)))
+        const result = await mutation.mutateAsync(
+          rolesChanged ? { ...details, roles, expectedRoles } : details,
+        )
         if (!result.ok) {
           setError(result.message)
           toast.error(result.message)
@@ -152,7 +155,7 @@ export function EmployeeDetailsSheet({
           <FieldGroup className="gap-4">
             <SheetDescription>
               მომხმარებლის სახელის ან შესვლის ელფოსტის შეცვლა მაშინვე აისახება
-              ანგარიშზე. როლის შეცვლისას მიმდინარე სესიები გაუქმდება.
+              ანგარიშზე. როლების შეცვლისას მიმდინარე სესიები გაუქმდება.
             </SheetDescription>
             {detailFields.map(({ name, label, autoComplete }) => (
               <form.Field key={name} name={name}>
@@ -195,54 +198,28 @@ export function EmployeeDetailsSheet({
                 }}
               </form.Field>
             ))}
-            {editableRole ? (
-              <form.Field name="role">
+            {editableRoles ? (
+              <form.Field name="roles">
                 {(field) => (
-                  <Field data-invalid={!field.state.meta.isValid}>
-                    <FieldLabel htmlFor="details-role">
-                      როლი{' '}
-                      <span aria-hidden="true" className="text-destructive">
-                        *
-                      </span>
-                    </FieldLabel>
-                    <Select
-                      required
-                      value={field.state.value ?? editableRole}
-                      disabled={mutation.isPending}
-                      onValueChange={(value) => {
-                        const parsed = allowedRoleSchema.safeParse(value)
-                        if (parsed.success) field.handleChange(parsed.data)
-                      }}
-                    >
-                      <SelectTrigger
-                        id="details-role"
-                        className="w-full"
-                        aria-required="true"
-                        aria-invalid={!field.state.meta.isValid}
-                      >
-                        <SelectValue>
-                          {roleLabels[field.state.value ?? editableRole]}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          {availableRoles.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {roleLabels[role]}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    <FieldError errors={field.state.meta.errors} />
-                  </Field>
+                  <AccountRoleFields
+                    options={availableRoles}
+                    value={field.state.value ?? editableRoles}
+                    onChange={field.handleChange}
+                    disabled={mutation.isPending}
+                    invalid={!field.state.meta.isValid}
+                    errors={field.state.meta.errors}
+                  />
                 )}
               </form.Field>
             ) : (
               <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                ამ ანგარიშის როლი (
-                {targetRoles.map((r) => roleLabels[r]).join(', ')}) იმართება
-                წვდომის მართვის გვერდიდან.
+                ამ ანგარიშის როლები წვდომის მართვის გვერდიდან იმართება.
+                {targetRoles.length > 0 ? (
+                  <>
+                    {' '}
+                    {targetRoles.map((role) => roleLabels[role]).join(', ')}.
+                  </>
+                ) : null}
               </p>
             )}
             {canConfigureSchedule ? (

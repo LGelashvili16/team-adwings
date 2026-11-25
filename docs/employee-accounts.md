@@ -34,13 +34,14 @@ It is never exposed by an HTTP route or server function.
 
 ## Employee management workflow
 
-Employee creation and account management live under the management sidebar group. The existing `hr_manager` role (HR), administrators, and owners can use this workflow. HR may create ordinary employee accounts and manage their profile and access lifecycle. Assigning a management role, including HR, still requires `roles.manage`; administrator/owner creation remains excluded. Company schedule changes require `attendance.configure`, which HR managers now hold. Old admin user routes have been deleted; employee links use the management routes directly. The `$employeeId` route parameter carries the linked auth user ID, preserving existing account links.
+Employee creation and account management live under the management sidebar group. HR, administrators, and owners can use this workflow. HR can assign employee roles and manage accounts within its scope. Assigning or removing the accountant or administrator role requires platform role-assignment authority. The owner role uses protected platform administration or bootstrap. Company schedule changes require `attendance.configure`. The `$employeeId` route parameter carries the linked auth user ID.
 
 Open `/manage/employees`. The route and every server function independently require
-`manage.access` and `employees.manage`. Choose an immutable username, full name,
-optional email, job title, phone number, and role. Account creation records an automatic audit reason;
-subsequent access changes still require an administrative reason. Management-role assignment
-also requires `roles.manage`. This screen cannot create administrators or owners.
+`manage.access` and `employees.manage`. Enter the full name, optional email, job
+title and phone number, and select at least one role. The employee sets their
+username during activation. Authorized profile editors can change the assigned roles.
+The server checks the current role set before saving, records an audit event and
+revokes active sessions when the roles change.
 
 Usernames are normalized to lowercase. Migration `0010_employee_username.sql` renames `employee.code` to `employee.username`, including its unique index and normalization constraint, without recreating employee records. Better Auth's username plugin is already enabled on the server, provisioning instance, and client; its auth-owned `user.username` column and typed SDK require no regeneration for this employee-table rename. Existing administrative request/response keys named `code` remain compatibility aliases for the username; activation and reset codes remain separate secrets.
 Database constraints enforce unique usernames in each table, one employee record

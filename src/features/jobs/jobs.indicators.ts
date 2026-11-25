@@ -3,13 +3,14 @@ import type { JobStatus } from './jobs.types'
 
 export const newJobPulseDuration = 5 * 60_000
 export function jobMarkerPriority(
-  indicators: { isNew: boolean; dueTomorrow: boolean },
+  indicators: { isNew: boolean; dueTomorrow: boolean; isOverdue: boolean },
   selected: boolean,
 ) {
   if (selected) return 4
-  if (indicators.isNew && indicators.dueTomorrow) return 3
+  const hasDeadlineIndicator = indicators.dueTomorrow || indicators.isOverdue
+  if (indicators.isNew && hasDeadlineIndicator) return 3
   if (indicators.isNew) return 2
-  return indicators.dueTomorrow ? 1 : 0
+  return hasDeadlineIndicator ? 1 : 0
 }
 export function jobIndicators(
   job: {
@@ -20,13 +21,16 @@ export function jobIndicators(
   },
   now = Date.now(),
 ) {
-  const tomorrow = jobsToday(new Date(now + 24 * 60 * 60_000))
+  const deadline =
+    job.status === 'completed' || job.status === 'rejected'
+      ? null
+      : job.deadline
   const age = job.createdAt ? now - Date.parse(job.createdAt) : Infinity
   return {
-    dueTomorrow:
-      job.deadline === tomorrow &&
-      job.status !== 'completed' &&
-      job.status !== 'rejected',
+    isOverdue: Boolean(deadline && deadline < jobsToday(new Date(now))),
+    dueTomorrow: Boolean(
+      deadline && deadline === jobsToday(new Date(now + 24 * 60 * 60_000)),
+    ),
     isNew: job.isUnread === true,
     pulse: job.isUnread === true && age >= 0 && age < newJobPulseDuration,
   }

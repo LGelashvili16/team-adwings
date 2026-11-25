@@ -59,6 +59,7 @@ export const jobsQueryOptions = (actorId: string, search: JobSearch) =>
       search.status,
       search.kind,
       search.scope,
+      search.deadlineState,
       search.sort,
       search.view,
       search.page,

@@ -130,12 +130,12 @@ describe.runIf(enabled)('durable reminders against PostgreSQL', () => {
       'malformed',
     ])
     await sql()
-      .query(`update "user" set roles='supervisor' where id in ('manager','denied','noaccess','noread','later','subject','malformed');
-      update "user" set roles=E'\\t employee , supervisor \\n',permission_overrides='null'::jsonb where id='manager';
+      .query(`update "user" set roles='hr_manager' where id in ('manager','denied','noaccess','noread','later','subject','malformed');
+      update "user" set roles=E'\\t employee , hr_manager \\n',permission_overrides='null'::jsonb where id='manager';
       update "user" set permission_overrides='{"allow":[],"deny":["unknown"]}' where id='malformed';
       update "user" set permission_overrides='{"allow":[],"deny":["attendance.review.team"]}' where id='denied';
       update "user" set permission_overrides='{"allow":[],"deny":["manage.access"]}' where id='noaccess';
-      update "user" set permission_overrides='{"allow":[],"deny":["attendance.read.team"]}' where id='noread';
+      update "user" set permission_overrides='{"allow":[],"deny":["attendance.read.team","attendance.read.all"]}' where id='noread';
       insert into attendance_reviewer (reviewer_id,employee_id) select u.id,e.id from "user" u cross join employee e where e.user_id='subject' and u.id in ('manager','denied','noaccess','noread','subject','malformed');
       update company_schedule set checkout_reminder_minutes_before=60 where effective_from='2031-01-02';
       insert into attendance_session(employee_id,request_id,work_date,timezone,schedule_effective_from,expected_start_at,expected_end_at,started_at,max_open_hours)
@@ -367,7 +367,7 @@ describe.runIf(enabled)('durable reminders against PostgreSQL', () => {
   it('warns before 18 hours and closes overdue sessions once at the cutoff for review', async () => {
     await employees(['auto-subject', 'auto-reviewer'])
     await sql().query(`
-      update "user" set roles='supervisor' where id='auto-reviewer';
+      update "user" set roles='hr_manager' where id='auto-reviewer';
       insert into attendance_reviewer (reviewer_id,employee_id)
         select 'auto-reviewer',id from employee where user_id='auto-subject';
       insert into attendance_session(employee_id,request_id,work_date,timezone,schedule_effective_from,expected_start_at,expected_end_at,started_at)

@@ -99,7 +99,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     return service.provisionEmployee(owner, {
       name,
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
     })
   }
   async function identity(code: string) {
@@ -172,7 +172,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
         const issued = await service.provisionEmployee(owner, {
           name: label,
           contactEmail: '',
-          role: 'employee',
+          roles: ['employee'],
           dayOffAllowance: override,
         })
         const record = await identityForCode(issued.code)
@@ -207,7 +207,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       const issued = await service.provisionEmployee(owner, {
         name: `ტესტის ${role}`,
         contactEmail: '',
-        role,
+        roles: [role],
       })
       const record = await identityForCode(issued.code)
       expect(record.roles).toBe(role)
@@ -219,7 +219,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'HR',
       contactEmail: '',
-      role: 'hr_manager',
+      roles: ['hr_manager'],
     })
     await service.completeEmployeeActivation(
       { code: issued.code, username: 'hr-operator', newPassword: password },
@@ -230,7 +230,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const input = {
       name: 'ახალი თანამშრომელი',
       contactEmail: '',
-      role: 'employee' as const,
+      roles: ['employee' as const],
     }
     const startDate = '2026-11-20'
     const activation = await service.provisionEmployee(hr, {
@@ -322,25 +322,43 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     }
     const hrSupervisor = await service.provisionEmployee(hr, {
       ...input,
-      role: 'supervisor',
+      roles: ['supervisor'],
     })
     expect((await identityForCode(hrSupervisor.code)).roles).toBe('supervisor')
     await expect(
-      service.provisionEmployee(hr, { ...input, role: 'accountant' }),
+      service.provisionEmployee(hr, {
+        ...input,
+        roles: ['hr_manager', 'accountant'],
+      }),
     ).rejects.toThrow()
     await expect(
       service.editEmployeeDetails(hr, {
         userId: worker.id,
         name: 'აკრძალული მინიჭება',
         contactEmail: '',
-        role: 'accountant',
+        roles: ['hr_manager', 'accountant'],
+        expectedRoles: 'employee',
       }),
     ).rejects.toThrow()
     const accountantCode = await service.provisionEmployee(owner, {
       ...input,
-      role: 'accountant',
+      roles: ['hr_manager', 'accountant', 'hr_manager'],
     })
     const accountantRecord = await identityForCode(accountantCode.code)
+    expect(accountantRecord.roles).toBe('accountant,hr_manager')
+    const editRoles = {
+      ...input,
+      userId: accountantRecord.id,
+      expectedRoles: accountantRecord.roles,
+      roles: ['accountant', 'supervisor'] as Array<'accountant' | 'supervisor'>,
+    }
+    await service.editEmployeeDetails(owner, editRoles)
+    expect((await identityById(accountantRecord.id)).roles).toBe(
+      'accountant,supervisor',
+    )
+    await expect(service.editEmployeeDetails(owner, editRoles)).rejects.toThrow(
+      'როლები შეიცვალა',
+    )
     await expect(
       service.manageEmployeeAccount(hr, {
         userId: accountantRecord.id,
@@ -351,7 +369,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     await expect(
       service.provisionEmployee(hr, {
         ...input,
-        role: 'admin',
+        roles: ['admin'],
       }),
     ).rejects.toThrow()
     // Mutation authority comes from the locked current account, not the caller's stale role projection.
@@ -413,7 +431,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const editWorkerCode = await service.provisionEmployee(owner, {
       name: 'რედაქტირების თანამშრომელი',
       contactEmail: 'edit-worker@example.com',
-      role: 'employee',
+      roles: ['employee'],
     })
     await service.completeEmployeeActivation(
       {
@@ -556,7 +574,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'ელფოსტის თანამშრომელი',
       contactEmail: '  Worker@Example.com  ',
-      role: 'employee',
+      roles: ['employee'],
       jobTitle: 'დიზაინერი',
       phone: '+995 555 12 34 56',
     })
@@ -595,7 +613,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(owner, {
         name: 'დუბლიკატი',
         contactEmail: 'WORKER@example.com',
-        role: 'employee',
+        roles: ['employee'],
       }),
     ).rejects.toThrow()
     expect(
@@ -628,7 +646,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const officeIssued = await service.provisionEmployee(owner, {
       name: 'ოფისის თანამშრომელი',
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
       workingWeek: days,
     })
     await service.completeEmployeeActivation(
@@ -660,7 +678,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(owner, {
         name: 'არასწორი კვირა',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
         workingWeek: days.map((day) => ({ ...day, weekday: 1 })),
       }),
     ).rejects.toThrow()
@@ -828,7 +846,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(forged, {
         name: 'ტესტი',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
       }),
     ).rejects.toThrow()
     await expect(
@@ -989,7 +1007,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'წვდომის ადმინისტრატორი',
       contactEmail: '',
-      role: 'admin',
+      roles: ['admin'],
     })
     await service.completeEmployeeActivation(
       { code: issued.code, username: 'access-admin', newPassword: password },
@@ -1000,7 +1018,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const createdByAdmin = await service.provisionEmployee(adminActor, {
       name: 'ადმინის შექმნილი ადმინი',
       contactEmail: '',
-      role: 'admin',
+      roles: ['admin'],
     })
     expect((await identityForCode(createdByAdmin.code)).roles).toBe('admin')
     await testDatabase().insert(tables.user).values({
@@ -1116,7 +1134,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'უფლებების ტესტი',
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
     })
     await service.completeEmployeeActivation(
       {
@@ -1161,9 +1179,9 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     ).toHaveLength(0)
     const attendance =
       await import('#/features/attendance/server/company-attendance.service.server')
-    expect(
-      (await attendance.listCompanyAttendanceUsers(actor, {})).total,
-    ).toBeGreaterThan(0)
+    await expect(
+      attendance.listCompanyAttendanceUsers(actor, {}),
+    ).rejects.toThrow()
     await expect(
       administration.updateAccountAuthorization(owner, {
         ...grant,

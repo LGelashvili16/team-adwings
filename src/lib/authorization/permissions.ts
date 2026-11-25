@@ -122,10 +122,34 @@ const payrollManagementPermissions = [
   'payroll.manage',
 ] as const satisfies ReadonlyArray<Permission>
 
-const payrollManagementRoles: ReadonlySet<Role> = new Set([
-  'accountant',
-  'admin',
-  'owner',
+const roleRestrictedManagementPermissions: ReadonlySet<Permission> = new Set([
+  'manage.access',
+  'attendance.read.team',
+  'attendance.read.all',
+  'attendance.review.team',
+  'attendance.correct.all',
+  'attendance.correct.self',
+  'attendance.record.manage',
+  'timesheets.review.team',
+  'schedule.manage',
+  'teams.manage',
+  'gps.read',
+  'gps.manage',
+  'announcements.manage',
+  'complaints.review.all',
+  'complaints.review.assigned',
+  'complaints.read.confidential',
+  'employees.read',
+  'employees.manage',
+  'employees.employment.manage',
+  'leave.review',
+  'leave.configure',
+  'reports.read',
+  'attendance.configure',
+  'attendance.devices.manage',
+  'attendance.devices.approve.self',
+  'attendance.clock.assist',
+  ...payrollManagementPermissions,
 ])
 
 const administrationPermissions = [
@@ -171,17 +195,16 @@ const managementPermissions: Record<
 > = {
   supervisor: [
     'teams.manage',
-    'complaints.review.assigned',
+    'gps.read',
+    'gps.manage',
     'manage.access',
-    'attendance.read.team',
-    'attendance.review.team',
-    'timesheets.review.team',
     'jobs.manage',
     'jobs.complete.manage',
     'jobs.assign',
-    'employees.read',
   ],
   hr_manager: [
+    'gps.read',
+    'gps.manage',
     'attendance.record.manage',
     'attendance.devices.manage',
     'attendance.devices.approve.self',
@@ -237,7 +260,7 @@ export const roles = {
     'team-adwings': managementPermissions.supervisor,
   }),
   sales_manager: accessControl.newRole({
-    'team-adwings': ['manage.access', 'jobs.manage'],
+    'team-adwings': ['jobs.manage'],
   }),
   hr_manager: accessControl.newRole({
     'team-adwings': managementPermissions.hr_manager,
@@ -250,6 +273,13 @@ export const roles = {
   owner: accessControl.newRole({ 'team-adwings': permissionSchema.options }),
 } satisfies Record<Role, unknown>
 
+function grantsPermission(role: Role, permission: Permission) {
+  return (
+    roleSchema.safeParse(role).success &&
+    roles[role].authorize({ 'team-adwings': [permission] }).success
+  )
+}
+
 export function hasPermission(
   subject: PermissionSubject,
   permission: Permission,
@@ -257,12 +287,14 @@ export function hasPermission(
   // Also deny malformed runtime values from legacy/imported records.
   if (!permissionSchema.safeParse(permission).success) return false
   const actorRoles = 'roles' in subject ? subject.roles : subject
-  // Individual grants cannot extend payroll management beyond these roles.
+  const grantedByRole = actorRoles.some((role) =>
+    grantsPermission(role, permission),
+  )
+  // Individual grants cannot open management workflows outside the account's roles.
   if (
-    payrollManagementPermissions.some(
-      (restricted) => restricted === permission,
-    ) &&
-    !actorRoles.some((role) => payrollManagementRoles.has(role))
+    roleRestrictedManagementPermissions.has(permission) &&
+    !grantedByRole &&
+    !actorRoles.includes('admin')
   )
     return false
   if ('roles' in subject && subject.permissionOverrides) {
@@ -270,11 +302,7 @@ export function hasPermission(
     if (overrides.deny.includes(permission)) return false
     if (overrides.allow.includes(permission)) return true
   }
-  return actorRoles.some(
-    (role) =>
-      roleSchema.safeParse(role).success &&
-      roles[role].authorize({ 'team-adwings': [permission] }).success,
-  )
+  return grantedByRole
 }
 
 export function hasEveryPermission(

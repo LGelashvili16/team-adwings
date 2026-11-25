@@ -30,8 +30,15 @@ function grant(permission: Permission) {
   const roles = roleSchema.options.filter((role) =>
     hasPermission([role], permission),
   )
-  return sql`(not (p.deny ? ${permission}) and (p.allow ? ${permission} or
-    (p.roles <@ ${array(roleSchema.options)} and p.roles && ${array(roles)})))`
+  const overrideRoles = roleSchema.options.filter((role) =>
+    hasPermission(
+      { roles: [role], permissionOverrides: { allow: [permission], deny: [] } },
+      permission,
+    ),
+  )
+  return sql`(not (p.deny ? ${permission}) and p.roles <@ ${array(roleSchema.options)}
+    and (p.roles && ${array(roles)} or
+      (p.allow ? ${permission} and p.roles && ${array(overrideRoles)})))`
 }
 // Mirror the current policy, including fail-closed handling of malformed persisted overrides.
 const reviewers = sql`select a.employee_id, u.id as recipient from attendance_reviewer a

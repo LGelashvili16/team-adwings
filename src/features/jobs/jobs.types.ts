@@ -20,6 +20,7 @@ export type JobSummary = {
   address: string
   kind: JobKind
   deadline: string | null
+  isOverdue?: boolean
   status: JobStatus
   longitude: number | null
   latitude: number | null

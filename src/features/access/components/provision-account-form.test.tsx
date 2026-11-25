@@ -73,26 +73,24 @@ describe('administrative account provisioning', () => {
     expect(
       screen.queryByRole('textbox', { name: 'მომხმარებლის სახელი' }),
     ).not.toBeInTheDocument()
-    await user.click(screen.getByRole('combobox'))
-    expect(
-      (await screen.findAllByRole('option')).map(
-        (option) => option.textContent,
-      ),
-    ).toEqual([
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5)
+    for (const name of [
       'თანამშრომელი',
       'წარმოების სპეციალისტი',
       'წარმოების უფროსი',
       'გაყიდვების მენეჯერი',
       'HR',
     ])
+      expect(screen.getByRole('checkbox', { name })).toBeEnabled()
     await user.click(
-      screen.getByRole('option', { name: 'გაყიდვების მენეჯერი' }),
+      screen.getByRole('checkbox', { name: 'გაყიდვების მენეჯერი' }),
     )
-    expect(screen.getByRole('combobox')).toHaveTextContent(
-      'გაყიდვების მენეჯერი',
-    )
+    expect(
+      screen.getByRole('checkbox', { name: 'გაყიდვების მენეჯერი' }),
+    ).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'თანამშრომელი' })).toBeChecked()
   })
-  it('adds the accountant and admin options for owners and admins without exposing owner', async () => {
+  it('submits HR and accountant together and requires at least one selection', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
     render(
@@ -100,29 +98,29 @@ describe('administrative account provisioning', () => {
         <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin />
       </QueryClientProvider>,
     )
-    await user.click(screen.getByRole('combobox'))
     expect(
-      (await screen.findAllByRole('option')).map(
-        (option) => option.textContent,
-      ),
-    ).toEqual([
-      'თანამშრომელი',
-      'წარმოების სპეციალისტი',
-      'წარმოების უფროსი',
-      'გაყიდვების მენეჯერი',
-      'HR',
-      'ბუღალტერი',
-      'ადმინისტრატორი',
-    ])
-    await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
+      screen.getByRole('checkbox', { name: 'ადმინისტრატორი' }),
+    ).toBeEnabled()
+    expect(
+      screen.queryByRole('checkbox', { name: 'კომპანიის მფლობელი' }),
+    ).not.toBeInTheDocument()
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
       'ანა მაისურაძე',
     )
+    await user.click(screen.getByRole('checkbox', { name: 'თანამშრომელი' }))
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    expect(await screen.findByText('აირჩიეთ მინიმუმ ერთი როლი.')).toBeVisible()
+    expect(create).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('checkbox', { name: 'HR' }))
+    await user.click(screen.getByRole('checkbox', { name: 'ბუღალტერი' }))
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ role: 'admin', workingWeek: null }),
+        data: expect.objectContaining({
+          roles: ['hr_manager', 'accountant'],
+          workingWeek: null,
+        }),
       }),
     )
   })
@@ -145,7 +143,10 @@ describe('administrative account provisioning', () => {
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ role: 'employee', workingWeek: null }),
+        data: expect.objectContaining({
+          roles: ['employee'],
+          workingWeek: null,
+        }),
       }),
     )
   })
@@ -227,7 +228,7 @@ describe('administrative account provisioning', () => {
       data: {
         name: 'ანა მაისურაძე',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
         jobTitle: '',
         phone: '',
         workingWeek: null,

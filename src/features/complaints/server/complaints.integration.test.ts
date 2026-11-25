@@ -165,9 +165,9 @@ describe.runIf(process.env.RUN_COMPLAINTS_DB_TESTS === '1')(
       expect(
         (await service.listComplaints(other, { review: false })).total,
       ).toBe(0)
-      expect(
-        (await service.listComplaints(supervisor, { review: true })).total,
-      ).toBe(0)
+      await expect(
+        service.listComplaints(supervisor, { review: true }),
+      ).rejects.toThrow()
       await expect(service.complaintDetail(other, { id })).rejects.toThrow()
       await expect(
         service.complaintDetail(supervisor, { id }),
@@ -412,16 +412,28 @@ describe.runIf(process.env.RUN_COMPLAINTS_DB_TESTS === '1')(
         await listener.end()
       }
     })
-    it('allows explicit assignment, deduplicates replies, and removes reassigned supervisors', async () => {
+    it('rejects supervisor assignment and preserves scoped assignment for an authorized reviewer', async () => {
       const { id } = await service.createComplaint(employee, input())
+      await expect(
+        service.assignComplaint(hr, {
+          id,
+          revision: 0,
+          assigneeId: supervisor.id,
+          reason: 'განხილვის მინიჭება',
+        }),
+      ).rejects.toThrow()
+      await sql().query(
+        `UPDATE "user" SET permission_overrides='{"allow":["complaints.review.assigned"],"deny":["complaints.review.all"]}' WHERE id=$1`,
+        [platformAdmin.id],
+      )
       await service.assignComplaint(hr, {
         id,
         revision: 0,
-        assigneeId: supervisor.id,
+        assigneeId: platformAdmin.id,
         reason: 'განხილვის მინიჭება',
       })
       expect(
-        (await service.listComplaints(supervisor, { review: true })).total,
+        (await service.listComplaints(platformAdmin, { review: true })).total,
       ).toBe(1)
       const reply = {
         id,
@@ -429,8 +441,8 @@ describe.runIf(process.env.RUN_COMPLAINTS_DB_TESTS === '1')(
         body: 'დამატებითი ინფორმაცია',
       }
       await Promise.all([
-        service.replyToComplaint(supervisor, reply),
-        service.replyToComplaint(supervisor, reply),
+        service.replyToComplaint(platformAdmin, reply),
+        service.replyToComplaint(platformAdmin, reply),
       ])
       const detail = await service.complaintDetail(employee, { id })
       expect(
@@ -444,10 +456,10 @@ describe.runIf(process.env.RUN_COMPLAINTS_DB_TESTS === '1')(
         reason: 'HR აგრძელებს განხილვას',
       })
       expect(
-        (await service.listComplaints(supervisor, { review: true })).total,
+        (await service.listComplaints(platformAdmin, { review: true })).total,
       ).toBe(0)
       await expect(
-        service.complaintDetail(supervisor, { id }),
+        service.complaintDetail(platformAdmin, { id }),
       ).rejects.toThrow()
     })
     it('serializes decisions, preserves history, and prevents self-review or stale writes', async () => {

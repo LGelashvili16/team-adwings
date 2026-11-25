@@ -87,6 +87,11 @@ function checkTarget(actor: Actor, id: string, roles: Array<Role>) {
     throw new AuthorizationError()
 }
 
+function assertAssignableRoles(actor: Actor, roles: ReadonlyArray<Role>) {
+  if (roles.includes('admin') || roles.includes('accountant'))
+    assertPermissions(actor, ['admin.access', 'users.manage', 'roles.manage'])
+}
+
 async function issueChallenge(
   tx: repository.AccessTransaction,
   userId: string,
@@ -111,9 +116,10 @@ async function createEmployee(
   tx: repository.AccessTransaction,
   input: z.infer<typeof provisionAccountSchema> & { code?: string | null },
   manager: Actor | null,
-  role: Role,
+  roles: ReadonlyArray<Role>,
 ) {
   const actorId = manager?.id ?? null
+  const storedRoles = [...new Set(roles)].sort().join(',')
   const username = input.code ?? null
   const userId = await provisionIdentity(
     tx,
@@ -154,16 +160,16 @@ async function createEmployee(
   }
   await tx
     .update(user)
-    .set({ roles: role })
+    .set({ roles: storedRoles })
     .where(sql`${user.id} = ${userId}`)
   await repository.updateIdentity(tx, userId, 'invited', null)
   const challenge = await issueChallenge(tx, userId, actorId, 'activation')
   await repository.auditAccess(tx, {
     actorId,
     targetId: userId,
-    action: `account.provisioned.${role}`,
+    action: `account.provisioned.${storedRoles}`,
     reason:
-      role === 'owner'
+      storedRoles === 'owner'
         ? 'კომპანიის პირველი მფლობელის პირველადი შექმნა.'
         : 'თანამშრომლის ანგარიშის შექმნა.',
   })
@@ -177,14 +183,8 @@ export async function provisionEmployee(
   const input = provisionAccountSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
-    if (input.role === 'admin' || input.role === 'accountant') {
-      assertPermissions(manager, [
-        'admin.access',
-        'users.manage',
-        'roles.manage',
-      ])
-    }
-    return createEmployee(tx, input, manager, input.role)
+    assertAssignableRoles(manager, input.roles)
+    return createEmployee(tx, input, manager, input.roles)
   })
 }
 
@@ -280,22 +280,22 @@ export async function editEmployeeDetails(
     const targetRoles = parseRoles(target.identity.roles)
     checkTarget(manager, input.userId, targetRoles)
     let roleChanged = false
-    if (input.role !== undefined) {
-      if (targetRoles.length !== 1 || targetRoles.includes('owner'))
+    if (input.roles !== undefined) {
+      if (!targetRoles.length || targetRoles.includes('owner'))
         throw new AccountWorkflowError(
-          'ამ ანგარიშის როლის შეცვლა მხოლოდ წვდომის მართვის გვერდიდანაა შესაძლებელი.',
+          'ამ ანგარიშის როლები წვდომის მართვის გვერდიდან იმართება.',
         )
-      if (input.role !== targetRoles[0]) {
-        if (input.role === 'admin' || input.role === 'accountant') {
-          assertPermissions(manager, [
-            'admin.access',
-            'users.manage',
-            'roles.manage',
-          ])
-        }
+      if (input.expectedRoles !== target.identity.roles)
+        throw new AccountWorkflowError(
+          'როლები შეიცვალა. განაახლეთ თანამშრომლის მონაცემები და სცადეთ ხელახლა.',
+        )
+      const storedRoles = [...new Set(input.roles)].sort().join(',')
+      if (storedRoles !== [...targetRoles].sort().join(',')) {
+        assertAssignableRoles(manager, targetRoles)
+        assertAssignableRoles(manager, input.roles)
         await tx
           .update(user)
-          .set({ roles: input.role })
+          .set({ roles: storedRoles })
           .where(sql`${user.id} = ${input.userId}`)
         await repository.revokeSessions(tx, input.userId)
         roleChanged = true
@@ -357,7 +357,7 @@ export async function editEmployeeDetails(
         actorId: manager.id,
         targetId: input.userId,
         action: 'account.role_updated',
-        reason: 'თანამშრომლის როლის განახლება.',
+        reason: 'თანამშრომლის როლების განახლება.',
       })
     }
     if (input.workingWeek === undefined) return
@@ -493,7 +493,7 @@ export async function bootstrapOwner(
     ...provisionAccountSchema.parse({
       name: ownerInput.name,
       contactEmail: ownerInput.contactEmail,
-      role: 'employee',
+      roles: ['employee'],
     }),
     code: ownerInput.code,
   }
@@ -510,7 +510,7 @@ export async function bootstrapOwner(
       throw new AccountWorkflowError(
         'პრივილეგირებული ანგარიში უკვე არსებობს. გამოიყენეთ ანგარიშების მართვის გვერდი.',
       )
-    return createEmployee(tx, input, null, 'owner')
+    return createEmployee(tx, input, null, ['owner'])
   })
 }
 

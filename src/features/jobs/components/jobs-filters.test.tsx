@@ -7,6 +7,54 @@ import { jobSearchSchema } from '../jobs.schemas'
 vi.mock('#/hooks/use-mobile', () => ({ useIsMobile: () => false }))
 
 describe('job URL filters', () => {
+  it.each([
+    ['დღეს და მომავალი ვადები', 'upcoming'],
+    ['ვადაგადაცილებული', 'overdue'],
+  ])(
+    'shows %s in deadline order and restores the range on reset',
+    async (label, deadlineState) => {
+      const onChange = vi.fn()
+      const search = jobSearchSchema.parse({ page: 3, kind: 'measurement' })
+      render(<JobsFilters search={search} onChange={onChange} />)
+      await userEvent.click(
+        screen.getByRole('combobox', { name: 'დალაგება და ვადა' }),
+      )
+      await userEvent.click(await screen.findByRole('option', { name: label }))
+      expect(onChange).toHaveBeenCalledWith(
+        { ...search, page: 1, deadlineState, sort: 'deadline_asc' },
+        false,
+      )
+      await userEvent.click(
+        screen.getByRole('button', { name: 'ფილტრების გასუფთავება' }),
+      )
+      expect(onChange).toHaveBeenLastCalledWith(jobSearchSchema.parse({}))
+    },
+  )
+  it('restores the creation range when switching from overdue jobs to a sort choice', async () => {
+    const onChange = vi.fn()
+    const search = jobSearchSchema.parse({
+      deadlineState: 'overdue',
+      from: '2026-09-01',
+      to: '2026-09-30',
+    })
+    render(<JobsFilters search={search} onChange={onChange} />)
+    const select = screen.getByRole('combobox', { name: 'დალაგება და ვადა' })
+    expect(select).toHaveTextContent('ვადაგადაცილებული')
+    expect(
+      screen.queryByRole('button', { name: /სამუშაოების შექმნის პერიოდი/ }),
+    ).not.toBeInTheDocument()
+    await userEvent.click(select)
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'ჯერ ახლო ვადა' }),
+    )
+    expect(onChange).toHaveBeenCalledWith(
+      { ...search, deadlineState: 'all', sort: 'deadline_asc' },
+      false,
+    )
+    expect(
+      screen.getByRole('button', { name: /სამუშაოების შექმნის პერიოდი/ }),
+    ).toBeVisible()
+  })
   it('offers related-to-me separately from assigned jobs and preserves other filters', async () => {
     const onChange = vi.fn()
     const search = jobSearchSchema.parse({ page: 3, kind: 'measurement' })

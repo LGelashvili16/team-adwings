@@ -240,14 +240,19 @@ describe('job boundary validation', () => {
       status: 'all',
       kind: 'all',
       scope: 'all',
+      deadlineState: 'all',
       sort: 'newest',
       page: 2,
       view: 'map',
     })
+    expect(jobSearchSchema.parse({ deadlineState: 'upcoming' }).sort).toBe(
+      'deadline_asc',
+    )
     for (const input of [
       { page: 0 },
       { page: 10001 },
       { status: 'invalid' },
+      { deadlineState: 'invalid' },
       { sort: 'sql' },
       { q: 'ა'.repeat(101) },
       { pin: 'bad' },

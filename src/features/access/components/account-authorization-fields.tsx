@@ -1,12 +1,21 @@
 import { Checkbox } from '#/components/ui/checkbox'
+import { useId } from 'react'
 import { IconChevronDown } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
+import { Card, CardContent } from '#/components/ui/card'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
-import { Field, FieldLabel, FieldSet, FieldLegend } from '#/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldSet,
+  FieldLegend,
+} from '#/components/ui/field'
 import {
   Select,
   SelectContent,
@@ -19,53 +28,73 @@ import {
   hasPermission,
   permissionSchema,
   roleLabels,
-  roleSchema,
 } from '#/lib/authorization/permissions'
 import { permissionLabels } from '../admin-access.content'
 import type { PermissionOverrides, Role } from '#/lib/authorization/permissions'
+import type { ComponentProps } from 'react'
 
-export function AccountRoleFields({
+export function AccountRoleFields<T extends Role>({
+  options,
   value,
   onChange,
-  owner,
+  owner = false,
   disabled,
   invalid,
+  errors,
 }: {
-  value: Array<Role>
-  onChange: (value: Array<Role>) => void
-  owner: boolean
+  options: ReadonlyArray<T>
+  value: Array<T>
+  onChange: (value: Array<T>) => void
+  owner?: boolean
   disabled: boolean
   invalid: boolean
+  errors: ComponentProps<typeof FieldError>['errors']
 }) {
+  const id = useId()
   return (
-    <FieldSet
-      aria-invalid={invalid}
-      aria-describedby="admin-roles-error"
-      data-invalid={invalid}
-    >
-      <FieldLegend>
-        როლები <span aria-hidden="true">*</span>
-      </FieldLegend>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {roleSchema.options.map((role) => (
-          <Field key={role} orientation="horizontal">
-            <Checkbox
-              id={`role-${role}`}
-              checked={value.includes(role)}
-              disabled={disabled || (role === 'owner' && !owner)}
-              onCheckedChange={(checked) =>
-                onChange(
-                  checked
-                    ? [...value, role]
-                    : value.filter((item) => item !== role),
-                )
-              }
-            />
-            <FieldLabel htmlFor={`role-${role}`}>{roleLabels[role]}</FieldLabel>
-          </Field>
-        ))}
-      </div>
-    </FieldSet>
+    <Card>
+      <CardContent className="@container">
+        <FieldSet
+          className="min-w-0"
+          aria-invalid={invalid}
+          aria-describedby={invalid ? `${id}-hint ${id}-error` : `${id}-hint`}
+          data-invalid={invalid}
+        >
+          <FieldLegend>
+            როლები{' '}
+            <span aria-hidden="true" className="text-destructive">
+              *
+            </span>
+          </FieldLegend>
+          <FieldDescription id={`${id}-hint`}>
+            აირჩიეთ ერთი ან რამდენიმე როლი.
+          </FieldDescription>
+          <div className="grid gap-x-4 gap-y-3 @md:grid-cols-2">
+            {options.map((role) => (
+              <Field key={role} orientation="horizontal">
+                <Checkbox
+                  id={`${id}-${role}`}
+                  className="border-muted-foreground"
+                  checked={value.includes(role)}
+                  disabled={disabled || (role === 'owner' && !owner)}
+                  onCheckedChange={(checked) =>
+                    onChange(
+                      checked
+                        ? [...value, role]
+                        : value.filter((item) => item !== role),
+                    )
+                  }
+                />
+                <FieldLabel htmlFor={`${id}-${role}`}>
+                  {roleLabels[role]}
+                </FieldLabel>
+              </Field>
+            ))}
+          </div>
+          <FieldError id={`${id}-error`} errors={errors} />
+        </FieldSet>
+      </CardContent>
+    </Card>
   )
 }
 export function AccountPermissionFields({
@@ -103,11 +132,18 @@ export function AccountPermissionFields({
         >
           <FieldLegend className="sr-only">ინდივიდუალური უფლებები</FieldLegend>
           <p className="text-sm text-muted-foreground">
-            როლის წესის შეცვლა მოქმედებს მხოლოდ ამ ანგარიშზე. აკრძალვას
-            უპირატესობა აქვს.
+            ინდივიდუალური აკრძალვა როლის უფლებაზე უპირატესია. მართვის გვერდებზე
+            წვდომა ანგარიშის როლებით იზღუდება.
           </p>
           <div className="flex flex-col gap-3">
             {permissionSchema.options.map((permission) => {
+              const canAllow = hasPermission(
+                {
+                  roles,
+                  permissionOverrides: { allow: [permission], deny: [] },
+                },
+                permission,
+              )
               const selected = value.deny.includes(permission)
                 ? 'deny'
                 : value.allow.includes(permission)
@@ -118,7 +154,11 @@ export function AccountPermissionFields({
                   value: 'inherit',
                   label: `როლიდან: ${hasPermission(roles, permission) ? 'დაშვებულია' : 'აკრძალულია'}`,
                 },
-                { value: 'allow', label: 'დაშვება' },
+                {
+                  value: 'allow',
+                  label: canAllow ? 'დაშვება' : 'როლისთვის მიუწვდომელია',
+                  disabled: !canAllow,
+                },
                 { value: 'deny', label: 'აკრძალვა' },
               ]
               return (
@@ -161,7 +201,11 @@ export function AccountPermissionFields({
                     <SelectContent>
                       <SelectGroup>
                         {choices.map((choice) => (
-                          <SelectItem key={choice.value} value={choice.value}>
+                          <SelectItem
+                            key={choice.value}
+                            value={choice.value}
+                            disabled={choice.disabled}
+                          >
                             {choice.label}
                           </SelectItem>
                         ))}

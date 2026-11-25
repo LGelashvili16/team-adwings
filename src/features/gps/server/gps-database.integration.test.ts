@@ -207,8 +207,8 @@ it.skipIf(!url)(
 
     const viewer: Actor = {
       ...owner,
-      roles: ['employee'],
-      permissionOverrides: { allow: ['manage.access', 'gps.read'], deny: [] },
+      roles: ['supervisor'],
+      permissionOverrides: { allow: [], deny: ['gps.manage'] },
     }
     expect((await readGpsMapDevices(viewer, all({ q: 'ახალი' }))).total).toBe(1)
     await expect(
@@ -218,7 +218,11 @@ it.skipIf(!url)(
       readGpsMapDevices(
         {
           ...viewer,
-          permissionOverrides: { allow: ['manage.access'], deny: [] },
+          roles: ['employee'],
+          permissionOverrides: {
+            allow: ['manage.access', 'gps.read'],
+            deny: [],
+          },
         },
         all(),
       ),

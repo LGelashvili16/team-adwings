@@ -1468,6 +1468,53 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     expect(record.history).toHaveLength(1)
     expect((await service.listCompanyJobs(worker, search)).total).toBe(1)
   })
+  it('finds unfinished upcoming and overdue jobs regardless of when they were created', async () => {
+    const {
+      rows: [dates],
+    } = await sql().query<{
+      today: string
+      yesterday: string
+      tomorrow: string
+    }>(
+      `select day::text as today, (day - 1)::text as yesterday, (day + 1)::text as tomorrow
+       from (select (current_timestamp at time zone 'Asia/Tbilisi')::date as day) as clock`,
+    )
+    const later = await createPin({ deadline: dates.tomorrow })
+    const today = await createPin({ deadline: dates.today })
+    const overdue = await createPin({ deadline: dates.yesterday })
+    const completed = await createPin({ deadline: dates.yesterday })
+    const rejected = await createPin({ deadline: dates.yesterday })
+    const undated = await createPin()
+    await sql().query(
+      "UPDATE job SET created_at = '2020-01-01' WHERE id = $1",
+      [overdue.id],
+    )
+    await sql().query('UPDATE job SET deadline = null WHERE id = $1', [
+      undated.id,
+    ])
+    await transition(completed.id, 'completed', manager)
+    await transition(rejected.id, 'rejected', manager, 'ობიექტი დაკეტილია')
+
+    const upcoming = await service.listCompanyJobs(worker, {
+      view: 'list',
+      deadlineState: 'upcoming',
+    })
+    expect(upcoming.total).toBe(2)
+    expect(upcoming.items.map(({ id }) => id)).toEqual([today.id, later.id])
+    expect(upcoming.markers.map(({ id }) => id)).toEqual([today.id, later.id])
+    expect(upcoming.items.every(({ isOverdue }) => !isOverdue)).toBe(true)
+
+    const pastDue = await service.listCompanyJobs(worker, {
+      deadlineState: 'overdue',
+    })
+    expect(pastDue.total).toBe(1)
+    expect(pastDue.items).toMatchObject([{ id: overdue.id, isOverdue: true }])
+    expect(pastDue.markers).toMatchObject([{ id: overdue.id }])
+    expect(await detail(overdue.id)).toMatchObject({ isOverdue: true })
+    expect(await detail(completed.id)).toMatchObject({ isOverdue: false })
+    expect(await detail(rejected.id)).toMatchObject({ isOverdue: false })
+    expect(await detail(undated.id)).toMatchObject({ isOverdue: false })
+  })
   it('sorts deadlines across pages in both directions with missing deadlines last', async () => {
     const early = await createPin({ deadline: '2026-11-01' })
     const late = await createPin({ deadline: '2026-11-30' })

@@ -119,7 +119,7 @@ describe('direct server authorization guards', () => {
   it('returns a valid actor and requires every grant', async () => {
     mocks.readActor.mockResolvedValue({
       ...actor,
-      roles: ['admin', 'supervisor'],
+      roles: ['admin', 'hr_manager'],
     })
     await expect(requireActor()).resolves.toMatchObject({ id: actor.id })
     await expect(

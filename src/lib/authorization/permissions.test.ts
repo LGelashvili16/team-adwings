@@ -83,7 +83,11 @@ describe('role and permission boundaries', () => {
       expect(hasEveryPermission(subject, payroll)).toBe(
         ['accountant', 'admin', 'owner'].includes(role),
       )
-      expect(hasPermission(subject, 'manage.access')).toBe(true)
+      expect(hasPermission(subject, 'manage.access')).toBe(
+        ['supervisor', 'hr_manager', 'accountant', 'admin', 'owner'].includes(
+          role,
+        ),
+      )
     }
     expect(hasEveryPermission(['employee', 'accountant'], payroll)).toBe(true)
   })
@@ -103,11 +107,11 @@ describe('role and permission boundaries', () => {
       expect(parseRoles(`employee,${role}`)).toEqual([])
     }
   })
-  it('limits sales managers to job management and its navigation grant', () => {
+  it('limits sales managers to job management', () => {
     expect(parseRoles('sales_manager')).toEqual(['sales_manager'])
     for (const permission of permissionSchema.options)
       expect(hasPermission(['sales_manager'], permission)).toBe(
-        permission === 'manage.access' || permission === 'jobs.manage',
+        permission === 'jobs.manage',
       )
   })
   it('grants vacation review to HR, admins, and owners, with explicit denials taking precedence', () => {
@@ -244,7 +248,7 @@ describe('role and permission boundaries', () => {
         platformPermissions.some((platform) => platform === permission),
       )
     }
-    expect(hasPermission(['supervisor'], 'timesheets.review.team')).toBe(true)
+    expect(hasPermission(['supervisor'], 'timesheets.review.team')).toBe(false)
     expect(hasPermission(['supervisor'], 'roles.manage')).toBe(false)
   })
   it('combines explicit grants without adding unrelated permissions', () => {
@@ -253,7 +257,7 @@ describe('role and permission boundaries', () => {
       'supervisor',
     ])
     expect(
-      hasPermission(['admin', 'supervisor'], 'timesheets.review.team'),
+      hasPermission(['accountant', 'hr_manager'], 'timesheets.review.team'),
     ).toBe(true)
     expect(hasPermission(['supervisor'], 'employees.manage')).toBe(false)
   })
@@ -299,11 +303,36 @@ describe('role and permission boundaries', () => {
     expect(hasEveryPermission(['owner'], permissionSchema.options)).toBe(true)
   })
   it('combines grants across roles for all/any checks', () => {
-    const required = ['users.manage', 'timesheets.review.team'] as const
-    expect(hasEveryPermission(['admin', 'supervisor'], required)).toBe(true)
-    expect(hasEveryPermission(['admin'], required)).toBe(false)
-    expect(hasAnyPermission(['supervisor'], required)).toBe(true)
+    const required = ['payroll.manage', 'attendance.read.all'] as const
+    expect(hasEveryPermission(['accountant', 'hr_manager'], required)).toBe(
+      true,
+    )
+    expect(hasEveryPermission(['accountant'], required)).toBe(false)
+    expect(hasAnyPermission(['hr_manager'], required)).toBe(true)
     expect(hasAnyPermission(['employee'], required)).toBe(false)
+  })
+  it('keeps management permissions within assigned roles even with individual allows', () => {
+    const allow = permissionSchema.options
+    for (const [role, permission] of [
+      ['employee', 'manage.access'],
+      ['sales_manager', 'manage.access'],
+      ['production_specialist', 'gps.read'],
+      ['supervisor', 'attendance.read.team'],
+      ['supervisor', 'complaints.review.assigned'],
+      ['hr_manager', 'teams.manage'],
+      ['accountant', 'gps.manage'],
+    ] as const)
+      expect(
+        hasPermission(
+          { roles: [role], permissionOverrides: { allow, deny: [] } },
+          permission,
+        ),
+      ).toBe(false)
+
+    for (const role of ['supervisor', 'hr_manager'] as const)
+      expect(
+        hasEveryPermission([role], ['manage.access', 'gps.read', 'gps.manage']),
+      ).toBe(true)
   })
 })
 

@@ -15,16 +15,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '#/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
-import { roleLabels } from '#/lib/authorization/permissions'
 import { createEmployeeAccount } from '../access.functions'
 import {
   employeeRoleSchema,
@@ -32,13 +23,14 @@ import {
   provisionAccountSchema,
 } from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
+import { AccountRoleFields } from './account-authorization-fields'
 import type { z } from 'zod'
 import type { IssuedAccountCode } from '../access.types'
 
 const defaults: z.input<typeof provisionAccountSchema> = {
   name: '',
   contactEmail: '',
-  role: 'employee',
+  roles: ['employee'],
   jobTitle: '',
   phone: '',
   workingWeek: null,
@@ -89,9 +81,6 @@ export function ProvisionAccountForm({
   const availableRoles = canAssignAdmin
     ? provisionableRoleSchema.options
     : employeeRoleSchema.options
-  const allowedRoleSchema = canAssignAdmin
-    ? provisionableRoleSchema
-    : employeeRoleSchema
   const settings = useQuery(dayOffSettingsQuery())
   const client = useQueryClient()
   const [error, setError] = useState('')
@@ -176,44 +165,16 @@ export function ProvisionAccountForm({
             )}
           </form.Field>
         ))}
-        <form.Field name="role">
+        <form.Field name="roles">
           {(field) => (
-            <Field data-invalid={!field.state.meta.isValid}>
-              <FieldLabel htmlFor="provision-role">
-                როლი{' '}
-                <span aria-hidden="true" className="text-destructive">
-                  *
-                </span>
-              </FieldLabel>
-              <Select
-                required
-                value={field.state.value}
-                disabled={mutation.isPending}
-                onValueChange={(value) => {
-                  const parsed = allowedRoleSchema.safeParse(value)
-                  if (parsed.success) field.handleChange(parsed.data)
-                }}
-              >
-                <SelectTrigger
-                  id="provision-role"
-                  className="w-full"
-                  aria-required="true"
-                  aria-invalid={!field.state.meta.isValid}
-                >
-                  <SelectValue>{roleLabels[field.state.value]}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {availableRoles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {roleLabels[role]}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldError errors={field.state.meta.errors} />
-            </Field>
+            <AccountRoleFields
+              options={availableRoles}
+              value={field.state.value}
+              onChange={field.handleChange}
+              disabled={mutation.isPending}
+              invalid={!field.state.meta.isValid}
+              errors={field.state.meta.errors}
+            />
           )}
         </form.Field>
         {canSetEmploymentDate ? (

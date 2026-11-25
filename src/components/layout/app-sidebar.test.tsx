@@ -365,7 +365,7 @@ describe('workspace navigation', () => {
       ).not.toBeInTheDocument()
     },
   )
-  it.each(['owner', 'supervisor'] as const)(
+  it.each(['owner', 'hr_manager'] as const)(
     'uses one attendance workspace for %s without duplicate management routes',
     (role) => {
       location.pathname = '/manage/attendance/worker'
@@ -384,6 +384,50 @@ describe('workspace navigation', () => {
       expect(
         screen.getByRole('link', { name: 'სამუშაოების რუკა' }),
       ).toHaveAttribute('href', '/jobs')
+    },
+  )
+  it.each([
+    { roles: ['supervisor'], paths: ['teams', 'gps'] },
+    {
+      roles: ['hr_manager'],
+      paths: [
+        'attendance',
+        'employees',
+        'gps',
+        'devices',
+        'leave',
+        'schedule',
+        'announcements',
+        'complaints',
+        'reports',
+      ],
+    },
+    {
+      roles: ['accountant', 'hr_manager'],
+      paths: [
+        'payroll/monthly',
+        'attendance',
+        'employees',
+        'gps',
+        'devices',
+        'leave',
+        'schedule',
+        'announcements',
+        'complaints',
+        'reports',
+      ],
+    },
+    { roles: ['sales_manager'], paths: [] },
+    { roles: ['production_specialist'], paths: [] },
+  ] satisfies Array<{ roles: Array<Role>; paths: Array<string> }>)(
+    'renders exactly the management pages granted to $roles',
+    ({ roles, paths }) => {
+      const { container } = renderSidebar(roles)
+      expect(
+        Array.from(container.querySelectorAll('a[href^="/manage/"]'), (link) =>
+          link.getAttribute('href'),
+        ),
+      ).toEqual(paths.map((path) => `/manage/${path}`))
     },
   )
   it.each(['admin', 'owner'] as const)(

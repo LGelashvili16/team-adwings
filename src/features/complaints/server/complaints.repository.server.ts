@@ -184,7 +184,7 @@ export async function reviewerAccounts(tx: ComplaintTransaction, q = '') {
       and(
         eq(user.accessState, 'active'),
         or(isNull(employee.id), eq(employee.status, 'active')),
-        sql`(${user.roles} ~ '(^|,)(hr_manager|supervisor|admin|owner)(,|$)' or (${user.permissionOverrides}->'allow') ?| array['complaints.review.all','complaints.review.assigned'])`,
+        sql`(${user.roles} ~ '(^|,)[[:space:]]*(hr_manager|admin|owner)[[:space:]]*(,|$)' or (${user.permissionOverrides}->'allow') ?| array['complaints.review.all','complaints.review.assigned'])`,
         escaped ? ilike(user.name, `%${escaped}%`) : undefined,
       ),
     )

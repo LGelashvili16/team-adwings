@@ -2,23 +2,41 @@ import { expect, it } from 'vitest'
 import { jobIndicators, jobMarkerPriority } from './jobs.indicators'
 
 const now = Date.parse('2026-11-24T20:30:00Z')
-it('orders overlapping jobs by selection, combined indicators, new, due tomorrow, then ordinary pins', () => {
-  const ordinary = { isNew: false, dueTomorrow: false }
-  const deadline = { ...ordinary, dueTomorrow: true }
-  const unread = { ...ordinary, isNew: true }
-  const both = { isNew: true, dueTomorrow: true }
-  expect(jobMarkerPriority(deadline, false)).toBeGreaterThan(
-    jobMarkerPriority(ordinary, false),
+it.each(['dueTomorrow', 'isOverdue'] as const)(
+  'prioritizes overlapping pins with %s and unread indicators',
+  (indicator) => {
+    const ordinary = { isNew: false, dueTomorrow: false, isOverdue: false }
+    const deadline = { ...ordinary, [indicator]: true }
+    const unread = { ...ordinary, isNew: true }
+    const both = { ...deadline, isNew: true }
+    expect(jobMarkerPriority(deadline, false)).toBeGreaterThan(
+      jobMarkerPriority(ordinary, false),
+    )
+    expect(jobMarkerPriority(unread, false)).toBeGreaterThan(
+      jobMarkerPriority(deadline, false),
+    )
+    expect(jobMarkerPriority(both, false)).toBeGreaterThan(
+      jobMarkerPriority(unread, false),
+    )
+    expect(jobMarkerPriority(ordinary, true)).toBeGreaterThan(
+      jobMarkerPriority(both, false),
+    )
+  },
+)
+it('marks unfinished jobs overdue once their Tbilisi calendar day ends', () => {
+  const pending = { deadline: '2026-11-24', status: 'pending' as const }
+  expect(
+    jobIndicators(pending, Date.parse('2026-11-24T19:59:59Z')).isOverdue,
+  ).toBe(false)
+  expect(jobIndicators(pending, now)).toMatchObject({
+    isOverdue: true,
+    dueTomorrow: false,
+  })
+  expect(jobIndicators({ ...pending, deadline: null }, now).isOverdue).toBe(
+    false,
   )
-  expect(jobMarkerPriority(unread, false)).toBeGreaterThan(
-    jobMarkerPriority(deadline, false),
-  )
-  expect(jobMarkerPriority(both, false)).toBeGreaterThan(
-    jobMarkerPriority(unread, false),
-  )
-  expect(jobMarkerPriority(ordinary, true)).toBeGreaterThan(
-    jobMarkerPriority(both, false),
-  )
+  for (const status of ['completed', 'rejected'] as const)
+    expect(jobIndicators({ ...pending, status }, now).isOverdue).toBe(false)
 })
 it('uses the company calendar after local midnight and omits closed jobs', () => {
   expect(

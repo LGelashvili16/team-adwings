@@ -7,9 +7,12 @@ import {
   count,
   desc,
   eq,
+  gte,
   gt,
   ilike,
   isNotNull,
+  lt,
+  notInArray,
   or,
   sql,
 } from 'drizzle-orm'
@@ -107,12 +110,17 @@ export async function jobNotificationDetails(tx: JobsTransaction, id: string) {
       .where(eq(job.id, id))
   ).at(0)
 }
+const currentJobDay = sql`(current_timestamp at time zone ${jobsTimeZone})::date`
+const hasOpenDeadline = notInArray(job.status, ['completed', 'rejected'])
+const overdueDeadline = and(hasOpenDeadline, lt(job.deadline, currentJobDay))
+
 const summaryColumns = {
   id: job.id,
   title: job.title,
   address: job.address,
   kind: job.kind,
   deadline: job.deadline,
+  isOverdue: sql<boolean>`coalesce(${overdueDeadline}, false)`,
   status: job.status,
   longitude: job.longitude,
   latitude: job.latitude,
@@ -160,9 +168,17 @@ export async function listJobs(
   )
   // Escape SQL wildcard characters so ordinary input is a literal substring search.
   const term = `%${search.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+  const period =
+    search.deadlineState === 'all'
+      ? and(
+          sql`${job.createdAt} >= (${search.from}::date::timestamp at time zone ${jobsTimeZone})`,
+          sql`${job.createdAt} < ((${search.to}::date + 1)::timestamp at time zone ${jobsTimeZone})`,
+        )
+      : search.deadlineState === 'upcoming'
+        ? and(hasOpenDeadline, gte(job.deadline, currentJobDay))
+        : overdueDeadline
   const where = and(
-    sql`${job.createdAt} >= (${search.from}::date::timestamp at time zone ${jobsTimeZone})`,
-    sql`${job.createdAt} < ((${search.to}::date + 1)::timestamp at time zone ${jobsTimeZone})`,
+    period,
     search.q
       ? or(
           ilike(job.title, term),

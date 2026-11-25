@@ -121,10 +121,10 @@ describe('single account page', () => {
       for (const cb of callbacks) cb(performance.now())
     }
   })
-  it('saves employee edits without requesting or submitting a reason', async () => {
+  it('edits an existing role set together with employee details', async () => {
     updateEmployeeDetails.mockResolvedValue({ ok: true })
     const user = userEvent.setup()
-    renderDetail()
+    renderDetail({ roles: 'employee,hr_manager' })
     await user.click(await screen.findByRole('button', { name: 'რედაქტირება' }))
     expect(
       await screen.findByRole('dialog', { name: 'მონაცემების რედაქტირება' }),
@@ -138,25 +138,16 @@ describe('single account page', () => {
     })
     await user.clear(username)
     await user.type(username, 'worker-updated')
-    await user.click(screen.getByRole('combobox'))
-    expect(
-      (await screen.findAllByRole('option')).map((opt) => opt.textContent),
-    ).toEqual([
-      'თანამშრომელი',
-      'წარმოების სპეციალისტი',
-      'წარმოების უფროსი',
-      'გაყიდვების მენეჯერი',
-      'HR',
-      'ბუღალტერი',
-      'ადმინისტრატორი',
-    ])
-    await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
+    expect(screen.getByRole('checkbox', { name: 'HR' })).toBeChecked()
+    await user.click(screen.getByRole('checkbox', { name: 'თანამშრომელი' }))
+    await user.click(screen.getByRole('checkbox', { name: 'ბუღალტერი' }))
     await user.click(screen.getByRole('button', { name: 'შენახვა' }))
     expect(updateEmployeeDetails).toHaveBeenCalledOnce()
     expect(updateEmployeeDetails.mock.calls[0][0].data).toMatchObject({
       name: 'განახლებული სახელი',
       code: 'worker-updated',
-      role: 'admin',
+      roles: ['hr_manager', 'accountant'],
+      expectedRoles: 'employee,hr_manager',
       userId: 'employee',
     })
     expect(updateEmployeeDetails.mock.calls[0][0].data).not.toHaveProperty(
@@ -172,16 +163,11 @@ describe('single account page', () => {
     ).toHaveAttribute('href', '/manage/employees?page=1')
     await user.click(await screen.findByRole('button', { name: 'რედაქტირება' }))
     expect(await screen.findByRole('dialog')).toBeVisible()
-    await user.click(screen.getByRole('combobox'))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5)
+    expect(screen.getByRole('checkbox', { name: 'HR' })).toBeEnabled()
     expect(
-      (await screen.findAllByRole('option')).map((opt) => opt.textContent),
-    ).toEqual([
-      'თანამშრომელი',
-      'წარმოების სპეციალისტი',
-      'წარმოების უფროსი',
-      'გაყიდვების მენეჯერი',
-      'HR',
-    ])
+      screen.queryByRole('checkbox', { name: 'ბუღალტერი' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.getByRole('switch', { name: 'კომპანიის განრიგის გამოყენება' }),
     ).toBeInTheDocument()
@@ -225,8 +211,11 @@ describe('single account page', () => {
       {},
       {
         ...actor,
-        roles: ['supervisor'],
-        permissionOverrides: { allow: [], deny: ['timesheets.review.team'] },
+        roles: ['hr_manager'],
+        permissionOverrides: {
+          allow: [],
+          deny: ['attendance.read.all', 'timesheets.review.team'],
+        },
       },
     )
     expect(
