@@ -28,7 +28,6 @@ describe('payroll settings validation', () => {
       expect(
         payrollSettingsFormSchema.safeParse({
           ...draft,
-          reason: request.reason,
           incomeTaxBasisPoints: value,
         }).success,
       ).toBe(false)

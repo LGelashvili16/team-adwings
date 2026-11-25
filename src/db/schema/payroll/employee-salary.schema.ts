@@ -39,7 +39,7 @@ export const employeeSalaryTerm = pgTable(
     actorId: text('actor_id')
       .notNull()
       .references(() => user.id, { onDelete: 'restrict' }),
-    /** Required administrative explanation, excluded from employee self-service responses. */
+    /** Administrative audit note or earlier explanation, excluded from employee self-service. */
     reason: text('reason').notNull(),
     /** Database-generated UTC recording instant. */
     createdAt: createdAt(),

@@ -29,7 +29,6 @@ function defaults(initial: PayrollSettingsView) {
       latest.employerPensionBasisPoints,
     ),
     expectedVersion: latest.version,
-    reason: '',
   }
 }
 
@@ -76,7 +75,6 @@ export function usePayrollSettingsForm(
         const savedValues = {
           ...parsed,
           expectedVersion: result.value.version,
-          reason: '',
         }
         // Keep Form's options and reset baseline aligned so a rerender cannot restore the original rates.
         setInitialValues(savedValues)

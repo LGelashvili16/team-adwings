@@ -45,10 +45,19 @@ export const salaryDirectorySchema = z.object(
   { error: 'მოთხოვნა არასწორია.' },
 )
 export const salaryHistorySearchSchema = z.object({ page })
-export const salarySelfReadSchema = z.strictObject(
-  { page },
-  { error: 'მოთხოვნა არასწორია.' },
-)
+export const payrollMonthSchema = z
+  .string({ error: 'აირჩიეთ თვე.' })
+  .regex(/^(20\d{2}|2100)-(0[1-9]|1[0-2])$/, 'აირჩიეთ სწორი თვე.')
+const salarySelfSearch = {
+  page,
+  statementPage: page,
+  month: payrollMonthSchema.optional(),
+}
+export const salarySelfSearchSchema = z.object(salarySelfSearch)
+export const salarySelfReadSchema = z.strictObject(salarySelfSearch, {
+  error: 'მოთხოვნა არასწორია.',
+})
+export type SalarySelfSearch = z.output<typeof salarySelfSearchSchema>
 export const salaryFilterFormSchema = z.object({
   page: z
     .number({ error: 'გვერდი არასწორია.' })
@@ -104,7 +113,8 @@ export const salarySaveSchema = z.strictObject(
       .string({ error: 'მიუთითეთ ცვლილების მიზეზი.' })
       .trim()
       .min(5, 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.')
-      .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.'),
+      .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
+      .optional(),
   },
   { error: 'ხელფასის მონაცემები არასწორია.' },
 )
@@ -121,7 +131,6 @@ export const salaryFormSchema = z.object({
   kind: salaryKindSchema,
   amountBasis: salaryBasisSchema,
   amount,
-  reason: salarySaveSchema.shape.reason,
 })
 /** Parse decimal text into exact integer tetri without binary floating-point rounding. */
 export function salaryToMinor(value: string) {

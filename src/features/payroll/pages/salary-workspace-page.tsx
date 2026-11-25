@@ -1,26 +1,23 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi, Link } from '@tanstack/react-router'
-import { IconArrowLeft, IconEdit } from '@tabler/icons-react'
+import { IconArrowLeft, IconEdit, IconAlertCircle } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
+import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Button } from '#/components/ui/button'
+import { Card } from '#/components/ui/card'
 import { Skeleton } from '#/components/ui/skeleton'
 import { DataPagination } from '#/components/common/data-pagination'
+import { accountInitials } from '#/features/access/access.presentation'
 import { hasPermission } from '#/lib/authorization/permissions'
-import { employeeSalaryQuery, mySalaryQuery } from '../salary.queries'
+import { employeeSalaryQuery } from '../salary.queries'
 import { SalarySummary } from '../components/salary-summary'
 import { SalaryHistory } from '../components/salary-history'
 import { SalaryEditor } from '../components/salary-editor'
 import type { Actor } from '#/lib/authorization/actor'
 import type { SalaryEmployee } from '../salary.types'
 
-const personalRoute = getRouteApi('/_authenticated/payroll')
 const employeeRoute = getRouteApi('/_authenticated/manage/payroll/$userId')
-export function MySalaryPage() {
-  const { actor } = personalRoute.useRouteContext()
-  const { page } = personalRoute.useSearch()
-  return <SalaryWorkspace key={actor.id} actor={actor} page={page} />
-}
 export function EmployeeSalaryPage() {
   const { actor } = employeeRoute.useRouteContext()
   const { userId } = employeeRoute.useParams()
@@ -35,14 +32,10 @@ export function SalaryWorkspace({
   page,
 }: {
   actor: Actor
-  userId?: string
+  userId: string
   page: number
 }) {
-  const query = useQuery(
-    userId
-      ? employeeSalaryQuery(actor.id, userId, page)
-      : mySalaryQuery(actor.id, page),
-  )
+  const query = useQuery(employeeSalaryQuery(actor.id, userId, page))
   const [draft, setDraft] = useState<{
     key: number
     targets: SalaryEmployee[]
@@ -50,61 +43,74 @@ export function SalaryWorkspace({
   const [open, setOpen] = useState(false)
   const view = query.data?.ok ? query.data.value : null
   const canEdit =
-    !!userId &&
-    actor.id !== userId &&
-    hasPermission(actor, 'payroll.terms.manage')
-  return (
-    <div className="flex min-w-0 max-w-6xl flex-col gap-6">
-      {userId ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-fit"
-          nativeButton={false}
-          role="link"
-          render={<Link to="/manage/payroll" />}
-        >
-          <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
-          ხელფასები
-        </Button>
-      ) : null}
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    actor.id !== userId && hasPermission(actor, 'payroll.terms.manage')
+  const header = (
+    <header className="relative flex flex-wrap items-center justify-between gap-4">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        {view ? (
+          <Avatar
+            className="size-12 shrink-0 ring-1 ring-border sm:size-14"
+            aria-hidden="true"
+          >
+            <AvatarFallback className="bg-accent text-lg font-semibold text-accent-foreground">
+              {accountInitials(view.employee.name)}
+            </AvatarFallback>
+          </Avatar>
+        ) : null}
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">
-            {userId
-              ? (view?.employee.name ?? 'თანამშრომლის ხელფასი')
-              : 'ხელფასი'}
+          <h1 className="wrap-anywhere text-2xl font-semibold tracking-tight">
+            {view?.employee.name ?? 'თანამშრომლის ხელფასი'}
           </h1>
-          {userId && view?.employee.jobTitle ? (
-            <p className="mt-1 text-sm text-muted-foreground">
+          {view?.employee.jobTitle ? (
+            <p className="mt-1 wrap-anywhere text-sm text-muted-foreground">
               {view.employee.jobTitle}
             </p>
           ) : null}
         </div>
-        {canEdit && view ? (
-          <Button
-            onClick={() => {
-              setDraft({ key: (draft?.key ?? 0) + 1, targets: [view.employee] })
-              setOpen(true)
-            }}
-          >
-            <IconEdit data-icon="inline-start" aria-hidden="true" />
-            ხელფასის განსაზღვრა
-          </Button>
-        ) : null}
-      </header>
+      </div>
+      {canEdit && view ? (
+        <Button
+          className="max-sm:w-full"
+          onClick={() => {
+            setDraft({ key: (draft?.key ?? 0) + 1, targets: [view.employee] })
+            setOpen(true)
+          }}
+        >
+          <IconEdit data-icon="inline-start" aria-hidden="true" />
+          ხელფასის განსაზღვრა
+        </Button>
+      ) : null}
+    </header>
+  )
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-6">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-fit"
+        nativeButton={false}
+        role="link"
+        render={<Link to="/manage/payroll" />}
+      >
+        <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
+        თანამშრომლების ხელფასები
+      </Button>
+      <Card className="rounded-2xl bg-linear-to-br from-muted/60 via-card to-card px-4 py-5 sm:px-6">
+        {header}
+      </Card>
       {query.isPending ? (
         <div role="status" aria-busy="true" aria-label="ხელფასი იტვირთება">
-          <div aria-hidden="true" className="flex flex-col gap-4">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Skeleton className="h-52 rounded-xl" />
-              <Skeleton className="h-52 rounded-xl" />
+          <div aria-hidden="true" className="flex flex-col gap-6">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+              <Skeleton className="h-56 rounded-xl" />
+              <Skeleton className="h-56 rounded-xl" />
             </div>
             <Skeleton className="h-64 rounded-xl" />
           </div>
         </div>
       ) : !view ? (
         <Alert variant="destructive">
+          <IconAlertCircle aria-hidden="true" />
           <AlertDescription>
             {query.data && !query.data.ok
               ? query.data.message
@@ -114,13 +120,6 @@ export function SalaryWorkspace({
       ) : (
         <>
           <SalarySummary employee={view.employee} />
-          <Alert variant="info">
-            <AlertDescription>
-              თვის დარიცხვებისა და სახელფასო უწყისის გამოთვლა ჯერ არ არის
-              ჩართული. აქ ნაჩვენებია შეთანხმებული ხელფასი და ცვლილებების
-              ისტორია.
-            </AlertDescription>
-          </Alert>
           {userId === actor.id ? (
             <p className="text-sm text-muted-foreground">
               საკუთარი ხელფასის შესაცვლელად მიმართეთ სხვა უფლებამოსილ პირს.
@@ -135,22 +134,14 @@ export function SalaryWorkspace({
                   page={page}
                   total={view.total}
                   pageSize={view.pageSize}
-                  renderLink={(next) =>
-                    userId ? (
-                      <Link
-                        to="/manage/payroll/$userId"
-                        params={{ userId }}
-                        search={{ page: next }}
-                        resetScroll={false}
-                      />
-                    ) : (
-                      <Link
-                        to="/payroll"
-                        search={{ page: next }}
-                        resetScroll={false}
-                      />
-                    )
-                  }
+                  renderLink={(next) => (
+                    <Link
+                      to="/manage/payroll/$userId"
+                      params={{ userId }}
+                      search={{ page: next }}
+                      resetScroll={false}
+                    />
+                  )}
                 />
               ) : undefined
             }

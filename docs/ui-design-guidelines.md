@@ -207,6 +207,8 @@ For grouped records, paginate the meaningful group when the UI promises complete
 
 Use shadcn `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` for tabbed sections. Higher-level tabs must appear below the page's main title.
 
+Payroll uses the same header and tab order across its tabbed pages. On narrow screens, page actions sit below the scrollable tab strip so the strip remains at the same height when actions appear or disappear.
+
 Do not add route-changing tabs that duplicate destinations already shown as separate sidebar links. The `დასწრებები` sidebar item opens the employee directory. Selecting an employee opens one detail page with local attendance and monthly-hours tabs; both tabs keep that sidebar item active. There is no standalone company-timesheets sidebar item or route. Section tabs remain appropriate for related views that are not separately exposed in the sidebar, such as personal attendance and its correction/hour views.
 
 The approved appearance is the existing attendance tab strip shown in the user's reference:
@@ -296,6 +298,10 @@ When the user changes a shared UI standard, update this file instead of creating
 
 ## Payroll configuration
 
+Payroll tabs use compensation-specific Tabler icons and place settings last. Use the shared shadcn Calendar to choose a whole payroll month. Payroll filters use the compact, rounded Jobs toolbar styling and wrap within the available width. Give payroll alerts an icon that matches their severity. Show the month status in the toolbar after finalization. Use one tab and one entry sheet for bonuses, premiums and fines.
+
+The management salary detail uses the full available content width. Give the current agreement more emphasis than the scheduled change. Show salary history as a table on wider screens and as stacked entries on narrow screens so dates, amounts and audit details remain readable.
+
 `/manage/payroll/settings` belongs to management navigation under `ხელფასების პარამეტრები`, guarded by `payroll.configure`. Administrators, accountants and owners can edit it without granting accountants platform-administration access. Use separate Cards for calculation rules, statutory withholding settings and the save reason, with a single Save action. Keep employee and employer pension rates separately labeled and explain that the employer share is an additional company expense. Disabled built-in calculation does not imply a statutory exemption. Retain the dated version indicator, honest unavailable-calculation notice, inline validation, required reason, pending Spinner and draft preservation after conflicts or background refetch failures. Date selection uses the Georgian shadcn Calendar. Never display estimated settings as an employee's salary or simulate deductions.
 
 | Version | Date       | Decision                                                                                                                                                                                                               |
@@ -344,6 +350,7 @@ When the user changes a shared UI standard, update this file instead of creating
 ## Employee creation and day-off allowance
 
 - Open employee creation in a right shadcn Sheet from the page action; the employee list uses the full available width. Keep the form scrollable and preserve the one-time activation-code dialog.
+- Show the optional employment start date in employee creation for managers with employment-date permissions. Use the shared Georgian date picker with an empty initial value.
 - Employee profiles also use the full available content width. Profile editing opens in a matching right shadcn Sheet, with the same desktop width, full width on mobile, a fixed title header, and a scrollable form. Label the leave-balance action რედაქტირება.
 - Schedule settings define the starting day-off allowance (initially 4) and a toggle for calendar-year resets. Employee creation inherits the company default with an optional override. Employee profiles show remaining days and permit authorized HR adjustments. Approved day offs consume one day; vacations are separate.
 

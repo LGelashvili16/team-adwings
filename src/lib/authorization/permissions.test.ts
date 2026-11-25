@@ -36,8 +36,7 @@ describe('role and permission boundaries', () => {
           'payroll.configure',
           'payroll.read.all',
           'payroll.terms.manage',
-          'payroll.awards.propose',
-          'payroll.awards.review',
+          'payroll.manage',
         ].includes(permission),
       )
     for (const role of roleSchema.options)
@@ -45,8 +44,7 @@ describe('role and permission boundaries', () => {
         'payroll.configure',
         'payroll.read.all',
         'payroll.terms.manage',
-        'payroll.awards.propose',
-        'payroll.awards.review',
+        'payroll.manage',
       ] as const)
         expect(hasPermission([role], permission)).toBe(
           ['accountant', 'admin', 'owner'].includes(role),
@@ -66,6 +64,28 @@ describe('role and permission boundaries', () => {
       expect(hasPermission([role], 'announcements.manage')).toBe(
         ['hr_manager', 'admin', 'owner'].includes(role),
       )
+  })
+  it('keeps payroll management grants inside payroll roles even with individual overrides', () => {
+    const payroll = [
+      'payroll.configure',
+      'payroll.read.all',
+      'payroll.terms.manage',
+      'payroll.manage',
+    ] as const
+    for (const role of roleSchema.options) {
+      const subject = {
+        roles: [role],
+        permissionOverrides: {
+          allow: [...payroll, 'manage.access' as const],
+          deny: [],
+        },
+      }
+      expect(hasEveryPermission(subject, payroll)).toBe(
+        ['accountant', 'admin', 'owner'].includes(role),
+      )
+      expect(hasPermission(subject, 'manage.access')).toBe(true)
+    }
+    expect(hasEveryPermission(['employee', 'accountant'], payroll)).toBe(true)
   })
   it('offers exactly the five employee roles, with administration kept separate', () => {
     expect(employeeRoleSchema.options.map((role) => roleLabels[role])).toEqual([
@@ -211,8 +231,7 @@ describe('role and permission boundaries', () => {
       'payroll.configure',
       'payroll.read.all',
       'payroll.terms.manage',
-      'payroll.awards.propose',
-      'payroll.awards.review',
+      'payroll.manage',
       'leave.review',
       'security.configure',
       'notifications.configure',

@@ -435,6 +435,55 @@
       "when": 1795581257752,
       "tag": "0061_award_allocation_review",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795587939771,
+      "tag": "0062_bulk_fixed_premiums",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795589596991,
+      "tag": "0063_reviewed_deductions",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1795592367956,
+      "tag": "0064_simple_monthly_payroll",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1795595744124,
+      "tag": "0065_remove_payroll_calendar_and_bonus_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1795601404584,
+      "tag": "0066_bonus_only_monthly_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795603122690,
+      "tag": "0067_unified_monthly_adjustments",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795611303959,
+      "tag": "0068_payroll_employee_history_index",
+      "breakpoints": true
     }
   ]
 }

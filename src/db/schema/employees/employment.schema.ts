@@ -76,7 +76,7 @@ export const employeeEmploymentAudit = pgTable(
     before: jsonb('before').$type<EmploymentPeriodFacts | null>(),
     /** Minimal resulting dates/void state, with no credentials or account records. */
     after: jsonb('after').$type<EmploymentPeriodFacts>().notNull(),
-    /** Required human explanation for the confirmed change. */
+    /** Audit note for the change, including explanations from older records. */
     reason: text('reason').notNull(),
     /** Database-generated UTC decision time. */
     createdAt: createdAt(),

@@ -6,6 +6,7 @@ import { useForm } from '@tanstack/react-form'
 import { IconUserPlus } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Button } from '#/components/ui/button'
+import { DatePicker } from '#/components/common/date-picker'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import {
@@ -74,12 +75,14 @@ export function ProvisionAccountForm({
   onCode,
   canAssignAdmin = false,
   canConfigureSchedule = false,
+  canSetEmploymentDate = false,
   framed = true,
   onPendingChange,
 }: {
   onCode: (value: IssuedAccountCode) => void
   canAssignAdmin?: boolean
   canConfigureSchedule?: boolean
+  canSetEmploymentDate?: boolean
   framed?: boolean
   onPendingChange?: (pending: boolean) => void
 }) {
@@ -213,6 +216,29 @@ export function ProvisionAccountForm({
             </Field>
           )}
         </form.Field>
+        {canSetEmploymentDate ? (
+          <form.Field name="employmentStartDate">
+            {(field) => (
+              <Field data-invalid={!field.state.meta.isValid}>
+                <FieldLabel htmlFor="provision-employment-start-date">
+                  მუშაობის დაწყების თარიღი
+                </FieldLabel>
+                <DatePicker
+                  id="provision-employment-start-date"
+                  value={field.state.value ?? ''}
+                  invalid={!field.state.meta.isValid}
+                  clearLabel="დაწყების თარიღის გასუფთავება"
+                  onChange={(date) => field.handleChange(date || undefined)}
+                  onBlur={field.handleBlur}
+                />
+                <FieldError
+                  id="provision-employment-start-date-error"
+                  errors={field.state.meta.errors}
+                />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
         {canConfigureSchedule ? (
           <form.Field name="workingWeek">
             {(field) => (

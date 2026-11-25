@@ -14,11 +14,13 @@ export function DataPagination({
   total,
   pageSize,
   renderLink,
+  label,
 }: {
   page: number
   total: number
   pageSize: number
   renderLink: (page: number) => ReactElement
+  label?: string
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize))
   const visible = [...new Set([1, page - 1, page, page + 1, pages])]
@@ -29,7 +31,7 @@ export function DataPagination({
       <p className="text-sm text-muted-foreground" aria-live="polite">
         სულ: {total}. გვერდი {page} / {pages}
       </p>
-      <Pagination>
+      <Pagination aria-label={label ?? 'გვერდები'}>
         <PaginationContent>
           <PaginationItem>
             {page > 1 ? (

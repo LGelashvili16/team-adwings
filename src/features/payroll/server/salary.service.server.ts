@@ -14,10 +14,15 @@ import {
   effectivePolicy,
 } from './payroll-settings.repository.server'
 import * as repository from './salary.repository.server'
+import { employeeStatements } from './monthly.repository.server'
 import type { PayrollTransaction } from './payroll-settings.repository.server'
 import type { Actor } from '#/lib/authorization/actor'
 import type { Permission } from '#/lib/authorization/permissions'
-import type { SalaryDetail, SalaryDirectory } from '../salary.types'
+import type {
+  MySalaryDetail,
+  SalaryDetail,
+  SalaryDirectory,
+} from '../salary.types'
 
 export class SalaryError extends Error {}
 async function authorize(
@@ -38,14 +43,17 @@ async function authorize(
     ])
   return current
 }
+async function salarySubject(tx: PayrollTransaction, userId: string) {
+  const target = await repository.person(tx, userId)
+  if (!target) throw new SalaryError('თანამშრომლის ჩანაწერი ვერ მოიძებნა.')
+  return target
+}
 async function detail(
   tx: PayrollTransaction,
-  userId: string,
+  target: Awaited<ReturnType<typeof salarySubject>>,
   page: number,
   audit: boolean,
 ): Promise<SalaryDetail> {
-  const target = await repository.person(tx, userId)
-  if (!target) throw new SalaryError('თანამშრომლის ჩანაწერი ვერ მოიძებნა.')
   const workday = await getCompanyWorkday(new Date(), tx)
   const version = await repository.latestVersion(tx, target.id)
   const current = await repository.applicable(tx, target.id, workday.date)
@@ -88,12 +96,23 @@ async function detail(
     })),
   }
 }
-export async function readMySalary(actor: Actor | null, input: unknown) {
+export async function readMySalary(
+  actor: Actor | null,
+  input: unknown,
+): Promise<MySalaryDetail> {
   const data = salarySelfReadSchema.parse(input)
   return repository.transactSalaries(
     async (tx) => {
       const current = await authorize(tx, actor)
-      return detail(tx, current.id, data.page, false)
+      const target = await salarySubject(tx, current.id)
+      const salary = await detail(tx, target, data.page, false)
+      const statements = await employeeStatements(
+        tx,
+        target.id,
+        data.statementPage,
+        data.month,
+      )
+      return { ...salary, statements }
     },
     { isolationLevel: 'repeatable read' },
   )
@@ -103,7 +122,7 @@ export async function readEmployeeSalary(actor: Actor | null, input: unknown) {
   return repository.transactSalaries(
     async (tx) => {
       await authorize(tx, actor, 'payroll.read.all')
-      return detail(tx, data.userId, data.page, true)
+      return detail(tx, await salarySubject(tx, data.userId), data.page, true)
     },
     { isolationLevel: 'repeatable read' },
   )
@@ -157,7 +176,7 @@ export async function saveSalaryTerms(actor: Actor | null, input: unknown) {
         amountMinor: data.amountMinor,
         amountBasis: data.amountBasis,
         currency: data.currency,
-        reason: data.reason,
+        reason: data.reason ?? 'ხელფასის შეთანხმება შენახულია.',
       })
     }
     return { saved: data.targets.length }

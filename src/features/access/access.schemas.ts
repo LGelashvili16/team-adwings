@@ -5,6 +5,7 @@ import {
 } from '#/lib/authorization/permissions'
 import { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
 import { dayOffDaysSchema } from '#/features/leave/day-off-allowance.schemas'
+import { employmentDateSchema } from '#/features/employees/employment.schemas'
 import {
   maxPasswordLength,
   minPasswordLength,
@@ -76,6 +77,7 @@ export const provisionAccountSchema = z.object({
   phone: phoneSchema,
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
+  employmentStartDate: employmentDateSchema.optional(),
   role: provisionableRoleSchema,
 })
 export const bootstrapOwnerSchema = z.object({

@@ -18,14 +18,16 @@ export function DatePicker({
   today,
   invalid,
   required,
+  clearLabel = 'დასრულების თარიღის გასუფთავება',
   onChange,
   onBlur,
 }: {
   id: string
   value: string
-  today: string
+  today?: string
   invalid: boolean
   required?: boolean
+  clearLabel?: string
   onChange: (value: string) => void
   onBlur: () => void
 }) {
@@ -62,7 +64,9 @@ export function DatePicker({
             locale={ka}
             captionLayout="dropdown"
             selected={selected}
-            defaultMonth={selected ?? new Date(`${today}T12:00:00`)}
+            defaultMonth={
+              selected ?? (today ? new Date(`${today}T12:00:00`) : undefined)
+            }
             startMonth={new Date(1900, 0, 1)}
             endMonth={new Date(2100, 11, 31)}
             formatters={{
@@ -95,7 +99,7 @@ export function DatePicker({
         <Button
           variant="outline"
           size="icon"
-          aria-label="დასრულების თარიღის გასუფთავება"
+          aria-label={clearLabel}
           onClick={() => {
             onChange('')
             onBlur()

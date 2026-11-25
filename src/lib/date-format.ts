@@ -9,6 +9,10 @@ export function formatGeorgianShortDate(date: string) {
   return format(parseISO(date), 'd MMM, yyyy', { locale: ka })
 }
 
+export function formatGeorgianMonth(month: string) {
+  return format(parseISO(month), 'MMMM yyyy', { locale: ka })
+}
+
 export function formatGeorgianDateTime(
   instant: string,
   timezone: string,

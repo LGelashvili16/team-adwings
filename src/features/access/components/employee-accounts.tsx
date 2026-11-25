@@ -82,6 +82,10 @@ export function EmployeeAccounts({
                   actor,
                   'attendance.configure',
                 )}
+                canSetEmploymentDate={hasPermission(
+                  actor,
+                  'employees.employment.manage',
+                )}
               />
             </div>
           </SheetContent>

@@ -1,9 +1,19 @@
 import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { IconDeviceFloppy, IconX } from '@tabler/icons-react'
+import {
+  IconDeviceFloppy,
+  IconX,
+  IconAlertTriangle,
+  IconAlertCircle,
+  IconHistory,
+  IconUsers,
+  IconWallet,
+} from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { DatePicker } from '#/components/common/date-picker'
+import { Avatar, AvatarFallback } from '#/components/ui/avatar'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '#/components/ui/card'
 import {
@@ -11,10 +21,13 @@ import {
   FieldLabel,
   FieldError,
   FieldGroup,
-  FieldDescription,
 } from '#/components/ui/field'
-import { Input } from '#/components/ui/input'
-import { Textarea } from '#/components/ui/textarea'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from '#/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -24,15 +37,16 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import {
-  Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetFooter,
 } from '#/components/ui/sheet'
+import { DraftSheet } from '#/components/common/draft-sheet'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Spinner } from '#/components/ui/spinner'
+import { accountInitials } from '#/features/access/access.presentation'
 import {
   salaryAmountInput,
   salaryBasisSchema,
@@ -51,7 +65,6 @@ export function SalaryEditor({
   today,
   open,
   onClose,
-  onSaved,
   defaultAmountBasis = 'gross',
 }: {
   actorId: string
@@ -59,7 +72,6 @@ export function SalaryEditor({
   today: string
   open: boolean
   onClose: () => void
-  onSaved?: () => void
   defaultAmountBasis?: 'gross' | 'net'
 }) {
   const client = useQueryClient()
@@ -72,7 +84,6 @@ export function SalaryEditor({
       amountBasis: existing?.amountBasis ?? defaultAmountBasis,
       amount: existing ? salaryAmountInput(existing.amountMinor) : '',
       effectiveFrom: today,
-      reason: '',
     }
   })
   const mutation = useMutation({
@@ -104,7 +115,6 @@ export function SalaryEditor({
             amountBasis: parsed.amountBasis,
             amountMinor: salaryToMinor(parsed.amount),
             currency: 'GEL',
-            reason: parsed.reason,
           },
         })
         if (!result.ok) {
@@ -118,7 +128,6 @@ export function SalaryEditor({
             : `${result.value.saved} თანამშრომლის ხელფასი შენახულია.`,
         )
         void client.invalidateQueries({ queryKey: salaryKey(actorId) })
-        onSaved?.()
         onClose()
       } catch {
         const message =
@@ -131,7 +140,7 @@ export function SalaryEditor({
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(pending) => (
-        <Sheet
+        <DraftSheet
           open={open}
           onOpenChange={(next) => {
             if (!next && !pending) onClose()
@@ -141,8 +150,13 @@ export function SalaryEditor({
             className="gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
             showCloseButton={false}
           >
-            <SheetHeader className="shrink-0 border-b p-5 pr-16 sm:p-6 sm:pr-16">
-              <SheetTitle>ხელფასის განსაზღვრა</SheetTitle>
+            <SheetHeader className="relative shrink-0 border-b p-4 pr-14 sm:p-6 sm:pr-16">
+              <SheetTitle className="flex min-w-0 items-center gap-3 text-base sm:text-lg">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                  <IconWallet className="size-5" aria-hidden="true" />
+                </span>
+                ხელფასის განსაზღვრა
+              </SheetTitle>
               <SheetDescription className="sr-only">
                 ახალი შეთანხმება {targets.length} თანამშრომლისთვის
               </SheetDescription>
@@ -150,7 +164,8 @@ export function SalaryEditor({
                 variant="ghost"
                 size="icon"
                 aria-label="დახურვა"
-                className="absolute top-4 right-4"
+                className="absolute top-1/2 right-3 -translate-y-1/2 sm:right-4"
+                type="button"
                 disabled={pending}
                 onClick={onClose}
               >
@@ -170,35 +185,68 @@ export function SalaryEditor({
                 disabled={pending}
                 className="flex min-h-0 flex-1 flex-col"
               >
-                <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>თანამშრომლები ({targets.length})</CardTitle>
-                    </CardHeader>
+                <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-4 sm:p-6">
+                  <Card className="shrink-0 gap-0 rounded-xl bg-muted/35">
+                    {targets.length > 1 ? (
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <IconUsers
+                            className="size-4 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          თანამშრომლები
+                          <Badge variant="secondary" className="tabular-nums">
+                            {targets.length}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                    ) : null}
                     <CardContent>
-                      <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto text-sm">
+                      <ul
+                        aria-label="თანამშრომლები"
+                        className="flex max-h-40 flex-col gap-3 overflow-y-auto overscroll-contain text-sm"
+                      >
                         {targets.map((target) => (
-                          <li key={target.userId} className="wrap-anywhere">
-                            {target.name}
+                          <li
+                            key={target.userId}
+                            className="flex min-w-0 items-center gap-3"
+                          >
+                            <Avatar
+                              aria-hidden="true"
+                              className="size-9 shrink-0 ring-1 ring-border"
+                            >
+                              <AvatarFallback className="bg-accent text-xs font-semibold text-accent-foreground">
+                                {accountInitials(target.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 wrap-anywhere">
+                              <p className="font-medium">{target.name}</p>
+                              {target.jobTitle ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {target.jobTitle}
+                                </p>
+                              ) : null}
+                            </div>
                           </li>
                         ))}
                       </ul>
                     </CardContent>
                   </Card>
                   {targets.some((target) => target.next) ? (
-                    <Alert variant="warning">
+                    <Alert variant="warning" role="status">
+                      <IconAlertTriangle aria-hidden="true" />
                       <AlertDescription>
                         არსებული მომავალი ცვლილებები შენარჩუნდება. იმავე თარიღზე
                         ახალი ვერსია წინა შეთანხმებას ჩაანაცვლებს.
                       </AlertDescription>
                     </Alert>
                   ) : null}
-                  <Card>
-                    <CardHeader>
+                  <Card className="shrink-0 rounded-xl sm:[--card-spacing:--spacing(5)]">
+                    <CardHeader className="border-b border-border/70">
                       <CardTitle>ანაზღაურების პირობები</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <FieldGroup>
+                      <FieldGroup className="grid gap-4 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
                         <form.Field name="kind">
                           {(field) => (
                             <Field>
@@ -246,23 +294,36 @@ export function SalaryEditor({
                                 <FieldLabel htmlFor="salary-amount">
                                   თანხა ლარში <span aria-hidden="true">*</span>
                                 </FieldLabel>
-                                <Input
-                                  id="salary-amount"
-                                  name={field.name}
-                                  required
-                                  inputMode="decimal"
-                                  maxLength={10}
-                                  autoComplete="off"
-                                  value={field.state.value}
-                                  onChange={(event) =>
-                                    field.handleChange(event.target.value)
-                                  }
-                                  onBlur={field.handleBlur}
-                                  aria-invalid={invalid}
-                                  aria-describedby={
-                                    invalid ? 'salary-amount-error' : undefined
-                                  }
-                                />
+                                <InputGroup>
+                                  <InputGroupInput
+                                    id="salary-amount"
+                                    name={field.name}
+                                    required
+                                    inputMode="decimal"
+                                    maxLength={10}
+                                    autoComplete="off"
+                                    value={field.state.value}
+                                    className="min-w-0 font-medium tabular-nums"
+                                    onChange={(event) =>
+                                      field.handleChange(event.target.value)
+                                    }
+                                    onBlur={field.handleBlur}
+                                    aria-invalid={invalid}
+                                    aria-describedby={
+                                      invalid
+                                        ? 'salary-amount-error'
+                                        : undefined
+                                    }
+                                  />
+                                  <InputGroupAddon
+                                    align="inline-end"
+                                    aria-hidden="true"
+                                  >
+                                    <InputGroupText className="font-medium">
+                                      ₾
+                                    </InputGroupText>
+                                  </InputGroupAddon>
+                                </InputGroup>
                                 <FieldError
                                   id="salary-amount-error"
                                   errors={
@@ -275,7 +336,7 @@ export function SalaryEditor({
                         </form.Field>
                         <form.Field name="amountBasis">
                           {(field) => (
-                            <Field>
+                            <Field className="sm:col-span-2">
                               <FieldLabel htmlFor="salary-basis">
                                 თანხის საფუძველი{' '}
                                 <span aria-hidden="true">*</span>
@@ -308,10 +369,6 @@ export function SalaryEditor({
                                   </SelectGroup>
                                 </SelectContent>
                               </Select>
-                              <FieldDescription>
-                                დარიცხული თანხა დაქვითვებამდეა. ხელზე ასაღები
-                                თანხა ხელშეკრულებით შეთანხმებული ოდენობაა.
-                              </FieldDescription>
                             </Field>
                           )}
                         </form.Field>
@@ -321,7 +378,10 @@ export function SalaryEditor({
                               field.state.meta.isTouched &&
                               !field.state.meta.isValid
                             return (
-                              <Field data-invalid={invalid}>
+                              <Field
+                                className="sm:col-span-2"
+                                data-invalid={invalid}
+                              >
                                 <FieldLabel htmlFor="salary-date">
                                   ამოქმედების თარიღი{' '}
                                   <span aria-hidden="true">*</span>
@@ -345,64 +405,40 @@ export function SalaryEditor({
                             )
                           }}
                         </form.Field>
-                        <form.Field name="reason">
-                          {(field) => {
-                            const invalid =
-                              field.state.meta.isTouched &&
-                              !field.state.meta.isValid
-                            return (
-                              <Field data-invalid={invalid}>
-                                <FieldLabel htmlFor="salary-reason">
-                                  ცვლილების მიზეზი{' '}
-                                  <span aria-hidden="true">*</span>
-                                </FieldLabel>
-                                <Textarea
-                                  id="salary-reason"
-                                  name={field.name}
-                                  required
-                                  maxLength={500}
-                                  value={field.state.value}
-                                  onChange={(event) =>
-                                    field.handleChange(event.target.value)
-                                  }
-                                  onBlur={field.handleBlur}
-                                  aria-invalid={invalid}
-                                  aria-describedby={
-                                    invalid ? 'salary-reason-error' : undefined
-                                  }
-                                />
-                                <FieldError
-                                  id="salary-reason-error"
-                                  errors={
-                                    invalid ? field.state.meta.errors : []
-                                  }
-                                />
-                              </Field>
-                            )
-                          }}
-                        </form.Field>
                       </FieldGroup>
                     </CardContent>
                   </Card>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    შეინახება ახალი შეთანხმება. წინა ვერსიები დარჩება ისტორიაში.
-                    ეს მოქმედება თანხას არ რიცხავს და არ იხდის.
-                  </p>
+                  <Alert variant="info" role="status">
+                    <IconHistory aria-hidden="true" />
+                    <AlertDescription>
+                      შეთანხმება ინახება ისტორიაში. დარიცხვა და გადახდა ცალკე
+                      ხდება.
+                    </AlertDescription>
+                  </Alert>
                   {error ? (
                     <Alert variant="destructive">
+                      <IconAlertCircle aria-hidden="true" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   ) : null}
                 </div>
-                <SheetFooter className="shrink-0 border-t p-5 sm:flex-row sm:justify-end sm:p-6">
+                <SheetFooter className="shrink-0 flex-row gap-2 border-t bg-card p-4 sm:justify-end sm:px-6">
                   <Button
+                    type="button"
                     variant="outline"
+                    depth="raised"
+                    className="flex-1 sm:flex-none"
                     disabled={pending}
                     onClick={onClose}
                   >
                     გაუქმება
                   </Button>
-                  <Button type="submit" disabled={pending} aria-busy={pending}>
+                  <Button
+                    type="submit"
+                    className="flex-1 sm:min-w-28 sm:flex-none"
+                    disabled={pending}
+                    aria-busy={pending}
+                  >
                     <span className="flex size-4 items-center justify-center">
                       {pending ? (
                         <Spinner aria-hidden="true" />
@@ -416,7 +452,7 @@ export function SalaryEditor({
               </fieldset>
             </form>
           </SheetContent>
-        </Sheet>
+        </DraftSheet>
       )}
     </form.Subscribe>
   )

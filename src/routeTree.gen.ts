@@ -68,13 +68,10 @@ import { Route as AuthenticatedManageEmployeesEmployeeIdRouteImport } from './ro
 import { Route as AuthenticatedManageGpsDeviceIdRouteImport } from './routes/_authenticated/manage/gps_.$deviceId'
 import { Route as AuthenticatedManagePayrollIndexRouteImport } from './routes/_authenticated/manage/payroll/index'
 import { Route as AuthenticatedManagePayrollUserIdRouteImport } from './routes/_authenticated/manage/payroll/$userId'
-import { Route as AuthenticatedManagePayrollCalendarRouteImport } from './routes/_authenticated/manage/payroll/calendar'
+import { Route as AuthenticatedManagePayrollMonthlyRouteImport } from './routes/_authenticated/manage/payroll/monthly'
 import { Route as AuthenticatedManagePayrollSettingsRouteImport } from './routes/_authenticated/manage/payroll/settings'
-import { Route as AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport } from './routes/_authenticated/manage/payroll/award-pools/$poolId'
-import { Route as AuthenticatedManagePayrollAwardsIndexRouteImport } from './routes/_authenticated/manage/payroll/awards/index'
-import { Route as AuthenticatedManagePayrollAwardsProposalIdRouteImport } from './routes/_authenticated/manage/payroll/awards/$proposalId'
-import { Route as AuthenticatedManagePayrollBonusesIndexRouteImport } from './routes/_authenticated/manage/payroll/bonuses/index'
-import { Route as AuthenticatedManagePayrollBonusesRuleIdRouteImport } from './routes/_authenticated/manage/payroll/bonuses/$ruleId'
+import { Route as AuthenticatedManagePayrollDeductionsIndexRouteImport } from './routes/_authenticated/manage/payroll/deductions/index'
+import { Route as AuthenticatedManagePayrollDeductionsDeductionIdRouteImport } from './routes/_authenticated/manage/payroll/deductions/$deductionId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -408,10 +405,10 @@ const AuthenticatedManagePayrollUserIdRoute =
     path: '/payroll/$userId',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
-const AuthenticatedManagePayrollCalendarRoute =
-  AuthenticatedManagePayrollCalendarRouteImport.update({
-    id: '/payroll/calendar',
-    path: '/payroll/calendar',
+const AuthenticatedManagePayrollMonthlyRoute =
+  AuthenticatedManagePayrollMonthlyRouteImport.update({
+    id: '/payroll/monthly',
+    path: '/payroll/monthly',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
 const AuthenticatedManagePayrollSettingsRoute =
@@ -420,34 +417,16 @@ const AuthenticatedManagePayrollSettingsRoute =
     path: '/payroll/settings',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
-const AuthenticatedManagePayrollAwardPoolsPoolIdRoute =
-  AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport.update({
-    id: '/payroll/award-pools/$poolId',
-    path: '/payroll/award-pools/$poolId',
+const AuthenticatedManagePayrollDeductionsIndexRoute =
+  AuthenticatedManagePayrollDeductionsIndexRouteImport.update({
+    id: '/payroll/deductions/',
+    path: '/payroll/deductions/',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
-const AuthenticatedManagePayrollAwardsIndexRoute =
-  AuthenticatedManagePayrollAwardsIndexRouteImport.update({
-    id: '/payroll/awards/',
-    path: '/payroll/awards/',
-    getParentRoute: () => AuthenticatedManageRouteRoute,
-  } as any)
-const AuthenticatedManagePayrollAwardsProposalIdRoute =
-  AuthenticatedManagePayrollAwardsProposalIdRouteImport.update({
-    id: '/payroll/awards/$proposalId',
-    path: '/payroll/awards/$proposalId',
-    getParentRoute: () => AuthenticatedManageRouteRoute,
-  } as any)
-const AuthenticatedManagePayrollBonusesIndexRoute =
-  AuthenticatedManagePayrollBonusesIndexRouteImport.update({
-    id: '/payroll/bonuses/',
-    path: '/payroll/bonuses/',
-    getParentRoute: () => AuthenticatedManageRouteRoute,
-  } as any)
-const AuthenticatedManagePayrollBonusesRuleIdRoute =
-  AuthenticatedManagePayrollBonusesRuleIdRouteImport.update({
-    id: '/payroll/bonuses/$ruleId',
-    path: '/payroll/bonuses/$ruleId',
+const AuthenticatedManagePayrollDeductionsDeductionIdRoute =
+  AuthenticatedManagePayrollDeductionsDeductionIdRouteImport.update({
+    id: '/payroll/deductions/$deductionId',
+    path: '/payroll/deductions/$deductionId',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
 
@@ -507,16 +486,13 @@ export interface FileRoutesByFullPath {
   '/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
-  '/manage/payroll/calendar': typeof AuthenticatedManagePayrollCalendarRoute
+  '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
   '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
   '/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
-  '/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
-  '/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
-  '/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
-  '/manage/payroll/awards/': typeof AuthenticatedManagePayrollAwardsIndexRoute
-  '/manage/payroll/bonuses/': typeof AuthenticatedManagePayrollBonusesIndexRoute
+  '/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/manage/payroll/deductions/': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -572,16 +548,13 @@ export interface FileRoutesByTo {
   '/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
-  '/manage/payroll/calendar': typeof AuthenticatedManagePayrollCalendarRoute
+  '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
   '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees': typeof AuthenticatedManageEmployeesIndexRoute
   '/manage/payroll': typeof AuthenticatedManagePayrollIndexRoute
-  '/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
-  '/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
-  '/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
-  '/manage/payroll/awards': typeof AuthenticatedManagePayrollAwardsIndexRoute
-  '/manage/payroll/bonuses': typeof AuthenticatedManagePayrollBonusesIndexRoute
+  '/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/manage/payroll/deductions': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -641,16 +614,13 @@ export interface FileRoutesById {
   '/_authenticated/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/_authenticated/manage/gps_/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/_authenticated/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
-  '/_authenticated/manage/payroll/calendar': typeof AuthenticatedManagePayrollCalendarRoute
+  '/_authenticated/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
   '/_authenticated/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/_authenticated/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/_authenticated/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
   '/_authenticated/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
-  '/_authenticated/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
-  '/_authenticated/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
-  '/_authenticated/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
-  '/_authenticated/manage/payroll/awards/': typeof AuthenticatedManagePayrollAwardsIndexRoute
-  '/_authenticated/manage/payroll/bonuses/': typeof AuthenticatedManagePayrollBonusesIndexRoute
+  '/_authenticated/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/_authenticated/manage/payroll/deductions/': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -710,16 +680,13 @@ export interface FileRouteTypes {
     | '/manage/employees/$employeeId'
     | '/manage/gps/$deviceId'
     | '/manage/payroll/$userId'
-    | '/manage/payroll/calendar'
+    | '/manage/payroll/monthly'
     | '/manage/payroll/settings'
     | '/manage/attendance/'
     | '/manage/employees/'
     | '/manage/payroll/'
-    | '/manage/payroll/award-pools/$poolId'
-    | '/manage/payroll/awards/$proposalId'
-    | '/manage/payroll/bonuses/$ruleId'
-    | '/manage/payroll/awards/'
-    | '/manage/payroll/bonuses/'
+    | '/manage/payroll/deductions/$deductionId'
+    | '/manage/payroll/deductions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -775,16 +742,13 @@ export interface FileRouteTypes {
     | '/manage/employees/$employeeId'
     | '/manage/gps/$deviceId'
     | '/manage/payroll/$userId'
-    | '/manage/payroll/calendar'
+    | '/manage/payroll/monthly'
     | '/manage/payroll/settings'
     | '/manage/attendance'
     | '/manage/employees'
     | '/manage/payroll'
-    | '/manage/payroll/award-pools/$poolId'
-    | '/manage/payroll/awards/$proposalId'
-    | '/manage/payroll/bonuses/$ruleId'
-    | '/manage/payroll/awards'
-    | '/manage/payroll/bonuses'
+    | '/manage/payroll/deductions/$deductionId'
+    | '/manage/payroll/deductions'
   id:
     | '__root__'
     | '/'
@@ -843,16 +807,13 @@ export interface FileRouteTypes {
     | '/_authenticated/manage/employees/$employeeId'
     | '/_authenticated/manage/gps_/$deviceId'
     | '/_authenticated/manage/payroll/$userId'
-    | '/_authenticated/manage/payroll/calendar'
+    | '/_authenticated/manage/payroll/monthly'
     | '/_authenticated/manage/payroll/settings'
     | '/_authenticated/manage/attendance/'
     | '/_authenticated/manage/employees/'
     | '/_authenticated/manage/payroll/'
-    | '/_authenticated/manage/payroll/award-pools/$poolId'
-    | '/_authenticated/manage/payroll/awards/$proposalId'
-    | '/_authenticated/manage/payroll/bonuses/$ruleId'
-    | '/_authenticated/manage/payroll/awards/'
-    | '/_authenticated/manage/payroll/bonuses/'
+    | '/_authenticated/manage/payroll/deductions/$deductionId'
+    | '/_authenticated/manage/payroll/deductions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1279,11 +1240,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManagePayrollUserIdRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
-    '/_authenticated/manage/payroll/calendar': {
-      id: '/_authenticated/manage/payroll/calendar'
-      path: '/payroll/calendar'
-      fullPath: '/manage/payroll/calendar'
-      preLoaderRoute: typeof AuthenticatedManagePayrollCalendarRouteImport
+    '/_authenticated/manage/payroll/monthly': {
+      id: '/_authenticated/manage/payroll/monthly'
+      path: '/payroll/monthly'
+      fullPath: '/manage/payroll/monthly'
+      preLoaderRoute: typeof AuthenticatedManagePayrollMonthlyRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
     '/_authenticated/manage/payroll/settings': {
@@ -1293,39 +1254,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManagePayrollSettingsRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
-    '/_authenticated/manage/payroll/award-pools/$poolId': {
-      id: '/_authenticated/manage/payroll/award-pools/$poolId'
-      path: '/payroll/award-pools/$poolId'
-      fullPath: '/manage/payroll/award-pools/$poolId'
-      preLoaderRoute: typeof AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport
+    '/_authenticated/manage/payroll/deductions/': {
+      id: '/_authenticated/manage/payroll/deductions/'
+      path: '/payroll/deductions'
+      fullPath: '/manage/payroll/deductions/'
+      preLoaderRoute: typeof AuthenticatedManagePayrollDeductionsIndexRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
-    '/_authenticated/manage/payroll/awards/': {
-      id: '/_authenticated/manage/payroll/awards/'
-      path: '/payroll/awards'
-      fullPath: '/manage/payroll/awards/'
-      preLoaderRoute: typeof AuthenticatedManagePayrollAwardsIndexRouteImport
-      parentRoute: typeof AuthenticatedManageRouteRoute
-    }
-    '/_authenticated/manage/payroll/awards/$proposalId': {
-      id: '/_authenticated/manage/payroll/awards/$proposalId'
-      path: '/payroll/awards/$proposalId'
-      fullPath: '/manage/payroll/awards/$proposalId'
-      preLoaderRoute: typeof AuthenticatedManagePayrollAwardsProposalIdRouteImport
-      parentRoute: typeof AuthenticatedManageRouteRoute
-    }
-    '/_authenticated/manage/payroll/bonuses/': {
-      id: '/_authenticated/manage/payroll/bonuses/'
-      path: '/payroll/bonuses'
-      fullPath: '/manage/payroll/bonuses/'
-      preLoaderRoute: typeof AuthenticatedManagePayrollBonusesIndexRouteImport
-      parentRoute: typeof AuthenticatedManageRouteRoute
-    }
-    '/_authenticated/manage/payroll/bonuses/$ruleId': {
-      id: '/_authenticated/manage/payroll/bonuses/$ruleId'
-      path: '/payroll/bonuses/$ruleId'
-      fullPath: '/manage/payroll/bonuses/$ruleId'
-      preLoaderRoute: typeof AuthenticatedManagePayrollBonusesRuleIdRouteImport
+    '/_authenticated/manage/payroll/deductions/$deductionId': {
+      id: '/_authenticated/manage/payroll/deductions/$deductionId'
+      path: '/payroll/deductions/$deductionId'
+      fullPath: '/manage/payroll/deductions/$deductionId'
+      preLoaderRoute: typeof AuthenticatedManagePayrollDeductionsDeductionIdRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
   }
@@ -1421,15 +1361,12 @@ interface AuthenticatedManageRouteRouteChildren {
   AuthenticatedManageEmployeesEmployeeIdRoute: typeof AuthenticatedManageEmployeesEmployeeIdRoute
   AuthenticatedManageGpsDeviceIdRoute: typeof AuthenticatedManageGpsDeviceIdRoute
   AuthenticatedManagePayrollUserIdRoute: typeof AuthenticatedManagePayrollUserIdRoute
-  AuthenticatedManagePayrollCalendarRoute: typeof AuthenticatedManagePayrollCalendarRoute
+  AuthenticatedManagePayrollMonthlyRoute: typeof AuthenticatedManagePayrollMonthlyRoute
   AuthenticatedManagePayrollSettingsRoute: typeof AuthenticatedManagePayrollSettingsRoute
   AuthenticatedManageEmployeesIndexRoute: typeof AuthenticatedManageEmployeesIndexRoute
   AuthenticatedManagePayrollIndexRoute: typeof AuthenticatedManagePayrollIndexRoute
-  AuthenticatedManagePayrollAwardPoolsPoolIdRoute: typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
-  AuthenticatedManagePayrollAwardsProposalIdRoute: typeof AuthenticatedManagePayrollAwardsProposalIdRoute
-  AuthenticatedManagePayrollBonusesRuleIdRoute: typeof AuthenticatedManagePayrollBonusesRuleIdRoute
-  AuthenticatedManagePayrollAwardsIndexRoute: typeof AuthenticatedManagePayrollAwardsIndexRoute
-  AuthenticatedManagePayrollBonusesIndexRoute: typeof AuthenticatedManagePayrollBonusesIndexRoute
+  AuthenticatedManagePayrollDeductionsDeductionIdRoute: typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  AuthenticatedManagePayrollDeductionsIndexRoute: typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 
 const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildren =
@@ -1451,23 +1388,17 @@ const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildr
     AuthenticatedManageGpsDeviceIdRoute: AuthenticatedManageGpsDeviceIdRoute,
     AuthenticatedManagePayrollUserIdRoute:
       AuthenticatedManagePayrollUserIdRoute,
-    AuthenticatedManagePayrollCalendarRoute:
-      AuthenticatedManagePayrollCalendarRoute,
+    AuthenticatedManagePayrollMonthlyRoute:
+      AuthenticatedManagePayrollMonthlyRoute,
     AuthenticatedManagePayrollSettingsRoute:
       AuthenticatedManagePayrollSettingsRoute,
     AuthenticatedManageEmployeesIndexRoute:
       AuthenticatedManageEmployeesIndexRoute,
     AuthenticatedManagePayrollIndexRoute: AuthenticatedManagePayrollIndexRoute,
-    AuthenticatedManagePayrollAwardPoolsPoolIdRoute:
-      AuthenticatedManagePayrollAwardPoolsPoolIdRoute,
-    AuthenticatedManagePayrollAwardsProposalIdRoute:
-      AuthenticatedManagePayrollAwardsProposalIdRoute,
-    AuthenticatedManagePayrollBonusesRuleIdRoute:
-      AuthenticatedManagePayrollBonusesRuleIdRoute,
-    AuthenticatedManagePayrollAwardsIndexRoute:
-      AuthenticatedManagePayrollAwardsIndexRoute,
-    AuthenticatedManagePayrollBonusesIndexRoute:
-      AuthenticatedManagePayrollBonusesIndexRoute,
+    AuthenticatedManagePayrollDeductionsDeductionIdRoute:
+      AuthenticatedManagePayrollDeductionsDeductionIdRoute,
+    AuthenticatedManagePayrollDeductionsIndexRoute:
+      AuthenticatedManagePayrollDeductionsIndexRoute,
   }
 
 const AuthenticatedManageRouteRouteWithChildren =

@@ -10,7 +10,6 @@ describe('employment input boundaries', () => {
   const form = {
     startDate: '2026-01-01',
     endDate: '',
-    reason: 'ხელშეკრულების დადასტურება',
   }
   it('accepts ongoing employment and inclusive same-day dates', () => {
     expect(employmentFormSchema.safeParse(form).success).toBe(true)
@@ -30,13 +29,10 @@ describe('employment input boundaries', () => {
       false,
     )
   })
-  it('rejects reversed dates, empty reasons and writable identity injection', () => {
+  it('rejects reversed dates and writable identity injection', () => {
     expect(
       employmentFormSchema.safeParse({ ...form, endDate: '2025-12-31' })
         .success,
-    ).toBe(false)
-    expect(
-      employmentFormSchema.safeParse({ ...form, reason: '  ' }).success,
     ).toBe(false)
     expect(
       employmentWriteSchema.safeParse({

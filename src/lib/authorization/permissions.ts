@@ -43,8 +43,7 @@ export const permissionSchema = z.enum(
     'payroll.configure',
     'payroll.read.all',
     'payroll.terms.manage',
-    'payroll.awards.propose',
-    'payroll.awards.review',
+    'payroll.manage',
     'security.configure',
     'notifications.configure',
     'locations.manage',
@@ -116,6 +115,19 @@ export function currentAuthorization(value: {
   }
 }
 
+const payrollManagementPermissions = [
+  'payroll.configure',
+  'payroll.read.all',
+  'payroll.terms.manage',
+  'payroll.manage',
+] as const satisfies ReadonlyArray<Permission>
+
+const payrollManagementRoles: ReadonlySet<Role> = new Set([
+  'accountant',
+  'admin',
+  'owner',
+])
+
 const administrationPermissions = [
   'gps.read',
   'gps.manage',
@@ -144,11 +156,7 @@ const administrationPermissions = [
   'attendance.configure',
   'approvals.configure',
   'leave.configure',
-  'payroll.configure',
-  'payroll.read.all',
-  'payroll.terms.manage',
-  'payroll.awards.propose',
-  'payroll.awards.review',
+  ...payrollManagementPermissions,
   'leave.review',
   'security.configure',
   'notifications.configure',
@@ -235,14 +243,7 @@ export const roles = {
     'team-adwings': managementPermissions.hr_manager,
   }),
   accountant: accessControl.newRole({
-    'team-adwings': [
-      'manage.access',
-      'payroll.configure',
-      'payroll.read.all',
-      'payroll.terms.manage',
-      'payroll.awards.propose',
-      'payroll.awards.review',
-    ],
+    'team-adwings': ['manage.access', ...payrollManagementPermissions],
   }),
   // Employee account management is explicit; attendance review and job management remain separate.
   admin: accessControl.newRole({ 'team-adwings': administrationPermissions }),
@@ -256,6 +257,14 @@ export function hasPermission(
   // Also deny malformed runtime values from legacy/imported records.
   if (!permissionSchema.safeParse(permission).success) return false
   const actorRoles = 'roles' in subject ? subject.roles : subject
+  // Individual grants cannot extend payroll management beyond these roles.
+  if (
+    payrollManagementPermissions.some(
+      (restricted) => restricted === permission,
+    ) &&
+    !actorRoles.some((role) => payrollManagementRoles.has(role))
+  )
+    return false
   if ('roles' in subject && subject.permissionOverrides) {
     const overrides = parsePermissionOverrides(subject.permissionOverrides)
     if (overrides.deny.includes(permission)) return false

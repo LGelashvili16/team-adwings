@@ -92,6 +92,72 @@ const facts = (row: {
   voided: row.voidedAt !== null,
 })
 
+export function createInitialEmployeeEmployment(
+  tx: repository.EmploymentTransaction,
+  employeeId: string,
+  manager: Actor,
+  startDate: string,
+) {
+  assertPermissions(manager, ['employees.employment.manage'])
+  return writeEmploymentPeriod(tx, employeeId, manager.id, {
+    periodId: null,
+    startDate,
+    endDate: null,
+  })
+}
+
+async function writeEmploymentPeriod(
+  tx: repository.EmploymentTransaction,
+  employeeId: string,
+  actorId: string,
+  data: {
+    periodId: string | null
+    startDate: string
+    endDate: string | null
+    reason?: string
+  },
+) {
+  const before = data.periodId
+    ? await repository.periodById(tx, employeeId, data.periodId)
+    : null
+  if (data.periodId && !before)
+    throw new EmploymentError('პერიოდი ვერ მოიძებნა ან უკვე გაუქმებულია.')
+  if (
+    await repository.hasOverlap(
+      tx,
+      employeeId,
+      data.startDate,
+      data.endDate,
+      data.periodId,
+    )
+  )
+    throw new EmploymentError(
+      'არჩეული თარიღები სხვა დადასტურებულ პერიოდს ემთხვევა. გადაამოწმეთ დაწყება და დასრულება.',
+    )
+  const after = data.periodId
+    ? await repository.updatePeriod(tx, data.periodId, {
+        startDate: data.startDate,
+        endDate: data.endDate,
+      })
+    : await repository.insertPeriod(
+        tx,
+        employeeId,
+        data.startDate,
+        data.endDate,
+      )
+  await repository.recordChange(tx, {
+    employeeId,
+    periodId: after.id,
+    actorId,
+    action: before ? 'updated' : 'created',
+    before: before ? facts(before) : null,
+    after: facts(after),
+    reason:
+      data.reason ??
+      (before ? 'დასაქმების პერიოდი განახლდა.' : 'დასაქმების პერიოდი დაემატა.'),
+  })
+}
+
 export async function saveEmployeeEmployment(
   actor: Actor | null,
   input: unknown,
@@ -104,43 +170,7 @@ export async function saveEmployeeEmployment(
       data.userId,
       data.expectedRevision,
     )
-    const before = data.periodId
-      ? await repository.periodById(tx, target.id, data.periodId)
-      : null
-    if (data.periodId && !before)
-      throw new EmploymentError('პერიოდი ვერ მოიძებნა ან უკვე გაუქმებულია.')
-    if (
-      await repository.hasOverlap(
-        tx,
-        target.id,
-        data.startDate,
-        data.endDate,
-        data.periodId,
-      )
-    )
-      throw new EmploymentError(
-        'არჩეული თარიღები სხვა დადასტურებულ პერიოდს ემთხვევა. გადაამოწმეთ დაწყება და დასრულება.',
-      )
-    const after = data.periodId
-      ? await repository.updatePeriod(tx, data.periodId, {
-          startDate: data.startDate,
-          endDate: data.endDate,
-        })
-      : await repository.insertPeriod(
-          tx,
-          target.id,
-          data.startDate,
-          data.endDate,
-        )
-    await repository.recordChange(tx, {
-      employeeId: target.id,
-      periodId: after.id,
-      actorId,
-      action: before ? 'updated' : 'created',
-      before: before ? facts(before) : null,
-      after: facts(after),
-      reason: data.reason,
-    })
+    await writeEmploymentPeriod(tx, target.id, actorId, data)
     return { revision: target.revision + 1 }
   })
 }
@@ -169,7 +199,7 @@ export async function voidEmployeeEmployment(
       action: 'voided',
       before: facts(before),
       after: facts(after),
-      reason: data.reason,
+      reason: data.reason ?? 'დასაქმების პერიოდი გაუქმდა.',
     })
     return { revision: target.revision + 1 }
   })

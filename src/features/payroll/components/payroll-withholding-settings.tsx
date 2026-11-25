@@ -1,13 +1,13 @@
+import { IconReceiptTax } from '@tabler/icons-react'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import {
   Field,
-  FieldDescription,
   FieldError,
+  FieldGroup,
   FieldLabel,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Switch } from '#/components/ui/switch'
-import { Separator } from '#/components/ui/separator'
 import type { PayrollSettingsForm } from '../hooks/use-payroll-settings-form'
 
 const rates = [
@@ -34,64 +34,55 @@ export function PayrollWithholdingSettings({
   form: PayrollSettingsForm
 }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>გადასახადები და საპენსიო</CardTitle>
+    <Card className="min-w-0 rounded-2xl sm:[--card-spacing:--spacing(5)]">
+      <CardHeader className="border-b border-border/70">
+        <CardTitle className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+            <IconReceiptTax className="size-5" aria-hidden="true" />
+          </span>
+          <h2>გადასახადები და საპენსიო</h2>
+        </CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <form.Field name="incomeTaxEnabled">
-          {(field) => (
-            <Field orientation="horizontal" className="justify-between gap-4">
-              <FieldLabel htmlFor="payroll-incomeTaxEnabled">
-                საშემოსავლოს გამოთვლა
-              </FieldLabel>
-              <Switch
-                id="payroll-incomeTaxEnabled"
-                checked={field.state.value}
-                onCheckedChange={field.handleChange}
-                onBlur={field.handleBlur}
-              />
-            </Field>
-          )}
-        </form.Field>
-        <form.Subscribe selector={(state) => state.values.incomeTaxEnabled}>
-          {(enabled) => (
-            <p className="text-sm text-muted-foreground">
-              {enabled
-                ? 'საშემოსავლო გამოითვლება კანონით განსაზღვრული დასაბეგრი თანხიდან.'
-                : 'გამოთვლა გამორთულია. სავალდებულო დაკავებები ბუღალტერმა ცალკე უნდა ასახოს.'}
-            </p>
-          )}
-        </form.Subscribe>
-        <RateField form={form} rate={rates[0]} />
-        <Separator />
-        <form.Field name="pensionEnabled">
-          {(field) => (
-            <Field orientation="horizontal" className="justify-between gap-4">
-              <FieldLabel htmlFor="payroll-pensionEnabled">
-                საპენსიოს გამოთვლა
-              </FieldLabel>
-              <Switch
-                id="payroll-pensionEnabled"
-                checked={field.state.value}
-                onCheckedChange={field.handleChange}
-                onBlur={field.handleBlur}
-              />
-            </Field>
-          )}
-        </form.Field>
-        <FieldDescription>
-          გამოიყენება სქემაში მონაწილე თანამშრომლებისთვის. დამსაქმებლის წილი
-          კომპანიის დამატებითი ხარჯია და ხელზე ასაღებ თანხას არ აკლდება.
-        </FieldDescription>
-        <p className="text-sm text-muted-foreground">
-          სტანდარტული განაკვეთებია 20% საშემოსავლო და 2% + 2% საპენსიო. ცვლილება
-          უნდა შეესაბამებოდეს მოქმედ კანონმდებლობას.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <RateField form={form} rate={rates[1]} />
-          <RateField form={form} rate={rates[2]} />
-        </div>
+      <CardContent className="flex flex-col gap-3">
+        <FieldGroup className="gap-3 rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-4">
+          <form.Field name="incomeTaxEnabled">
+            {(field) => (
+              <Field orientation="horizontal" className="justify-between gap-4">
+                <FieldLabel htmlFor="payroll-incomeTaxEnabled">
+                  საშემოსავლოს გამოთვლა
+                </FieldLabel>
+                <Switch
+                  id="payroll-incomeTaxEnabled"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                />
+              </Field>
+            )}
+          </form.Field>
+          <RateField form={form} rate={rates[0]} />
+        </FieldGroup>
+        <FieldGroup className="gap-3 rounded-xl border border-border/70 bg-muted/20 p-3 sm:p-4">
+          <form.Field name="pensionEnabled">
+            {(field) => (
+              <Field orientation="horizontal" className="justify-between gap-4">
+                <FieldLabel htmlFor="payroll-pensionEnabled">
+                  საპენსიოს გამოთვლა
+                </FieldLabel>
+                <Switch
+                  id="payroll-pensionEnabled"
+                  checked={field.state.value}
+                  onCheckedChange={field.handleChange}
+                  onBlur={field.handleBlur}
+                />
+              </Field>
+            )}
+          </form.Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <RateField form={form} rate={rates[1]} />
+            <RateField form={form} rate={rates[2]} />
+          </div>
+        </FieldGroup>
       </CardContent>
     </Card>
   )

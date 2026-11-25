@@ -4,14 +4,21 @@ import {
   getEmployeeSalary,
   getSalaryDirectory,
 } from './salary.functions'
-import type { SalaryDirectorySearch } from './salary.schemas'
+import type { SalaryDirectorySearch, SalarySelfSearch } from './salary.schemas'
 
 export const salaryKey = (actorId: string) =>
   ['salary-workspace', actorId] as const
-export const mySalaryQuery = (actorId: string, page: number) =>
+export const mySalaryQuery = (actorId: string, search: SalarySelfSearch) =>
   queryOptions({
-    queryKey: [...salaryKey(actorId), 'mine', page],
-    queryFn: () => getMySalary({ data: { page } }),
+    queryKey: [...salaryKey(actorId), 'mine', search] as const,
+    queryFn: () => getMySalary({ data: search }),
+    placeholderData: (previous, query) => {
+      const previousSearch = query?.queryKey[3]
+      return query?.queryKey[1] === actorId &&
+        previousSearch?.page === search.page
+        ? previous
+        : undefined
+    },
     retry: false,
     staleTime: 0,
   })

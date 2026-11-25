@@ -164,7 +164,12 @@ describe.runIf(process.env.RUN_EMPLOYMENT_DB_TESTS === '1')(
       await service.saveEmployeeEmployment(actor, input())
       await service.saveEmployeeEmployment(
         actor,
-        input({ startDate: '2026-02-10', endDate: null, expectedRevision: 1 }),
+        input({
+          startDate: '2026-02-10',
+          endDate: null,
+          expectedRevision: 1,
+          reason: undefined,
+        }),
       )
       expect((await eligibility('2026-01-31')).periods).toHaveLength(1)
       expect((await eligibility('2026-02-01')).periods).toHaveLength(0)
@@ -178,6 +183,7 @@ describe.runIf(process.env.RUN_EMPLOYMENT_DB_TESTS === '1')(
       })
       expect(view.history[0]).toMatchObject({
         actorName: actor.id,
+        reason: 'დასაქმების პერიოდი დაემატა.',
         before: null,
         after: { startDate: '2026-02-10', endDate: null, voided: false },
       })
@@ -234,7 +240,6 @@ describe.runIf(process.env.RUN_EMPLOYMENT_DB_TESTS === '1')(
         userId: 'employment-worker',
         periodId,
         expectedRevision: 2,
-        reason: 'შეცდომით დადასტურებული პერიოდი',
       })
       expect(await read()).toMatchObject({
         confirmed: false,

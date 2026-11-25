@@ -55,7 +55,7 @@ function renderSidebar(
 }
 
 describe('workspace navigation', () => {
-  it('gives accountants payroll settings without account administration', () => {
+  it('gives accountants payroll access without a settings shortcut or account administration', () => {
     renderSidebar('accountant')
     expect(screen.getByRole('link', { name: 'ხელფასი' })).toHaveAttribute(
       'href',
@@ -63,11 +63,11 @@ describe('workspace navigation', () => {
     )
     expect(screen.getByRole('link', { name: 'ხელფასები' })).toHaveAttribute(
       'href',
-      '/manage/payroll',
+      '/manage/payroll/monthly',
     )
     expect(
-      screen.getByRole('link', { name: 'ხელფასების პარამეტრები' }),
-    ).toHaveAttribute('href', '/manage/payroll/settings')
+      screen.queryByRole('link', { name: 'ხელფასების პარამეტრები' }),
+    ).not.toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: 'მომხმარებლების წვდომა' }),
     ).not.toBeInTheDocument()
@@ -75,8 +75,15 @@ describe('workspace navigation', () => {
       screen.queryByRole('link', { name: 'თანამშრომლები' }),
     ).not.toBeInTheDocument()
   })
-  it('hides payroll settings from HR', () => {
-    renderSidebar('hr_manager')
+  it('keeps HR on personal payroll even with management payroll overrides', () => {
+    renderSidebar('hr_manager', false, {
+      allow: ['payroll.read.all', 'payroll.configure'],
+      deny: [],
+    })
+    expect(screen.getByRole('link', { name: 'ხელფასი' })).toHaveAttribute(
+      'href',
+      '/payroll',
+    )
     expect(
       screen.queryByRole('link', { name: 'ხელფასები' }),
     ).not.toBeInTheDocument()
@@ -282,7 +289,6 @@ describe('workspace navigation', () => {
       'დასწრების მოწყობილობები',
       'შვებულება & ბიულეტენი',
       'სამუშაო განრიგი',
-      'ხელფასების პარამეტრები',
       'განცხადებების მართვა',
       'საჩივრების მართვა',
       'რეპორტები',

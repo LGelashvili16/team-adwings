@@ -23,6 +23,7 @@ export interface ParticleTextProps {
   idleDrift?: number
   trigger?: 'mount' | 'hover' | 'click'
   fontSize?: number | string
+  fallbackFontSize?: number | string
   fontWeight?: number | string
   fontFamily?: string
   glow?: boolean
@@ -30,7 +31,9 @@ export interface ParticleTextProps {
   style?: CSSProperties
 }
 
-type Settings = Required<Omit<ParticleTextProps, 'className' | 'style'>>
+type Settings = Required<
+  Omit<ParticleTextProps, 'className' | 'style' | 'fallbackFontSize'>
+>
 type Intro = Settings['intro']
 type Shape = Settings['shape']
 type Rgb = { r: number; g: number; b: number }
@@ -139,6 +142,7 @@ const ParticleText = ({
   idleDrift = 0.7,
   trigger = 'mount',
   fontSize = 'clamp(3rem, 12vw, 8rem)',
+  fallbackFontSize = fontSize,
   fontWeight = 800,
   fontFamily = 'inherit',
   glow = true,
@@ -1020,8 +1024,8 @@ const ParticleText = ({
       />
       <span
         ref={fallbackRef}
-        className="pointer-events-none absolute inset-0 flex items-center justify-center motion-reduce:opacity-100!"
-        style={{ fontSize, fontWeight, fontFamily }}
+        className="pointer-events-none absolute inset-0 flex items-center justify-center leading-none whitespace-nowrap motion-reduce:opacity-100!"
+        style={{ fontSize: fallbackFontSize, fontWeight, fontFamily }}
       >
         {text}
       </span>

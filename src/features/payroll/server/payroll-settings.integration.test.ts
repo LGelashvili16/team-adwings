@@ -128,6 +128,10 @@ describe.runIf(enabled)(
             service.readPayrollSettings(actor(role)),
           ).resolves.toBeDefined()
         } else {
+          await sql().query(
+            `update "user" set permission_overrides='{"allow":["manage.access","payroll.configure"],"deny":[]}' where id=$1`,
+            [role],
+          )
           await expect(
             service.readPayrollSettings(actor(role)),
           ).rejects.toThrow()
@@ -169,7 +173,7 @@ describe.runIf(enabled)(
         ...request,
         expectedVersion: 1,
         employeePensionBasisPoints: 225,
-        reason: 'პროცენტის განახლება',
+        reason: undefined,
       })
       const rows = (
         await sql().query('select * from payroll_policy order by version')
@@ -185,6 +189,7 @@ describe.runIf(enabled)(
         actor_id: 'admin',
         version: 2,
         employee_pension_basis_points: 225,
+        reason: 'ხელფასების პარამეტრები შენახულია.',
       })
       expect(
         (await service.readPayrollSettings(actor())).current?.version,

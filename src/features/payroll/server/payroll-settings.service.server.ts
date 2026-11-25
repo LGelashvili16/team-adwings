@@ -63,7 +63,7 @@ export async function savePayrollSettings(actor: Actor | null, input: unknown) {
         ...policy,
         version: expectedVersion + 1,
         actorId,
-        reason,
+        reason: reason ?? 'ხელფასების პარამეტრები შენახულია.',
       }),
     )
   })

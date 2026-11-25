@@ -73,27 +73,27 @@ function mount(draft = initial) {
   )
   return { onClose, onSaved }
 }
-it('requires a reason, focuses the invalid field, then saves on the first valid click', async () => {
+it('requires a start date and saves on the first valid click without a reason', async () => {
   const user = userEvent.setup(),
-    callbacks = mount()
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
-  expect(
-    await screen.findByText('მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.'),
-  ).toBeVisible()
+    callbacks = mount({ ...initial, mode: 'create', period: null })
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
+  expect(await screen.findByText('აირჩიეთ სწორი თარიღი.')).toBeVisible()
   expect(updateEmployeeEmployment).not.toHaveBeenCalled()
-  const reason = screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ })
-  await waitFor(() => expect(reason).toHaveFocus())
-  await user.type(reason, 'ხელშეკრულებით დადასტურებულია')
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  expect(
+    screen.queryByRole('textbox', { name: /ცვლილების მიზეზი/ }),
+  ).not.toBeInTheDocument()
+  const start = screen.getByRole('textbox', { name: /დაწყების თარიღი/ })
+  await waitFor(() => expect(start).toHaveFocus())
+  await user.type(start, '2026-01-01')
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   await waitFor(() => expect(callbacks.onSaved).toHaveBeenCalledTimes(1))
   expect(updateEmployeeEmployment).toHaveBeenCalledWith({
     data: {
       userId: 'employee',
-      periodId: initial.period?.id,
+      periodId: null,
       expectedRevision: 3,
       startDate: '2026-01-01',
       endDate: null,
-      reason: 'ხელშეკრულებით დადასტურებულია',
     },
   })
   expect(callbacks.onClose).toHaveBeenCalledTimes(1)
@@ -106,23 +106,16 @@ it('preserves the complete draft after a revision conflict', async () => {
   const user = userEvent.setup(),
     callbacks = mount()
   await user.type(
-    screen.getByRole('textbox', { name: /დასრულების თარიღი/ }),
+    await screen.findByRole('textbox', { name: /დასრულების თარიღი/ }),
     '2026-11-30',
   )
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'დასაქმების დასრულება',
-  )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(
     await screen.findByText('პერიოდები შეიცვალა. განაახლეთ გვერდი.'),
   ).toBeVisible()
   expect(
     screen.getByRole('textbox', { name: /დასრულების თარიღი/ }),
   ).toHaveValue('2026-11-30')
-  expect(screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ })).toHaveValue(
-    'დასაქმების დასრულება',
-  )
   expect(callbacks.onClose).not.toHaveBeenCalled()
 })
 it('blocks repeat submission and dismissal while saving', async () => {
@@ -135,11 +128,7 @@ it('blocks repeat submission and dismissal while saving', async () => {
   )
   const user = userEvent.setup(),
     callbacks = mount()
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'თარიღის დაზუსტება',
-  )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(screen.getByRole('button', { name: 'შენახვა' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'დახურვა' })).toBeDisabled()
   await user.keyboard('{Escape}')
@@ -147,7 +136,7 @@ it('blocks repeat submission and dismissal while saving', async () => {
   finish({ ok: true, value: { revision: 4 } })
   await waitFor(() => expect(callbacks.onSaved).toHaveBeenCalledOnce())
 })
-it('explains voiding and submits only the scoped period and reason', async () => {
+it('explains voiding and submits only the scoped period and revision', async () => {
   vi.mocked(discardEmployeeEmployment).mockResolvedValue({
     ok: true,
     value: { revision: 4 },
@@ -155,23 +144,20 @@ it('explains voiding and submits only the scoped period and reason', async () =>
   const user = userEvent.setup(),
     callbacks = mount({ ...initial, mode: 'void' })
   expect(
-    screen.getByText(/ხელფასის გამოთვლისას აღარ გამოიყენება/),
+    await screen.findByText(/ხელფასის გამოთვლისას აღარ გამოიყენება/),
   ).toBeVisible()
   expect(
     screen.queryByRole('textbox', { name: /დაწყების თარიღი/ }),
   ).not.toBeInTheDocument()
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'შეცდომით მითითებული თარიღები',
+  await user.click(
+    await screen.findByRole('button', { name: 'პერიოდის გაუქმება' }),
   )
-  await user.click(screen.getByRole('button', { name: 'პერიოდის გაუქმება' }))
   await waitFor(() => expect(callbacks.onSaved).toHaveBeenCalledOnce())
   expect(discardEmployeeEmployment).toHaveBeenCalledWith({
     data: {
       userId: 'employee',
       periodId: initial.period?.id,
       expectedRevision: 3,
-      reason: 'შეცდომით მითითებული თარიღები',
     },
   })
   expect(updateEmployeeEmployment).not.toHaveBeenCalled()

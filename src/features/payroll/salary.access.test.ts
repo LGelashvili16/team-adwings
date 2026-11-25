@@ -20,10 +20,19 @@ it('preserves safe forbidden metadata through SSR serialization', () => {
     }
   }
 })
-it('keeps navigation aligned with explicit payroll grants and denials', () => {
+it('allows only payroll roles and honors explicit denials', () => {
+  for (const role of ['accountant', 'admin', 'owner'] as const) {
+    expect(() =>
+      requireSalaryWorkspace({ ...actor, roles: [role] }),
+    ).not.toThrow()
+  }
   expect(() =>
-    requireSalaryWorkspace({ ...actor, roles: ['accountant'] }),
-  ).not.toThrow()
+    requireSalaryWorkspace({
+      ...actor,
+      roles: ['hr_manager'],
+      permissionOverrides: { allow: ['payroll.read.all'], deny: [] },
+    }),
+  ).toThrow()
   expect(() =>
     requireSalaryWorkspace({
       ...actor,

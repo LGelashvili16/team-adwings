@@ -29,7 +29,7 @@ import type { SalaryDirectorySearch } from '../salary.schemas'
 const options = {
   kind: {
     all: 'ყველა ტიპი',
-    monthly: 'თვიური',
+    monthly: 'ყოველთვიური',
     hourly: 'საათობრივი',
     unconfigured: 'განსასაზღვრი',
   },
@@ -73,22 +73,23 @@ export function SalaryDirectoryFilters({
         void form.handleSubmit()
       }}
     >
-      <FieldGroup className="flex flex-col gap-3 xl:flex-row">
+      <FieldGroup className="flex flex-wrap items-start gap-2 md:flex-row">
         <form.Field name="q">
           {(field) => (
             <Field
-              className="min-w-0 xl:flex-1"
+              className="min-w-0 md:w-72"
               data-invalid={!field.state.meta.isValid}
             >
               <FieldLabel htmlFor="salary-search" className="sr-only">
                 თანამშრომლის ძიება
               </FieldLabel>
-              <InputGroup>
+              <InputGroup className="h-11 rounded-full px-1 md:h-9">
                 <InputGroupAddon>
                   <IconSearch aria-hidden="true" />
                 </InputGroupAddon>
                 <InputGroupInput
                   id="salary-search"
+                  className="h-full"
                   placeholder="სახელი, მომხმარებლის სახელი ან თანამდებობა"
                   value={field.state.value}
                   maxLength={100}
@@ -114,7 +115,7 @@ export function SalaryDirectoryFilters({
         {(['kind', 'status', 'sort'] as const).map((name) => (
           <form.Field key={name} name={name}>
             {(field) => (
-              <Field className="xl:w-auto">
+              <Field className="md:w-auto">
                 <FieldLabel
                   className="sr-only"
                   htmlFor={`salary-filter-${name}`}
@@ -140,7 +141,7 @@ export function SalaryDirectoryFilters({
                 >
                   <SelectTrigger
                     id={`salary-filter-${name}`}
-                    className="w-full"
+                    className="w-full rounded-full px-3 shadow-control-raised active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
                   >
                     <SelectValue>
                       {

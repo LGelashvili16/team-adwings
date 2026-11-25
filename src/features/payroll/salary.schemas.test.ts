@@ -12,7 +12,6 @@ const form = {
   amountBasis: 'gross',
   amount: '2500.29',
   effectiveFrom: '2026-11-25',
-  reason: 'დადასტურებულია ხელშეკრულებით',
 }
 it('converts validated decimal amounts exactly into integer tetri', () => {
   for (const [amount, minor] of [
@@ -35,7 +34,6 @@ it('validates boundary payloads, dates and unique bulk target revisions', () => 
   const input = {
     targets: [{ userId: 'worker', expectedVersion: 0 }],
     effectiveFrom: form.effectiveFrom,
-    reason: form.reason,
     amountMinor: 250029,
     amountBasis: form.amountBasis,
     kind: form.kind,

@@ -1,12 +1,12 @@
 import type { SalaryTerm } from './salary.types'
 
 export const salaryKindLabels = {
-  monthly: 'ფიქსირებული თვიური',
+  monthly: 'ფიქსირებული ყოველთვიური',
   hourly: 'საათობრივი',
 }
 export const salaryBasisLabels = {
   gross: 'დარიცხული თანხა',
-  net: 'შეთანხმებული ხელზე ასაღები',
+  net: 'ხელზე ასაღები',
 }
 /** Explicit lari formatting remains Georgian when a browser's ICU lacks the ka locale. */
 export function formatSalary(term: Pick<SalaryTerm, 'amountMinor'>) {

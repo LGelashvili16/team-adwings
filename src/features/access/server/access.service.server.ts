@@ -11,6 +11,7 @@ import {
 } from '#/lib/authorization/permissions'
 import { provisionIdentity } from '#/lib/auth/provisioning.server'
 import { initializeEmployeeDayOffBalance } from '#/features/leave/server/day-off-allowance.service.server'
+import { createInitialEmployeeEmployment } from '#/features/employees/server/employment.service.server'
 import {
   assignInitialEmployeeWeek,
   readCompanyWeek,
@@ -109,9 +110,10 @@ async function issueChallenge(
 async function createEmployee(
   tx: repository.AccessTransaction,
   input: z.infer<typeof provisionAccountSchema> & { code?: string | null },
-  actorId: string | null,
+  manager: Actor | null,
   role: Role,
 ) {
+  const actorId = manager?.id ?? null
   const username = input.code ?? null
   const userId = await provisionIdentity(
     tx,
@@ -134,6 +136,15 @@ async function createEmployee(
     actorId,
   )
   if (!person) throw new AuthorizationError()
+  if (input.employmentStartDate) {
+    if (!manager) throw new AuthorizationError()
+    await createInitialEmployeeEmployment(
+      tx,
+      person.id,
+      manager,
+      input.employmentStartDate,
+    )
+  }
   try {
     await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
   } catch (error) {
@@ -173,7 +184,7 @@ export async function provisionEmployee(
         'roles.manage',
       ])
     }
-    return createEmployee(tx, input, manager.id, input.role)
+    return createEmployee(tx, input, manager, input.role)
   })
 }
 

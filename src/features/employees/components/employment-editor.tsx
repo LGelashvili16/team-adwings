@@ -3,7 +3,9 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
+  IconAlertCircle,
   IconCalendarUser,
+  IconInfoCircle,
   IconDeviceFloppy,
   IconTrash,
   IconX,
@@ -12,14 +14,8 @@ import { DatePicker } from '#/components/common/date-picker'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
+import { Field, FieldError, FieldLabel } from '#/components/ui/field'
 import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from '#/components/ui/field'
-import {
-  Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
@@ -27,7 +23,7 @@ import {
   SheetFooter,
 } from '#/components/ui/sheet'
 import { Spinner } from '#/components/ui/spinner'
-import { Textarea } from '#/components/ui/textarea'
+import { DraftSheet } from '#/components/common/draft-sheet'
 import { employmentFormSchema } from '../employment.schemas'
 import {
   discardEmployeeEmployment,
@@ -63,15 +59,10 @@ export function EmploymentEditor({
   const [error, setError] = useState('')
   const removing = draft.mode === 'void'
   const mutation = useMutation({
-    mutationFn: async (value: {
-      startDate: string
-      endDate: string
-      reason: string
-    }) => {
+    mutationFn: async (value: { startDate: string; endDate: string }) => {
       const common = {
         userId,
         expectedRevision: draft.revision,
-        reason: value.reason,
       }
       return removing && draft.period
         ? discardEmployeeEmployment({
@@ -92,7 +83,6 @@ export function EmploymentEditor({
     defaultValues: {
       startDate: draft.period?.startDate ?? '',
       endDate: draft.period?.endDate ?? '',
-      reason: '',
     },
     validators: {
       onSubmit: employmentFormSchema,
@@ -128,7 +118,7 @@ export function EmploymentEditor({
   return (
     <form.Subscribe selector={(state) => state.isSubmitting}>
       {(pending) => (
-        <Sheet
+        <DraftSheet
           open={open}
           onOpenChange={(next) => {
             if (!next && !pending) onClose()
@@ -189,7 +179,8 @@ export function EmploymentEditor({
                     </div>
                   </div>
                   {removing && draft.period ? (
-                    <Alert variant="destructive">
+                    <Alert variant="warning" role="note">
+                      <IconAlertCircle aria-hidden="true" />
                       <AlertDescription className="space-y-2">
                         <p>
                           ეს პერიოდი ხელფასის გამოთვლისას აღარ გამოიყენება.
@@ -199,126 +190,93 @@ export function EmploymentEditor({
                       </AlertDescription>
                     </Alert>
                   ) : null}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>
-                        {removing
-                          ? 'გაუქმების საფუძველი'
-                          : 'დადასტურებული თარიღები'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-5">
-                      {!removing ? (
-                        <>
-                          <form.Field name="startDate">
-                            {(field) => {
-                              const invalid =
-                                field.state.meta.isTouched &&
-                                !field.state.meta.isValid
-                              return (
-                                <Field data-invalid={invalid}>
-                                  <FieldLabel htmlFor="employment-startDate">
-                                    დაწყების თარიღი{' '}
-                                    <span aria-hidden="true">*</span>
-                                  </FieldLabel>
-                                  <DatePicker
-                                    id="employment-startDate"
-                                    value={field.state.value}
-                                    today={today}
-                                    invalid={invalid}
-                                    required
-                                    onChange={field.handleChange}
-                                    onBlur={field.handleBlur}
-                                  />
-                                  <FieldError
-                                    id="employment-startDate-error"
-                                    errors={
-                                      invalid ? field.state.meta.errors : []
-                                    }
-                                  />
-                                </Field>
-                              )
-                            }}
-                          </form.Field>
-                          <form.Field name="endDate">
-                            {(field) => {
-                              const invalid =
-                                field.state.meta.isTouched &&
-                                !field.state.meta.isValid
-                              return (
-                                <Field data-invalid={invalid}>
-                                  <FieldLabel htmlFor="employment-endDate">
-                                    დასრულების თარიღი
-                                  </FieldLabel>
-                                  <DatePicker
-                                    id="employment-endDate"
-                                    value={field.state.value}
-                                    today={today}
-                                    invalid={invalid}
-                                    onChange={field.handleChange}
-                                    onBlur={field.handleBlur}
-                                  />
-                                  <FieldDescription>
-                                    ცარიელი ველი ნიშნავს, რომ დასაქმება
-                                    გრძელდება. დასრულების დღე პერიოდს მოიცავს.
-                                  </FieldDescription>
-                                  <FieldError
-                                    id="employment-endDate-error"
-                                    errors={
-                                      invalid ? field.state.meta.errors : []
-                                    }
-                                  />
-                                </Field>
-                              )
-                            }}
-                          </form.Field>
-                        </>
-                      ) : null}
-                      <form.Field name="reason">
-                        {(field) => {
-                          const invalid =
-                            field.state.meta.isTouched &&
-                            !field.state.meta.isValid
-                          return (
-                            <Field data-invalid={invalid}>
-                              <FieldLabel htmlFor="employment-reason">
-                                ცვლილების მიზეზი{' '}
-                                <span aria-hidden="true">*</span>
-                              </FieldLabel>
-                              <Textarea
-                                id="employment-reason"
-                                name={field.name}
-                                required
-                                maxLength={500}
-                                value={field.state.value}
-                                onChange={(event) =>
-                                  field.handleChange(event.target.value)
-                                }
-                                onBlur={field.handleBlur}
-                                aria-invalid={invalid}
-                                aria-describedby={
-                                  invalid
-                                    ? 'employment-reason-error'
-                                    : undefined
-                                }
-                                className="min-h-28"
-                              />
-                              <FieldError
-                                id="employment-reason-error"
-                                errors={invalid ? field.state.meta.errors : []}
-                              />
-                            </Field>
-                          )
-                        }}
-                      </form.Field>
-                    </CardContent>
-                  </Card>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    ეს თარიღები განსაზღვრავს ხელფასის დათვლის პერიოდს. ანგარიშის
-                    წვდომა და თანამშრომლის სტატუსი ცალკე იმართება.
-                  </p>
+                  {!removing ? (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>დადასტურებული თარიღები</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-5">
+                        <form.Field name="startDate">
+                          {(field) => {
+                            const invalid =
+                              field.state.meta.isTouched &&
+                              !field.state.meta.isValid
+                            return (
+                              <Field data-invalid={invalid}>
+                                <FieldLabel htmlFor="employment-startDate">
+                                  დაწყების თარიღი{' '}
+                                  <span aria-hidden="true">*</span>
+                                </FieldLabel>
+                                <DatePicker
+                                  id="employment-startDate"
+                                  value={field.state.value}
+                                  today={today}
+                                  invalid={invalid}
+                                  required
+                                  onChange={field.handleChange}
+                                  onBlur={field.handleBlur}
+                                />
+                                <FieldError
+                                  id="employment-startDate-error"
+                                  errors={
+                                    invalid ? field.state.meta.errors : []
+                                  }
+                                />
+                              </Field>
+                            )
+                          }}
+                        </form.Field>
+                        <form.Field name="endDate">
+                          {(field) => {
+                            const invalid =
+                              field.state.meta.isTouched &&
+                              !field.state.meta.isValid
+                            return (
+                              <Field data-invalid={invalid}>
+                                <FieldLabel htmlFor="employment-endDate">
+                                  დასრულების თარიღი
+                                </FieldLabel>
+                                <DatePicker
+                                  id="employment-endDate"
+                                  value={field.state.value}
+                                  today={today}
+                                  invalid={invalid}
+                                  onChange={field.handleChange}
+                                  onBlur={field.handleBlur}
+                                />
+                                <FieldError
+                                  id="employment-endDate-error"
+                                  errors={
+                                    invalid ? field.state.meta.errors : []
+                                  }
+                                />
+                              </Field>
+                            )
+                          }}
+                        </form.Field>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  {!removing ? (
+                    <Alert variant="info" role="note">
+                      <IconInfoCircle aria-hidden="true" />
+                      <AlertDescription>
+                        თუ თანამშრომელი ისევ მუშაობს, დასრულების თარიღი ცარიელი
+                        დატოვეთ. მითითებული დასრულების დღე პერიოდს მოიცავს.
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <Alert variant="info" role="note">
+                    <IconInfoCircle aria-hidden="true" />
+                    <AlertDescription>
+                      ამ თარიღებით განისაზღვრება, რომელ პერიოდზე ითვლება
+                      ხელფასი. ანგარიშის წვდომა და თანამშრომლის სტატუსი ცალკე
+                      იმართება.
+                    </AlertDescription>
+                  </Alert>
                   {error ? (
                     <Alert variant="destructive">
+                      <IconAlertCircle aria-hidden="true" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   ) : null}
@@ -352,7 +310,7 @@ export function EmploymentEditor({
               </fieldset>
             </form>
           </SheetContent>
-        </Sheet>
+        </DraftSheet>
       )}
     </form.Subscribe>
   )

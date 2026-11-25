@@ -96,7 +96,10 @@ export function EmploymentPeriodsTable({
                 >
                   <IconDots aria-hidden="true" />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-44">
+                <DropdownMenuContent
+                  align="end"
+                  className="w-max min-w-44 whitespace-nowrap"
+                >
                   <DropdownMenuItem
                     onClick={() => onEdit(row.original, 'edit')}
                   >

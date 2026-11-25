@@ -47,12 +47,13 @@ function mount() {
   return client
 }
 
-it('requires a reason and saves configured percentages as integer basis points', async () => {
+it('saves valid percentages as integer basis points without a manual reason', async () => {
   const user = userEvent.setup()
   vi.mocked(updatePayrollSettings).mockImplementation(async ({ data }) => ({
     ok: true,
     value: {
       ...data,
+      reason: 'ხელფასების პარამეტრები შენახულია.',
       version: 1,
       actorId: 'accountant',
       createdAt: '2026-11-24T10:00:00.000Z',
@@ -66,25 +67,25 @@ it('requires a reason and saves configured percentages as integer basis points',
   expect(
     screen.getByRole('textbox', { name: /საშემოსავლო გადასახადი/ }),
   ).toBeDisabled()
+  expect(
+    screen.queryByRole('textbox', { name: /ცვლილების მიზეზი/ }),
+  ).not.toBeInTheDocument()
+  await user.click(income)
+  const incomeRate = screen.getByRole('textbox', {
+    name: /საშემოსავლო გადასახადი/,
+  })
+  await user.clear(incomeRate)
   await user.click(screen.getByRole('button', { name: 'შენახვა' }))
   expect(updatePayrollSettings).not.toHaveBeenCalled()
   expect(
-    await screen.findByText('მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.'),
+    await screen.findByText('მიუთითეთ პროცენტი მაქსიმუმ ორი ათწილადით.'),
   ).toBeVisible()
-  await waitFor(() =>
-    expect(
-      screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    ).toHaveFocus(),
-  )
-  await user.click(income)
+  await waitFor(() => expect(incomeRate).toHaveFocus())
+  await user.type(incomeRate, '20')
   await user.click(screen.getByRole('switch', { name: 'საპენსიოს გამოთვლა' }))
   const rate = screen.getByRole('textbox', { name: /დასაქმებულის საპენსიო/ })
   await user.clear(rate)
   await user.type(rate, '2.25')
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'საწყისი წესების განსაზღვრა',
-  )
   await user.click(screen.getByRole('button', { name: 'შენახვა' }))
   await waitFor(() =>
     expect(updatePayrollSettings).toHaveBeenCalledWith({
@@ -99,9 +100,9 @@ it('requires a reason and saves configured percentages as integer basis points',
     }),
   )
   await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
-  expect(screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ })).toHaveValue(
-    '',
-  )
+  expect(
+    vi.mocked(updatePayrollSettings).mock.calls[0]?.[0].data,
+  ).not.toHaveProperty('reason')
   expect(
     screen.getByRole('switch', { name: 'საშემოსავლოს გამოთვლა' }),
   ).toBeChecked()
@@ -111,10 +112,6 @@ it('requires a reason and saves configured percentages as integer basis points',
   expect(
     screen.getByRole('textbox', { name: /დასაქმებულის საპენსიო/ }),
   ).toHaveValue('2.25')
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'შემდეგი ცვლილების მიზეზი',
-  )
   await user.click(screen.getByRole('button', { name: 'შენახვა' }))
   await waitFor(() =>
     expect(updatePayrollSettings).toHaveBeenLastCalledWith({
@@ -131,18 +128,22 @@ it('preserves the draft after conflicts and background updates', async () => {
   const message = 'პარამეტრები შეიცვალა. განაახლეთ გვერდი.'
   vi.mocked(updatePayrollSettings).mockResolvedValue({ ok: false, message })
   const client = mount()
-  const reason = await screen.findByRole('textbox', {
-    name: /ცვლილების მიზეზი/,
+  await user.click(
+    await screen.findByRole('switch', { name: 'საშემოსავლოს გამოთვლა' }),
+  )
+  const rate = screen.getByRole('textbox', {
+    name: /საშემოსავლო გადასახადი/,
   })
-  await user.type(reason, 'ჩემი მნიშვნელოვანი ცვლილება')
+  await user.clear(rate)
+  await user.type(rate, '21.5')
   client.setQueryData(payrollSettingsKey('accountant'), {
     ...initial,
     today: '2026-11-25',
   })
-  expect(reason).toHaveValue('ჩემი მნიშვნელოვანი ცვლილება')
+  expect(rate).toHaveValue('21.5')
   await user.click(screen.getByRole('button', { name: 'შენახვა' }))
   expect(await screen.findByText(message)).toBeVisible()
-  expect(reason).toHaveValue('ჩემი მნიშვნელოვანი ცვლილება')
+  expect(rate).toHaveValue('21.5')
   expect(toast.success).not.toHaveBeenCalled()
   expect(toast.error).toHaveBeenCalledWith(message)
 })
@@ -160,10 +161,14 @@ it('shows a safe error when settings cannot be read', async () => {
 it('retains unsaved inputs when a background refetch fails', async () => {
   const user = userEvent.setup()
   const client = mount()
-  const reason = await screen.findByRole('textbox', {
-    name: /ცვლილების მიზეზი/,
+  await user.click(
+    await screen.findByRole('switch', { name: 'საშემოსავლოს გამოთვლა' }),
+  )
+  const rate = screen.getByRole('textbox', {
+    name: /საშემოსავლო გადასახადი/,
   })
-  await user.type(reason, 'შენარჩუნებული ცვლილების მიზეზი')
+  await user.clear(rate)
+  await user.type(rate, '21.5')
   vi.mocked(getPayrollSettings).mockRejectedValue(
     new Error('private database failure'),
   )
@@ -171,7 +176,7 @@ it('retains unsaved inputs when a background refetch fails', async () => {
   expect(
     await screen.findByText(/პარამეტრების განახლება ვერ მოხერხდა/),
   ).toBeVisible()
-  expect(reason).toHaveValue('შენარჩუნებული ცვლილების მიზეზი')
+  expect(rate).toHaveValue('21.5')
   expect(screen.getByRole('button', { name: 'შენახვა' })).toBeEnabled()
   expect(toast.error).not.toHaveBeenCalled()
 })
@@ -180,11 +185,7 @@ it('disables repeated submission while saving', async () => {
   const user = userEvent.setup()
   vi.mocked(updatePayrollSettings).mockReturnValue(new Promise(() => {}))
   mount()
-  await user.type(
-    await screen.findByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'წესების ცვლილება',
-  )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'შენახვა' })).toHaveAttribute(
       'aria-busy',

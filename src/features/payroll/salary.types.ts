@@ -29,6 +29,23 @@ export type SalaryDetail = {
   total: number
   pageSize: number
 }
+export type SalaryStatement = {
+  month: string
+  amountBasis: SalaryTerm['amountBasis']
+  baseMinor: number
+  bonusMinor: number
+  premiumMinor: number
+  fineMinor: number
+  totalMinor: number
+}
+export type MySalaryDetail = SalaryDetail & {
+  statements: {
+    records: SalaryStatement[]
+    total: number
+    page: number
+    pageSize: number
+  }
+}
 export type SalaryDirectory = {
   defaultAmountBasis: 'gross' | 'net'
   today: string

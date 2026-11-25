@@ -168,7 +168,11 @@ describe.runIf(process.env.RUN_SALARY_DB_TESTS === '1')(
       ).rejects.toThrow()
     })
     it('resolves dated monthly/hourly changes and same-day corrections without overlapping rates', async () => {
-      await service.saveSalaryTerms(actor, input())
+      await service.saveSalaryTerms(actor, input({ reason: undefined }))
+      expect((await read()).history[0].audit).toEqual({
+        actorName: actor.id,
+        reason: 'ხელფასის შეთანხმება შენახულია.',
+      })
       await service.saveSalaryTerms(
         actor,
         input({
@@ -228,10 +232,18 @@ describe.runIf(process.env.RUN_SALARY_DB_TESTS === '1')(
     })
     it('prevents employees from reading other salaries through directory and direct details', async () => {
       const worker = { ...actor, id: 'salary-worker' }
+      await sql().query(
+        `update "user" set permission_overrides='{"allow":["manage.access","payroll.read.all","payroll.terms.manage"],"deny":[]}' where id=$1`,
+        [worker.id],
+      )
       await expect(service.readSalaryDirectory(worker, {})).rejects.toThrow()
       await expect(
         service.readEmployeeSalary(worker, { userId: 'salary-other' }),
       ).rejects.toThrow()
+      await expect(service.saveSalaryTerms(worker, input())).rejects.toThrow()
+      expect((await service.readMySalary(worker, {})).employee.userId).toBe(
+        worker.id,
+      )
       await sql().query(
         `update employee set status='inactive' where user_id='salary-worker'`,
       )

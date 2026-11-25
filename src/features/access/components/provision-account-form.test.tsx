@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { format } from 'date-fns'
+import { ka } from 'date-fns/locale'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProvisionAccountForm } from './provision-account-form'
 
@@ -31,6 +33,36 @@ beforeEach(() => {
 })
 
 describe('administrative account provisioning', () => {
+  it('submits the selected employment start date', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProvisionAccountForm onCode={vi.fn()} canSetEmploymentDate />
+      </QueryClientProvider>,
+    )
+    await user.type(
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
+      'ანა მაისურაძე',
+    )
+    await user.click(screen.getByLabelText('მუშაობის დაწყების თარიღი'))
+    const date = new Date()
+    date.setDate(15)
+    await user.click(
+      await screen.findByRole('button', {
+        name: format(date, 'EEEE, d MMMM yyyy', { locale: ka }),
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          employmentStartDate: format(date, 'yyyy-MM-dd'),
+        }),
+      }),
+    )
+  })
+
   it('offers the five non-admin employee roles for HR without a username field', async () => {
     const user = userEvent.setup()
     render(

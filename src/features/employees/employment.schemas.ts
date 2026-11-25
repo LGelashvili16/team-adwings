@@ -10,20 +10,23 @@ const page = z.coerce
   .min(1, 'გვერდი არასწორია.')
   .max(10000, 'გვერდი არასწორია.')
   .default(1)
-const date = z.iso.date({ error: 'აირჩიეთ სწორი თარიღი.' }).pipe(
-  z
-    .string()
-    .refine((value) => value >= '1900-01-01', 'თარიღი უნდა იყოს 1900 წლიდან.')
-    .refine(
-      (value) => value <= '2100-12-31',
-      'თარიღი არ უნდა აღემატებოდეს 2100 წელს.',
-    ),
-)
+export const employmentDateSchema = z.iso
+  .date({ error: 'აირჩიეთ სწორი თარიღი.' })
+  .pipe(
+    z
+      .string()
+      .refine((value) => value >= '1900-01-01', 'თარიღი უნდა იყოს 1900 წლიდან.')
+      .refine(
+        (value) => value <= '2100-12-31',
+        'თარიღი არ უნდა აღემატებოდეს 2100 წელს.',
+      ),
+  )
 const reason = z
   .string({ error: 'მიუთითეთ ცვლილების მიზეზი.' })
   .trim()
   .min(5, 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.')
   .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
+  .optional()
 const revision = z
   .number({ error: 'განაახლეთ მონაცემები.' })
   .int('ვერსია არასწორია.')
@@ -39,8 +42,8 @@ export const employmentReadSchema = z.object(
   { error: 'მოთხოვნა არასწორია.' },
 )
 export const employmentPeriodFactsSchema = z.object({
-  startDate: date,
-  endDate: date.nullable(),
+  startDate: employmentDateSchema,
+  endDate: employmentDateSchema.nullable(),
   voided: z.boolean(),
 })
 export const employmentWriteSchema = z
@@ -49,8 +52,8 @@ export const employmentWriteSchema = z
       userId,
       expectedRevision: revision,
       periodId: z.uuid({ error: 'პერიოდი არასწორია.' }).nullable(),
-      startDate: date,
-      endDate: date.nullable(),
+      startDate: employmentDateSchema,
+      endDate: employmentDateSchema.nullable(),
       reason,
     },
     { error: 'პერიოდის მონაცემები არასწორია.' },
@@ -70,9 +73,10 @@ export const employmentVoidSchema = z.strictObject(
 )
 export const employmentFormSchema = z
   .object({
-    startDate: date,
-    endDate: z.union([date, z.literal('')], { error: 'აირჩიეთ სწორი თარიღი.' }),
-    reason,
+    startDate: employmentDateSchema,
+    endDate: z.union([employmentDateSchema, z.literal('')], {
+      error: 'აირჩიეთ სწორი თარიღი.',
+    }),
   })
   .refine((value) => !value.endDate || value.endDate >= value.startDate, {
     path: ['endDate'],
@@ -81,8 +85,8 @@ export const employmentFormSchema = z
 export const employmentRangeSchema = z
   .object({
     employeeId: z.uuid({ error: 'თანამშრომელი არასწორია.' }),
-    startDate: date,
-    endDate: date,
+    startDate: employmentDateSchema,
+    endDate: employmentDateSchema,
   })
   .refine(
     (value) =>

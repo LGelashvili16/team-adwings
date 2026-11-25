@@ -25,6 +25,7 @@ export function AuthWelcome({
             <ParticleText
               text={APP_NAME}
               fontSize="clamp(3rem, 19cqw, 10rem)"
+              fallbackFontSize="clamp(2rem, 12cqw, 6rem)"
               highlightColor="currentColor"
               density={3}
               particleSize={2}

@@ -46,7 +46,7 @@ export const savePayrollSettingsSchema = z.strictObject(
   {
     ...payrollPolicySchema.shape,
     expectedVersion: revision,
-    reason,
+    reason: reason.optional(),
   },
   { error: 'ხელფასების პარამეტრები არასწორია.' },
 )
@@ -67,11 +67,13 @@ const percentage = z
     return parsed >= 1 && parsed <= 10000
   }, 'პროცენტი უნდა იყოს 0.01-დან 100-მდე.')
 
-export const payrollSettingsFormSchema = savePayrollSettingsSchema.extend({
-  incomeTaxBasisPoints: percentage,
-  employeePensionBasisPoints: percentage,
-  employerPensionBasisPoints: percentage,
-})
+export const payrollSettingsFormSchema = savePayrollSettingsSchema
+  .omit({ reason: true })
+  .extend({
+    incomeTaxBasisPoints: percentage,
+    employeePensionBasisPoints: percentage,
+    employerPensionBasisPoints: percentage,
+  })
 
 export type PayrollPolicy = z.infer<typeof payrollPolicySchema>
 export type PayrollSettingsFormValues = z.infer<
@@ -92,6 +94,5 @@ export function payrollSettingsDefaults(
     employeePensionBasisPoints: '2',
     employerPensionBasisPoints: '2',
     expectedVersion: 0,
-    reason: '',
   }
 }

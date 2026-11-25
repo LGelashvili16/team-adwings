@@ -49,19 +49,18 @@ function mount() {
   )
   return onClose
 }
-it('requires valid money and a reason, then saves exact bulk terms on the first valid click', async () => {
+it('saves exact bulk terms without a change reason on the first valid click', async () => {
   const user = userEvent.setup(),
     onClose = mount()
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(setSalaryTerms).not.toHaveBeenCalled()
   const amount = screen.getByRole('textbox', { name: /თანხა ლარში/ })
   await waitFor(() => expect(amount).toHaveFocus())
+  expect(
+    screen.queryByRole('textbox', { name: /ცვლილების მიზეზი/ }),
+  ).not.toBeInTheDocument()
   await user.type(amount, '2400,29')
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'ხელშეკრულებით დადასტურებული თანხა',
-  )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
   expect(setSalaryTerms).toHaveBeenCalledWith({
     data: {
@@ -74,7 +73,6 @@ it('requires valid money and a reason, then saves exact bulk terms on the first 
       amountBasis: 'gross',
       currency: 'GEL',
       amountMinor: 240029,
-      reason: 'ხელშეკრულებით დადასტურებული თანხა',
     },
   })
 })
@@ -85,14 +83,15 @@ it('retains the complete draft and target revisions on a conflict', async () => 
   })
   const user = userEvent.setup(),
     onClose = mount()
-  await user.click(screen.getByRole('combobox', { name: /ხელფასის ტიპი/ }))
-  await user.click(await screen.findByRole('option', { name: 'საათობრივი' }))
-  await user.type(screen.getByRole('textbox', { name: /თანხა ლარში/ }), '15.25')
-  await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'საათობრივი შეთანხმება',
+  await user.click(
+    await screen.findByRole('combobox', { name: /ხელფასის ტიპი/ }),
   )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('option', { name: 'საათობრივი' }))
+  await user.type(
+    await screen.findByRole('textbox', { name: /თანხა ლარში/ }),
+    '15.25',
+  )
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(
     await screen.findByText('ხელფასი შეიცვალა. განაახლეთ მონაცემები.'),
   ).toBeVisible()
@@ -114,12 +113,11 @@ it('prevents dismissal and repeated saves while the mutation is pending', async 
   )
   const user = userEvent.setup(),
     onClose = mount()
-  await user.type(screen.getByRole('textbox', { name: /თანხა ლარში/ }), '1200')
   await user.type(
-    screen.getByRole('textbox', { name: /ცვლილების მიზეზი/ }),
-    'ხელშეკრულების საფუძველზე',
+    await screen.findByRole('textbox', { name: /თანხა ლარში/ }),
+    '1200',
   )
-  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(screen.getByRole('button', { name: 'შენახვა' })).toBeDisabled()
   expect(screen.getByRole('button', { name: 'დახურვა' })).toBeDisabled()
   await user.keyboard('{Escape}')

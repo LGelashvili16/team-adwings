@@ -232,8 +232,22 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       contactEmail: '',
       role: 'employee' as const,
     }
-    const activation = await service.provisionEmployee(hr, input)
+    const startDate = '2026-11-20'
+    const activation = await service.provisionEmployee(hr, {
+      ...input,
+      employmentStartDate: startDate,
+    })
     const worker = await identityForCode(activation.code)
+    const { readEmployeeEmployment } =
+      await import('#/features/employees/server/employment.service.server')
+    expect(
+      await readEmployeeEmployment(hr, { userId: worker.id }),
+    ).toMatchObject({
+      confirmed: true,
+      revision: 1,
+      periods: [{ startDate, endDate: null }],
+      history: [{ action: 'created', after: { startDate, endDate: null } }],
+    })
     expect(
       (await service.listEmployeeAccounts(hr, { page: 1 })).records.some(
         (record) => record.userId === worker.id,
