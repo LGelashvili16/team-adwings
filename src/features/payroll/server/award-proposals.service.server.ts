@@ -1,15 +1,21 @@
 import '@tanstack/react-start/server-only'
 import { createHash } from 'node:crypto'
-import { AuthorizationError } from '#/lib/authorization/authorization-error'
-import { assertPermissions } from '#/lib/authorization/access'
-import { currentAuthorization } from '#/lib/authorization/permissions'
+import { hasPermission } from '#/lib/authorization/permissions'
 import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
 import { readEmploymentEligibility } from '#/features/employees/server/employment.service.server'
 import {
   getCompletedJobAwardEvidence,
   listCompletedJobsForAward,
 } from '#/features/jobs/server/job-award-evidence.service.server'
-import { currentAccount } from './payroll-settings.repository.server'
+import {
+  authorizeAward,
+  AwardProposalError,
+} from './award-proposals.policy.server'
+import {
+  resolveAwardEvidence,
+  assertEvidenceUnchanged,
+} from './award-evidence.service.server'
+import { reviewAwardSchema } from '../award-review.schemas'
 import * as repository from './award-proposals.repository.server'
 import {
   awardDetailSchema,
@@ -32,25 +38,15 @@ import type {
 } from '../award-proposals.types'
 import type { payrollBonusRuleVersion } from '#/db/schema'
 
-export class AwardProposalError extends Error {}
+export { AwardProposalError } from './award-proposals.policy.server'
 async function authorize(
   tx: PayrollTransaction,
   actor: Actor | null,
   write = false,
 ) {
-  if (!actor) throw new AuthorizationError()
-  const { account, person } = await currentAccount(tx, actor.id)
-  if (!account || account.state !== 'active' || person?.status === 'inactive')
-    throw new AuthorizationError()
-  const current = { ...actor, ...currentAuthorization(account) }
-  assertPermissions(current, [
-    'manage.access',
-    'payroll.read.all',
-    ...(write ? ['payroll.awards.propose' as const] : []),
-  ])
-  return current
+  return authorizeAward(tx, actor, write ? 'propose' : 'read')
 }
-function ruleFact(
+export function ruleFact(
   r: typeof payrollBonusRuleVersion.$inferSelect,
 ): BonusRuleVersion {
   return {
@@ -67,7 +63,7 @@ function ruleFact(
     enabled: r.enabled,
   }
 }
-function view(
+export function awardView(
   row: NonNullable<Awaited<ReturnType<typeof repository.readCurrent>>>,
 ): AwardSummary {
   const { proposal: p, decision: a, rate: r } = row
@@ -79,6 +75,7 @@ function view(
     sourceType: p.sourceType,
     sourceKey: p.sourceKey,
     jobId: p.jobId,
+    poolId: p.poolId,
     current: {
       version: a.version,
       status: a.status,
@@ -93,6 +90,11 @@ function view(
       rule: ruleFact(r),
       completionEventId: a.completionEventId,
       sourceSnapshot: a.sourceSnapshot,
+      evidenceVerified: a.evidenceVerified,
+      allocation:
+        p.poolId && row.poolTotalMinor !== null
+          ? { poolId: p.poolId, totalMinor: row.poolTotalMinor }
+          : null,
     },
   }
 }
@@ -108,7 +110,7 @@ export async function readAwardProposals(
       const rows = await repository.directory(tx, data)
       return {
         today: date,
-        items: rows.records.map(view),
+        items: rows.records.map(awardView),
         total: rows.total,
         pageSize: rows.pageSize,
       }
@@ -123,7 +125,7 @@ export async function readAwardProposal(
   const data = awardDetailSchema.parse(input)
   return repository.transactAwards(
     async (tx) => {
-      await authorize(tx, actor)
+      const current = await authorize(tx, actor)
       const found = await repository.readCurrent(tx, data.proposalId)
       if (!found) throw new AwardProposalError('განაცხადი ვერ მოიძებნა.')
       const { date } = await getCompanyWorkday(new Date(), tx)
@@ -134,9 +136,14 @@ export async function readAwardProposal(
         data.q,
       )
       return {
-        ...view(found),
+        ...awardView(found),
+        reviewEligible:
+          hasPermission(current, 'payroll.awards.review') &&
+          !found.proposal.poolId &&
+          found.userId !== current.id &&
+          !(await repository.preparedBy(tx, data.proposalId, current.id)),
         today: date,
-        history: rows.records.map((row) => view(row).current),
+        history: rows.records.map((row) => awardView(row).current),
         total: rows.total,
         pageSize: rows.pageSize,
       }
@@ -212,6 +219,87 @@ function fingerprint(action: string, data: unknown) {
     .update(JSON.stringify({ action, data }))
     .digest('hex')
 }
+
+export async function reviewAwardProposal(actor: Actor | null, input: unknown) {
+  const data = reviewAwardSchema.parse(input),
+    hash = fingerprint('review', data)
+  return repository.transactAwards(async (tx) => {
+    const current = await authorizeAward(tx, actor, 'review'),
+      prior = await replay(tx, current.id, data.requestId, hash)
+    if (prior) return prior
+    const peek = await repository.peekProposal(tx, data.proposalId)
+    if (!peek) throw new AwardProposalError('განაცხადი ვერ მოიძებნა.')
+    await repository.sourceMode(
+      tx,
+      peek.ruleId,
+      peek.sourceType,
+      peek.sourceKey,
+    )
+    const record = await repository.lockProposal(tx, peek.id)
+    if (!record || record.version !== data.expectedVersion)
+      throw new AwardProposalError('განაცხადი შეიცვალა. განაახლეთ მონაცემები.')
+    if (record.poolId)
+      throw new AwardProposalError(
+        'ფონდის წილი ცალკე ვერ განიხილება. განიხილეთ საერთო ფონდი.',
+      )
+    const found = await repository.readCurrent(tx, record.id)
+    if (!found)
+      throw new AwardProposalError('განაცხადის ისტორია გადასამოწმებელია.')
+    if (
+      found.userId === current.id ||
+      (await repository.preparedBy(tx, record.id, current.id))
+    )
+      throw new AwardProposalError(
+        'ბენეფიციარი ან განაცხადის მომმზადებელი მის განხილვაში ვერ მონაწილეობს.',
+      )
+    if (
+      data.decision === 'revoked'
+        ? record.status !== 'approved'
+        : record.status !== 'proposed'
+    )
+      throw new AwardProposalError(
+        'არჩეული მოქმედება ამ სტატუსისთვის დაუშვებელია.',
+      )
+    if (data.decision === 'approved') {
+      const resolved = await resolveAwardEvidence(tx, current, {
+        userId: found.userId,
+        ruleId: record.ruleId,
+        workDate: found.decision.workDate,
+        expectedRuleVersion: found.rate.version,
+        jobId: record.jobId,
+      })
+      assertEvidenceUnchanged(awardView(found).current, resolved)
+      if (
+        resolved.rate.id !== found.decision.ruleVersionId ||
+        proposedAwardAmount(
+          resolved.rate.amountMinor,
+          found.decision.quantityMilli,
+          resolved.rate.calculation,
+        ) !== found.decision.amountMinor
+      )
+        throw new AwardProposalError(
+          'ტარიფი ან თანხა შეიცვალა. ხელახლა მოამზადეთ განაცხადი.',
+        )
+    }
+    const previous = await repository.rawCurrent(tx, record.id, record.version)
+    if (!previous)
+      throw new AwardProposalError('განაცხადის ისტორია გადასამოწმებელია.')
+    const { id: _id, createdAt: _createdAt, ...facts } = previous,
+      version = record.version + 1
+    await repository.appendVersion(tx, {
+      ...facts,
+      version,
+      status: data.decision,
+      evidenceVerified: data.decision === 'approved' && data.evidenceVerified,
+      actorId: current.id,
+      reason: data.reason,
+      requestId: data.requestId,
+      commandHash: hash,
+    })
+    await repository.setCurrent(tx, record.id, version, data.decision)
+    return { proposalId: record.id, version }
+  })
+}
 async function replay(
   tx: PayrollTransaction,
   actorId: string,
@@ -234,6 +322,18 @@ export async function saveAwardProposal(actor: Actor | null, input: unknown) {
     const current = await authorize(tx, actor, true)
     const prior = await replay(tx, current.id, data.requestId, hash)
     if (prior) return prior
+    if (
+      (await repository.sourceMode(
+        tx,
+        data.ruleId,
+        data.jobId ? 'job' : 'external',
+        data.jobId ?? normalizeAwardReference(data.reference),
+        'individual',
+      )) !== 'individual'
+    )
+      throw new AwardProposalError(
+        'ამ წყაროზე საერთო ფონდი არსებობს. გამოიყენეთ ფონდის ცვლილება.',
+      )
     if (data.userId === current.id)
       throw new AwardProposalError(
         'საკუთარი წახალისების განაცხადს ვერ მოამზადებთ. მიმართეთ სხვა უფლებამოსილ პირს.',
@@ -243,6 +343,14 @@ export async function saveAwardProposal(actor: Actor | null, input: unknown) {
       : null
     if (data.proposalId && !existing)
       throw new AwardProposalError('განაცხადი ვერ მოიძებნა.')
+    if (existing?.poolId)
+      throw new AwardProposalError(
+        'ფონდის წილი ცალკე ვერ შეიცვლება. შეცვალეთ საერთო ფონდი.',
+      )
+    if (existing?.status === 'approved')
+      throw new AwardProposalError(
+        'დამტკიცებული წახალისება ჩაკეტილია. ცვლილებამდე გააუქმეთ დამტკიცება.',
+      )
     if ((existing?.version ?? 0) !== data.expectedVersion)
       throw new AwardProposalError(
         'განაცხადი შეიცვალა. განაახლეთ მონაცემები და გადაამოწმეთ ცვლილება.',
@@ -378,6 +486,18 @@ export async function withdrawAwardProposal(
     const current = await authorize(tx, actor, true),
       prior = await replay(tx, current.id, data.requestId, hash)
     if (prior) return prior
+    const peek = await repository.peekProposal(tx, data.proposalId)
+    if (peek?.poolId)
+      throw new AwardProposalError(
+        'ფონდის წილი ცალკე ვერ გაუქმდება. გამოიყენეთ საერთო ფონდი.',
+      )
+    if (peek)
+      await repository.sourceMode(
+        tx,
+        peek.ruleId,
+        peek.sourceType,
+        peek.sourceKey,
+      )
     const record = await repository.lockProposal(tx, data.proposalId)
     if (
       !record ||

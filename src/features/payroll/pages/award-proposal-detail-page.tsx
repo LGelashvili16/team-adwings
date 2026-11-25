@@ -13,6 +13,8 @@ import { formatGeorgianDate } from '#/lib/date-format'
 import { PayrollNavigation } from '../components/payroll-navigation'
 import { AwardProposalEditor } from '../components/award-proposal-editor'
 import { AwardWithdrawal } from '../components/award-withdrawal'
+import { AwardReviewDialog } from '../components/award-review-dialog'
+import type { AwardDecision } from '../components/award-review-dialog'
 import { PayrollHistorySearch } from '../components/payroll-history-search'
 import { Empty, EmptyHeader, EmptyTitle } from '#/components/ui/empty'
 import {
@@ -20,7 +22,10 @@ import {
   AwardHistoryTable,
 } from '../components/award-proposal-tables'
 import { awardQuery } from '../award-proposals.queries'
-import { awardStatusLabels } from '../award-proposals.presentation'
+import {
+  awardStatusLabels,
+  awardStatusVariants,
+} from '../award-proposals.presentation'
 import type { AwardDetail } from '../award-proposals.types'
 
 const route = getRouteApi('/_authenticated/manage/payroll/awards/$proposalId')
@@ -40,7 +45,26 @@ export function AwardProposalDetailPage() {
     } | null>(null),
     [open, setOpen] = useState(false)
   const canEdit =
-    hasPermission(actor, 'payroll.awards.propose') && view?.userId !== actor.id
+    hasPermission(actor, 'payroll.awards.propose') &&
+    view?.userId !== actor.id &&
+    !view?.poolId &&
+    view?.current.status !== 'approved'
+  const [reviewDraft, setReviewDraft] = useState<{
+      key: number
+      record: AwardDetail
+      decision: AwardDecision
+    } | null>(null),
+    [reviewOpen, setReviewOpen] = useState(false)
+  const startReview = (decision: AwardDecision) => {
+    if (view) {
+      setReviewDraft((previous) => ({
+        key: (previous?.key ?? 0) + 1,
+        record: view,
+        decision,
+      }))
+      setReviewOpen(true)
+    }
+  }
   const start = (mode: 'edit' | 'withdraw') => {
     if (view) {
       setDraft((previous) => ({
@@ -84,6 +108,46 @@ export function AwardProposalDetailPage() {
           განაცხადების სია
         </Button>
       </div>
+      {view?.reviewEligible ? (
+        <div className="flex flex-wrap justify-end gap-2">
+          {view.current.status === 'proposed' ? (
+            <>
+              <Button variant="outline" onClick={() => startReview('rejected')}>
+                უარყოფა
+              </Button>
+              <Button onClick={() => startReview('approved')}>
+                დამტკიცება
+              </Button>
+            </>
+          ) : null}
+          {view.current.status === 'approved' ? (
+            <Button variant="outline" onClick={() => startReview('revoked')}>
+              დამტკიცების გაუქმება
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      {view?.poolId ? (
+        <Alert variant="info">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            ეს თანხა საერთო ფონდის წილია. ცვლილება და განხილვა მთელი ფონდისთვის
+            სრულდება.
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={
+                <Link
+                  to="/manage/payroll/award-pools/$poolId"
+                  params={{ poolId: view.poolId }}
+                  search={{ page: 1 }}
+                />
+              }
+            >
+              ფონდის ნახვა
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {query.isPending ? (
         <div
           role="status"
@@ -111,13 +175,7 @@ export function AwardProposalDetailPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 <div>
-                  <Badge
-                    variant={
-                      view.current.status === 'proposed'
-                        ? 'orange'
-                        : 'secondary'
-                    }
-                  >
+                  <Badge variant={awardStatusVariants[view.current.status]}>
                     {awardStatusLabels[view.current.status]}
                   </Badge>
                 </div>
@@ -159,10 +217,9 @@ export function AwardProposalDetailPage() {
           </div>
           <Alert variant="info">
             <AlertDescription>
-              თანხა შემოთავაზებულია და არ წარმოადგენს სახელფასო დარიცხვას.
-              დამტკიცებამდე ხელახლა უნდა გადამოწმდეს დასაქმება, სამუშაოს
-              მდგომარეობა, რაოდენობა და ტარიფი. დამტკიცება ჯერ ხელმისაწვდომი არ
-              არის.
+              განაცხადის დამტკიცება არ წარმოადგენს სახელფასო დარიცხვას ან
+              გადახდას. გადაწყვეტილებას იღებს დამოუკიდებელი უფლებამოსილი პირი,
+              რომელიც არც ბენეფიციარია და არც განაცხადის მომმზადებელი.
             </AlertDescription>
           </Alert>
           {view.userId === actor.id ? (
@@ -246,6 +303,21 @@ export function AwardProposalDetailPage() {
           record={draft.record}
           open={open}
           onClose={() => setOpen(false)}
+        />
+      ) : null}
+      {reviewDraft ? (
+        <AwardReviewDialog
+          key={reviewDraft.key}
+          actorId={actor.id}
+          target={{
+            kind: 'individual',
+            id: reviewDraft.record.proposalId,
+            version: reviewDraft.record.current.version,
+            label: reviewDraft.record.employeeName,
+          }}
+          decision={reviewDraft.decision}
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
         />
       ) : null}
     </div>

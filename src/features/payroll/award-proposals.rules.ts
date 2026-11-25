@@ -31,3 +31,25 @@ export function proposedAwardAmount(
     )
   return amount
 }
+
+/** Distribute the remaining tetri in stable identity order, independent of picker order. */
+export function equalAwardShares(totalMinor: number, userIds: string[]) {
+  if (
+    !Number.isSafeInteger(totalMinor) ||
+    totalMinor > 100000000 ||
+    userIds.length < 2 ||
+    userIds.length > 20 ||
+    totalMinor < userIds.length ||
+    new Set(userIds).size !== userIds.length
+  )
+    throw new Error(
+      'აირჩიეთ განსხვავებული ბენეფიციარები და თითოეულისთვის მინიმუმ ერთი თეთრი.',
+    )
+  const sorted = [...userIds].sort(),
+    base = Math.floor(totalMinor / userIds.length),
+    remainder = totalMinor % userIds.length
+  return userIds.map((userId) => ({
+    userId,
+    amountMinor: base + (sorted.indexOf(userId) < remainder ? 1 : 0),
+  }))
+}

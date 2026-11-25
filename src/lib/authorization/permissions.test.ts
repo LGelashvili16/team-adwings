@@ -37,6 +37,7 @@ describe('role and permission boundaries', () => {
           'payroll.read.all',
           'payroll.terms.manage',
           'payroll.awards.propose',
+          'payroll.awards.review',
         ].includes(permission),
       )
     for (const role of roleSchema.options)
@@ -45,6 +46,7 @@ describe('role and permission boundaries', () => {
         'payroll.read.all',
         'payroll.terms.manage',
         'payroll.awards.propose',
+        'payroll.awards.review',
       ] as const)
         expect(hasPermission([role], permission)).toBe(
           ['accountant', 'admin', 'owner'].includes(role),
@@ -210,6 +212,7 @@ describe('role and permission boundaries', () => {
       'payroll.read.all',
       'payroll.terms.manage',
       'payroll.awards.propose',
+      'payroll.awards.review',
       'leave.review',
       'security.configure',
       'notifications.configure',

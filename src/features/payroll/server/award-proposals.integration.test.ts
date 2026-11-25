@@ -14,6 +14,7 @@ import {
 } from 'vitest'
 import type * as Service from './award-proposals.service.server'
 import type * as Jobs from '#/features/jobs/server/job-award-evidence.service.server'
+import type * as Pools from './award-pools.service.server'
 import type { db as Database } from '#/db'
 import type { Actor } from '#/lib/authorization/actor'
 
@@ -25,6 +26,7 @@ let admin: pg.Client | undefined,
   applicationDatabase: typeof Database | undefined,
   service: typeof Service,
   jobs: typeof Jobs,
+  pools: typeof Pools,
   created = false,
   ruleId: string,
   employeeId: string
@@ -56,6 +58,40 @@ const input = (extra = {}) => ({
 })
 const detail = (proposalId: string, extra = {}) =>
   service.readAwardProposal(actor, { proposalId, ...extra })
+const reviewer: Actor = { ...actor, id: 'award-admin', roles: ['admin'] }
+const review = (proposalId: string, extra = {}) =>
+  service.reviewAwardProposal(reviewer, {
+    proposalId,
+    expectedVersion: 1,
+    requestId: randomUUID(),
+    reason: 'მტკიცებულება დამოუკიდებლად გადამოწმებულია',
+    decision: 'approved',
+    evidenceVerified: true,
+    ...extra,
+  })
+const poolInput = (extra = {}) => {
+  const { proposalId: _id, userId: _userId, ...data } = input()
+  return {
+    ...data,
+    poolId: null,
+    allocations: [
+      { userId: 'award-worker', amountMinor: 8000 },
+      { userId: 'award-other', amountMinor: 7431 },
+    ],
+    ...extra,
+  }
+}
+const poolDetail = (poolId: string) => pools.readAwardPool(actor, { poolId })
+const poolReview = (poolId: string, extra = {}) =>
+  pools.decideAwardPool(reviewer, {
+    poolId,
+    expectedVersion: 1,
+    requestId: randomUUID(),
+    reason: 'ყველა წილი და მტკიცებულება გადამოწმებულია',
+    decision: 'approved',
+    evidenceVerified: true,
+    ...extra,
+  })
 async function rate(calculation = 'additional_work', kind = 'bonus') {
   const id = randomUUID()
   await sql().query('insert into payroll_bonus_rule(id) values ($1)', [id])
@@ -140,6 +176,7 @@ describe.runIf(process.env.RUN_AWARD_DB_TESTS === '1')(
       vi.resetModules()
       applicationDatabase = (await import('#/db')).db
       service = await import('./award-proposals.service.server')
+      pools = await import('./award-pools.service.server')
       jobs =
         await import('#/features/jobs/server/job-award-evidence.service.server')
       vi.useFakeTimers({ toFake: ['Date'] })
@@ -170,6 +207,326 @@ describe.runIf(process.env.RUN_AWARD_DB_TESTS === '1')(
           await admin.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`)
         await admin.end()
       }
+    })
+    it('requires independent attested approval and locks approved preparation until revocation', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      await expect(
+        service.reviewAwardProposal(actor, {
+          proposalId: saved.proposalId,
+          expectedVersion: 1,
+          requestId: randomUUID(),
+          reason: 'დამოუკიდებელი განხილვა',
+          decision: 'approved',
+          evidenceVerified: true,
+        }),
+      ).rejects.toThrow('მომმზადებელი')
+      await expect(
+        review(saved.proposalId, { evidenceVerified: false }),
+      ).rejects.toThrow('გადამოწმება')
+      const command = { requestId: randomUUID() }
+      const approved = await review(saved.proposalId, command)
+      expect(await review(saved.proposalId, command)).toEqual(approved)
+      expect((await detail(saved.proposalId)).current).toMatchObject({
+        status: 'approved',
+        version: 2,
+        evidenceVerified: true,
+        actorName: reviewer.id,
+        amountMinor: 15431,
+      })
+      await expect(
+        service.saveAwardProposal(
+          actor,
+          input({ proposalId: saved.proposalId, expectedVersion: 2 }),
+        ),
+      ).rejects.toThrow('ჩაკეტილია')
+      await review(saved.proposalId, {
+        expectedVersion: 2,
+        decision: 'revoked',
+        evidenceVerified: false,
+      })
+      await service.saveAwardProposal(
+        actor,
+        input({ proposalId: saved.proposalId, expectedVersion: 3 }),
+      )
+      expect((await detail(saved.proposalId)).current.status).toBe('proposed')
+    })
+    it('denies beneficiaries, all historical preparers and freshly revoked review grants', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      await sql().query(
+        "update \"user\" set roles='accountant' where id='award-worker'",
+      )
+      await expect(
+        service.reviewAwardProposal(
+          { ...reviewer, id: 'award-worker' },
+          {
+            proposalId: saved.proposalId,
+            expectedVersion: 1,
+            requestId: randomUUID(),
+            reason: 'დამოუკიდებელი განხილვა',
+            decision: 'approved',
+            evidenceVerified: true,
+          },
+        ),
+      ).rejects.toThrow('ბენეფიციარი')
+      await service.saveAwardProposal(
+        reviewer,
+        input({ proposalId: saved.proposalId, expectedVersion: 1 }),
+      )
+      await expect(
+        review(saved.proposalId, { expectedVersion: 2 }),
+      ).rejects.toThrow('მომმზადებელი')
+      await expect(
+        service.reviewAwardProposal(actor, {
+          proposalId: saved.proposalId,
+          expectedVersion: 2,
+          requestId: randomUUID(),
+          reason: 'დამოუკიდებელი განხილვა',
+          decision: 'approved',
+          evidenceVerified: true,
+        }),
+      ).rejects.toThrow('მომმზადებელი')
+      await sql().query(
+        `update "user" set permission_overrides='{"allow":[],"deny":["payroll.awards.review"]}' where id=$1`,
+        [reviewer.id],
+      )
+      await expect(
+        review(saved.proposalId, { expectedVersion: 2 }),
+      ).rejects.toThrow()
+    })
+    it('revalidates employment and tariff revisions before accepting, but permits rejection of stale evidence', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      await sql().query(
+        'update employee set employment_revision=2 where id=$1',
+        [employeeId],
+      )
+      await expect(review(saved.proposalId)).rejects.toThrow('შეიცვალა')
+      expect((await detail(saved.proposalId)).total).toBe(1)
+      await review(saved.proposalId, {
+        decision: 'rejected',
+        evidenceVerified: false,
+      })
+      await service.saveAwardProposal(
+        actor,
+        input({ proposalId: saved.proposalId, expectedVersion: 2 }),
+      )
+      await sql().query(
+        'update payroll_bonus_rule_version set enabled=false where rule_id=$1',
+        [ruleId],
+      )
+      await expect(
+        review(saved.proposalId, { expectedVersion: 3 }),
+      ).rejects.toThrow('წესი არ მოქმედებს')
+    })
+    it('allows one concurrent review and rejects source changes even when the job remains completed', async () => {
+      const saved = await service.saveAwardProposal(actor, input())
+      const results = await Promise.allSettled([
+        review(saved.proposalId),
+        review(saved.proposalId, {
+          decision: 'rejected',
+          evidenceVerified: false,
+        }),
+      ])
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      const jobId = await completedJob(),
+        jobRate = await rate('job')
+      const jobProposal = await service.saveAwardProposal(
+        actor,
+        input({ ruleId: jobRate, jobId, reference: '', quantityMilli: 1000 }),
+      )
+      await sql().query('update job set version=2 where id=$1', [jobId])
+      await expect(review(jobProposal.proposalId)).rejects.toThrow('შეიცვალა')
+    })
+    it('creates exact pool shares once, reserves allocation mode and prevents child bypass', async () => {
+      const payload = poolInput(),
+        saved = await pools.saveAwardPool(actor, payload)
+      expect(await pools.saveAwardPool(actor, payload)).toEqual(saved)
+      const record = await poolDetail(saved.poolId)
+      expect(record).toMatchObject({
+        current: { totalMinor: 15431, quantityMilli: 1250, status: 'proposed' },
+        members: expect.any(Array),
+      })
+      expect(
+        record.members.map((m) => m.current.amountMinor).sort((a, b) => a - b),
+      ).toEqual([7431, 8000])
+      expect(
+        record.members.every((m) => m.current.allocation?.totalMinor === 15431),
+      ).toBe(true)
+      await expect(service.saveAwardProposal(actor, input())).rejects.toThrow(
+        'ფონდ',
+      )
+      const member = record.members[0]
+      await expect(
+        service.withdrawAwardProposal(actor, {
+          proposalId: member.proposalId,
+          expectedVersion: 1,
+          requestId: randomUUID(),
+          reason: 'ცალკე წილის გაუქმება',
+        }),
+      ).rejects.toThrow('ფონდის წილი')
+      await expect(review(member.proposalId)).rejects.toThrow('ფონდის წილი')
+      await poolReview(saved.poolId)
+      expect(
+        (await poolDetail(saved.poolId)).members.every(
+          (m) => m.current.status === 'approved' && m.current.version === 2,
+        ),
+      ).toBe(true)
+      await expect(
+        pools.saveAwardPool(
+          actor,
+          poolInput({ poolId: saved.poolId, expectedVersion: 2 }),
+        ),
+      ).rejects.toThrow('ჩაკეტილია')
+      await poolReview(saved.poolId, {
+        expectedVersion: 2,
+        decision: 'revoked',
+        evidenceVerified: false,
+      })
+      expect(
+        (await poolDetail(saved.poolId)).members.every(
+          (m) => m.current.status === 'revoked',
+        ),
+      ).toBe(true)
+    })
+    it('rejects invalid pool totals, duplicate members, own shares and individual source overlap atomically', async () => {
+      await expect(
+        pools.saveAwardPool(
+          actor,
+          poolInput({
+            allocations: [
+              { userId: 'award-worker', amountMinor: 8000 },
+              { userId: 'award-other', amountMinor: 7430 },
+            ],
+          }),
+        ),
+      ).rejects.toThrow('ზუსტად')
+      await expect(
+        pools.saveAwardPool(
+          actor,
+          poolInput({
+            allocations: [
+              { userId: 'award-worker', amountMinor: 8000 },
+              { userId: 'award-worker', amountMinor: 7431 },
+            ],
+          }),
+        ),
+      ).rejects.toThrow('განმეორდეს')
+      await expect(
+        pools.saveAwardPool(
+          actor,
+          poolInput({
+            allocations: [
+              { userId: actor.id, amountMinor: 8000 },
+              { userId: 'award-other', amountMinor: 7431 },
+            ],
+          }),
+        ),
+      ).rejects.toThrow('საკუთარი')
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from payroll_award_pool',
+          )
+        ).rows[0].total,
+      ).toBe(0)
+      const saved = await service.saveAwardProposal(actor, input())
+      await service.withdrawAwardProposal(actor, {
+        proposalId: saved.proposalId,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        reason: 'დამატებითი შემოწმება',
+      })
+      await expect(pools.saveAwardPool(actor, poolInput())).rejects.toThrow(
+        'ინდივიდუალური',
+      )
+    })
+    it('retains withdrawn and removed shares, resubmits the same pool and blocks historic beneficiaries from review', async () => {
+      const saved = await pools.saveAwardPool(actor, poolInput())
+      const first = await poolDetail(saved.poolId),
+        removed = first.members.find((m) => m.userId === 'award-other')!
+      await pools.saveAwardPool(
+        actor,
+        poolInput({
+          poolId: saved.poolId,
+          expectedVersion: 1,
+          allocations: [
+            { userId: 'award-worker', amountMinor: 8000 },
+            { userId: 'award-admin', amountMinor: 7431 },
+          ],
+        }),
+      )
+      expect((await detail(removed.proposalId)).current.status).toBe(
+        'withdrawn',
+      )
+      await pools.saveAwardPool(
+        actor,
+        poolInput({ poolId: saved.poolId, expectedVersion: 2 }),
+      )
+      await expect(
+        poolReview(saved.poolId, { expectedVersion: 3 }),
+      ).rejects.toThrow('ბენეფიციარი')
+      await pools.withdrawAwardPool(actor, {
+        poolId: saved.poolId,
+        expectedVersion: 3,
+        requestId: randomUUID(),
+        reason: 'მტკიცებულება დასაზუსტებელია',
+      })
+      expect(
+        (await poolDetail(saved.poolId)).members.every(
+          (m) => m.current.status === 'withdrawn',
+        ),
+      ).toBe(true)
+      await pools.saveAwardPool(
+        actor,
+        poolInput({ poolId: saved.poolId, expectedVersion: 4 }),
+      )
+      const next = await poolDetail(saved.poolId)
+      expect(next.current).toMatchObject({ version: 5, status: 'proposed' })
+      expect(
+        next.members.find((m) => m.userId === 'award-other')?.proposalId,
+      ).toBe(removed.proposalId)
+    })
+    it('rechecks every pool beneficiary and rolls the entire decision back if one changed', async () => {
+      const saved = await pools.saveAwardPool(actor, poolInput())
+      await sql().query(
+        "update employee set employment_revision=2 where user_id='award-other'",
+      )
+      await expect(poolReview(saved.poolId)).rejects.toThrow('შეიცვალა')
+      const unchanged = await poolDetail(saved.poolId)
+      expect(unchanged.total).toBe(1)
+      expect(
+        unchanged.members.every(
+          (m) => m.current.status === 'proposed' && m.current.version === 1,
+        ),
+      ).toBe(true)
+      await poolReview(saved.poolId, {
+        decision: 'rejected',
+        evidenceVerified: false,
+      })
+      expect(
+        (await poolDetail(saved.poolId)).members.every(
+          (m) => m.current.status === 'rejected',
+        ),
+      ).toBe(true)
+    })
+    it('serializes competing allocation modes and competing pool decisions', async () => {
+      const race = await Promise.allSettled([
+        pools.saveAwardPool(actor, poolInput()),
+        service.saveAwardProposal(actor, input()),
+      ])
+      expect(race.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      const saved = await pools.saveAwardPool(
+        actor,
+        poolInput({ reference: 'POOL-SECOND' }),
+      )
+      const decisions = await Promise.allSettled([
+        poolReview(saved.poolId),
+        poolReview(saved.poolId, {
+          decision: 'rejected',
+          evidenceVerified: false,
+        }),
+      ])
+      expect(decisions.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
+      expect((await poolDetail(saved.poolId)).total).toBe(2)
     })
     it('retains beneficiary, exact quantity, applicable rate, evidence and trusted author without posting salary', async () => {
       const saved = await service.saveAwardProposal(actor, input()),
@@ -526,6 +883,7 @@ describe.runIf(process.env.RUN_AWARD_DB_TESTS === '1')(
         await expect(
           service.saveAwardProposal(actor, input()),
         ).rejects.toThrow()
+        await expect(pools.saveAwardPool(actor, poolInput())).rejects.toThrow()
       } finally {
         await sql().query(
           'drop trigger reject_award_version on payroll_award_proposal_version',
@@ -539,6 +897,73 @@ describe.runIf(process.env.RUN_AWARD_DB_TESTS === '1')(
           )
         ).rows[0].total,
       ).toBe(0)
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from payroll_award_pool',
+          )
+        ).rows[0].total,
+      ).toBe(0)
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from payroll_award_source',
+          )
+        ).rows[0].total,
+      ).toBe(0)
+    })
+    it('permits a review-only actor to revalidate native evidence without granting proposal pickers', async () => {
+      const jobId = await completedJob(),
+        jobRate = await rate('job')
+      const saved = await service.saveAwardProposal(
+        actor,
+        input({ ruleId: jobRate, jobId, reference: '', quantityMilli: 1000 }),
+      )
+      await sql().query(
+        `update "user" set permission_overrides='{"allow":["payroll.read.all","payroll.awards.review"],"deny":[]}' where id='award-hr_manager'`,
+      )
+      const reviewOnly: Actor = {
+        ...actor,
+        id: 'award-hr_manager',
+        roles: ['hr_manager'],
+      }
+      await expect(
+        service.lookupAwardInputs(reviewOnly, {
+          kind: 'job',
+          userId: 'award-worker',
+          workDate: '2026-11-25',
+        }),
+      ).rejects.toThrow()
+      await service.reviewAwardProposal(reviewOnly, {
+        proposalId: saved.proposalId,
+        expectedVersion: 1,
+        requestId: randomUUID(),
+        reason: 'სამუშაო და ბენეფიციარი გადამოწმებულია',
+        decision: 'approved',
+        evidenceVerified: true,
+      })
+      expect((await detail(saved.proposalId)).current.status).toBe('approved')
+    })
+    it('rolls back the parent and every share when a review audit write fails', async () => {
+      const saved = await pools.saveAwardPool(actor, poolInput())
+      await sql().query(
+        "create function reject_pool_review() returns trigger language plpgsql as $$ begin raise exception 'test'; end $$",
+      )
+      await sql().query(
+        'create trigger reject_pool_review before insert on payroll_award_proposal_version for each row execute function reject_pool_review()',
+      )
+      try {
+        await expect(poolReview(saved.poolId)).rejects.toThrow()
+      } finally {
+        await sql().query(
+          'drop trigger reject_pool_review on payroll_award_proposal_version',
+        )
+        await sql().query('drop function reject_pool_review()')
+      }
+      const view = await poolDetail(saved.poolId)
+      expect(view.current.status).toBe('proposed')
+      expect(view.total).toBe(1)
+      expect(view.members.every((m) => m.current.version === 1)).toBe(true)
     })
   },
 )

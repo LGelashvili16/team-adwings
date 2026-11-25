@@ -1,6 +1,8 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { expect, it, vi } from 'vitest'
 import { awardQuery } from './award-proposals.queries'
+import { awardPoolQuery } from './award-pools.queries'
+import type { AwardPoolDetail } from './award-pools.types'
 import type { AwardDetail, AwardVersion } from './award-proposals.types'
 
 vi.mock('./award-proposals.functions', () => ({
@@ -8,6 +10,7 @@ vi.mock('./award-proposals.functions', () => ({
   getAwardProposals: vi.fn(),
   getAwardChoices: vi.fn(),
 }))
+vi.mock('./award-pools.functions', () => ({ getAwardPool: vi.fn() }))
 const current: AwardVersion = {
   version: 1,
   status: 'proposed',
@@ -63,6 +66,46 @@ it('retains history context only for the same actor and proposal', () => {
     observer.setOptions(awardQuery(actorId, proposalId, 2, 'ავტორი'))
     expect(observer.getCurrentResult().data).toBe(keep ? previous : undefined)
     expect(observer.getCurrentResult().isPlaceholderData).toBe(keep)
+    observer.destroy()
+  }
+  client.clear()
+})
+it('never carries pool history into a different actor or pool', () => {
+  const value: AwardPoolDetail = {
+    poolId: 'pool-a',
+    ruleId: 'rule-a',
+    sourceType: 'external',
+    jobId: null,
+    today: '2026-11-25',
+    timezone: 'Asia/Tbilisi',
+    members: [],
+    history: [],
+    total: 1,
+    pageSize: 10,
+    reviewEligible: true,
+    preparationEligible: false,
+    current: {
+      ...current,
+      totalMinor: 100,
+      evidenceVerified: false,
+      allocations: [
+        { userId: 'worker', name: 'თანამშრომელი', amountMinor: 50 },
+        { userId: 'other', name: 'თანამშრომელი', amountMinor: 50 },
+      ],
+    },
+  }
+  const client = new QueryClient(),
+    options = awardPoolQuery('accountant', 'pool-a', 1, ''),
+    previous = { ok: true as const, value }
+  client.setQueryData(options.queryKey, previous)
+  for (const [actorId, poolId, keep] of [
+    ['accountant', 'pool-a', true],
+    ['other-actor', 'pool-a', false],
+    ['accountant', 'pool-b', false],
+  ] as const) {
+    const observer = new QueryObserver(client, options)
+    observer.setOptions(awardPoolQuery(actorId, poolId, 2, 'ავტორი'))
+    expect(observer.getCurrentResult().data).toBe(keep ? previous : undefined)
     observer.destroy()
   }
   client.clear()

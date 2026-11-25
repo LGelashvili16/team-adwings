@@ -7,10 +7,13 @@ import {
   payrollAwardProposalVersion as a,
   payrollBonusRule as rule,
   payrollBonusRuleVersion as r,
+  payrollAwardSource as source,
+  payrollAwardPoolVersion as poolVersion,
   user,
 } from '#/db/schema'
 import type { PayrollTransaction } from './payroll-settings.repository.server'
 import type { AwardSearch } from '../award-proposals.schemas'
+import type { AwardStatus } from '../award-proposals.types'
 
 export const transactAwards = db.transaction.bind(db)
 export const pageSize = 20,
@@ -106,7 +109,7 @@ export async function setCurrent(
   tx: PayrollTransaction,
   id: string,
   version: number,
-  status: 'proposed' | 'withdrawn',
+  status: AwardStatus,
 ) {
   await tx.update(p).set({ version, status }).where(eq(p.id, id))
 }
@@ -136,6 +139,60 @@ const projection = {
   employeeName: employee.fullName,
   userId: employee.userId,
   actorName: user.name,
+  poolTotalMinor: sql<
+    number | null
+  >`(select ${poolVersion.totalMinor} from ${poolVersion} where ${poolVersion.id} = ${a.poolVersionId})`,
+}
+export async function peekProposal(tx: PayrollTransaction, id: string) {
+  return (await tx.select().from(p).where(eq(p.id, id)).limit(1)).at(0)
+}
+export async function preparedBy(
+  tx: PayrollTransaction,
+  id: string,
+  actorId: string,
+) {
+  return !!(
+    await tx
+      .select({ id: a.id })
+      .from(a)
+      .where(
+        and(
+          eq(a.proposalId, id),
+          eq(a.actorId, actorId),
+          eq(a.status, 'proposed'),
+        ),
+      )
+      .limit(1)
+  ).at(0)
+}
+/** Serialize the allocation mode before locking any proposal or pool belonging to the source. */
+export async function sourceMode(
+  tx: PayrollTransaction,
+  ruleId: string,
+  sourceType: 'job' | 'external',
+  sourceKey: string,
+  mode?: 'individual' | 'pool',
+) {
+  await commandLock(tx, `source:${ruleId}:${sourceType}:${sourceKey}`)
+  const existing = (
+    await tx
+      .select()
+      .from(source)
+      .where(
+        and(
+          eq(source.ruleId, ruleId),
+          eq(source.sourceType, sourceType),
+          eq(source.sourceKey, sourceKey),
+        ),
+      )
+      .limit(1)
+  ).at(0)
+  if (existing) return existing.mode
+  if (mode) {
+    await tx.insert(source).values({ ruleId, sourceType, sourceKey, mode })
+    return mode
+  }
+  return null
 }
 const pattern = (q: string) => `%${q.replace(/[\\%_]/g, '\\$&')}%`
 export async function directory(tx: PayrollTransaction, search: AwardSearch) {

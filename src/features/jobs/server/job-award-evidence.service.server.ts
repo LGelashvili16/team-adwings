@@ -1,5 +1,7 @@
 import '@tanstack/react-start/server-only'
 import { assertPermissions } from '#/lib/authorization/access'
+import { hasAnyPermission } from '#/lib/authorization/permissions'
+import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
 import {
   jobAwardEvidenceSchema,
@@ -11,13 +13,24 @@ import type { JobsTransaction } from './jobs.repository.server'
 import type { Actor } from '#/lib/authorization/actor'
 
 /** Payroll callers supply their transaction; this narrow contract independently authorizes work evidence. */
-async function authorize(tx: JobsTransaction, actor: Actor | null) {
+async function authorize(
+  tx: JobsTransaction,
+  actor: Actor | null,
+  preparationOnly = false,
+) {
   const current = await requireJobActor(tx, actor, true)
   assertPermissions(current, [
     'manage.access',
     'payroll.read.all',
-    'payroll.awards.propose',
+    ...(preparationOnly ? ['payroll.awards.propose' as const] : []),
   ])
+  if (
+    !hasAnyPermission(current, [
+      'payroll.awards.propose',
+      'payroll.awards.review',
+    ])
+  )
+    throw new AuthorizationError()
 }
 export async function listCompletedJobsForAward(
   tx: JobsTransaction,
@@ -25,7 +38,7 @@ export async function listCompletedJobsForAward(
   input: unknown,
 ) {
   const data = jobAwardSearchSchema.parse(input)
-  await authorize(tx, actor)
+  await authorize(tx, actor, true)
   const { timezone } = await getCompanyWorkday(new Date(), tx)
   return repository.listAwardJobs(tx, data, timezone)
 }

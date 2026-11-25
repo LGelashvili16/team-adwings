@@ -10,6 +10,7 @@ import { DataPagination } from '#/components/common/data-pagination'
 import { hasPermission } from '#/lib/authorization/permissions'
 import { PayrollNavigation } from '../components/payroll-navigation'
 import { AwardProposalEditor } from '../components/award-proposal-editor'
+import { AwardPoolEditor } from '../components/award-pool-editor'
 import { AwardProposalFilters } from '../components/award-proposal-filters'
 import { AwardProposalsTable } from '../components/award-proposal-tables'
 import { awardsQuery } from '../award-proposals.queries'
@@ -21,9 +22,11 @@ export function AwardProposalsPage() {
     navigate = route.useNavigate()
   const query = useQuery(awardsQuery(actor.id, search)),
     view = query.data?.ok ? query.data.value : null
-  const [draft, setDraft] = useState<{ key: number; today: string } | null>(
-      null,
-    ),
+  const [draft, setDraft] = useState<{
+      key: number
+      today: string
+      kind: 'individual' | 'pool'
+    } | null>(null),
     [open, setOpen] = useState(false)
   return (
     <div className="flex min-w-0 flex-col gap-6">
@@ -32,21 +35,40 @@ export function AwardProposalsPage() {
           წახალისების განაცხადები
         </h1>
         {hasPermission(actor, 'payroll.awards.propose') ? (
-          <Button
-            disabled={!view}
-            onClick={() => {
-              if (view) {
-                setDraft((previous) => ({
-                  key: (previous?.key ?? 0) + 1,
-                  today: view.today,
-                }))
-                setOpen(true)
-              }
-            }}
-          >
-            <IconPlus data-icon="inline-start" aria-hidden="true" />
-            ახალი განაცხადი
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={!view}
+              onClick={() => {
+                if (view) {
+                  setDraft((previous) => ({
+                    key: (previous?.key ?? 0) + 1,
+                    today: view.today,
+                    kind: 'pool',
+                  }))
+                  setOpen(true)
+                }
+              }}
+            >
+              საერთო ფონდი
+            </Button>
+            <Button
+              disabled={!view}
+              onClick={() => {
+                if (view) {
+                  setDraft((previous) => ({
+                    key: (previous?.key ?? 0) + 1,
+                    today: view.today,
+                    kind: 'individual',
+                  }))
+                  setOpen(true)
+                }
+              }}
+            >
+              <IconPlus data-icon="inline-start" aria-hidden="true" />
+              ახალი განაცხადი
+            </Button>
+          </div>
         ) : null}
       </div>
       <PayrollNavigation actor={actor} active="awards" />
@@ -58,9 +80,9 @@ export function AwardProposalsPage() {
       />
       <Alert variant="info">
         <AlertDescription>
-          აქ ინახება ინდივიდუალური წინადადებები. თანხა ჯერ არ არის დამტკიცებული,
-          ხელფასზე დარიცხული ან გადახდილი. საერთო ფონდის განაწილება და
-          დამტკიცება შემდეგ ეტაპზე დაემატება.
+          აირჩიეთ ინდივიდუალური თანხა ან საერთო ფონდის წილი. დამტკიცებას
+          ასრულებს დამოუკიდებელი უფლებამოსილი პირი. სახელფასო დარიცხვა და
+          გადახდა ჯერ ხელმისაწვდომი არ არის.
         </AlertDescription>
       </Alert>
       {query.isPending ? (
@@ -110,7 +132,7 @@ export function AwardProposalsPage() {
           />
         </>
       )}
-      {draft ? (
+      {draft?.kind === 'individual' ? (
         <AwardProposalEditor
           key={draft.key}
           actorId={actor.id}
@@ -118,6 +140,23 @@ export function AwardProposalsPage() {
           today={draft.today}
           open={open}
           onClose={() => setOpen(false)}
+        />
+      ) : null}
+      {draft?.kind === 'pool' ? (
+        <AwardPoolEditor
+          key={draft.key}
+          actorId={actor.id}
+          existing={null}
+          today={draft.today}
+          open={open}
+          onClose={() => setOpen(false)}
+          onSaved={(poolId) => {
+            void navigate({
+              to: '/manage/payroll/award-pools/$poolId',
+              params: { poolId },
+              search: { page: 1 },
+            })
+          }}
         />
       ) : null}
     </div>

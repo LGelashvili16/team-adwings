@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
   check,
+  boolean,
   date,
   index,
   integer,
@@ -15,6 +16,8 @@ import { user } from '../auth/auth.schema'
 import { employee } from '../employees/employee.schema'
 import { job, jobEvent } from '../jobs/job.schema'
 import { payrollBonusRule, payrollBonusRuleVersion } from './bonus-rule.schema'
+import { payrollAwardPool, payrollAwardPoolVersion } from './award-pool.schema'
+import type { AwardStatus } from '#/features/payroll/award-proposals.types'
 
 /** Stable work claim survives rule edits, proposal withdrawal, job reopening and request retries. */
 export const payrollAwardProposal = pgTable(
@@ -26,7 +29,7 @@ export const payrollAwardProposal = pgTable(
     ruleId: uuid('rule_id')
       .notNull()
       .references(() => payrollBonusRule.id, { onDelete: 'restrict' }),
-    /** Sole beneficiary in this individual-proposal workflow. */
+    /** Beneficiary of an individual award or a shared-pool allocation. */
     employeeId: uuid('employee_id')
       .notNull()
       .references(() => employee.id, { onDelete: 'restrict' }),
@@ -38,8 +41,12 @@ export const payrollAwardProposal = pgTable(
     jobId: uuid('job_id').references(() => job.id, { onDelete: 'restrict' }),
     /** Current audited version. */
     version: integer('version').notNull(),
-    /** Proposal-only state; neither value authorizes a payment. */
-    status: text('status').$type<'proposed' | 'withdrawn'>().notNull(),
+    /** Optional owning pool; its members cannot be changed independently. */
+    poolId: uuid('pool_id').references(() => payrollAwardPool.id, {
+      onDelete: 'restrict',
+    }),
+    /** Preparation/review state, independent of actual payment. */
+    status: text('status').$type<AwardStatus>().notNull(),
     /** Database-generated creation instant. */
     createdAt: createdAt(),
   },
@@ -51,13 +58,14 @@ export const payrollAwardProposal = pgTable(
       t.sourceKey,
     ),
     index('payroll_award_directory').on(t.status, t.createdAt, t.id),
+    index('payroll_award_pool_members').on(t.poolId, t.employeeId),
     check(
       'payroll_award_source_valid',
       sql`(${t.sourceType} = 'job' and ${t.jobId} is not null and ${t.sourceKey} = ${t.jobId}::text) or (${t.sourceType} = 'external' and ${t.jobId} is null and length(${t.sourceKey}) between 3 and 160)`,
     ),
     check(
       'payroll_award_state_valid',
-      sql`${t.version} > 0 and ${t.status} in ('proposed','withdrawn')`,
+      sql`${t.version} > 0 and ${t.status} in ('proposed','withdrawn','approved','rejected','revoked')`,
     ),
   ],
 )
@@ -73,7 +81,14 @@ export const payrollAwardProposalVersion = pgTable(
     /** Consecutive proposal revision. */
     version: integer('version').notNull(),
     /** Preserved proposal or withdrawal decision. */
-    status: text('status').$type<'proposed' | 'withdrawn'>().notNull(),
+    status: text('status').$type<AwardStatus>().notNull(),
+    /** Group decision that fixes this exact share, where applicable. */
+    poolVersionId: uuid('pool_version_id').references(
+      () => payrollAwardPoolVersion.id,
+      { onDelete: 'restrict' },
+    ),
+    /** Explicit independent verification recorded by an approving reviewer. */
+    evidenceVerified: boolean('evidence_verified').notNull().default(false),
     /** Applicable immutable rate and qualification. */
     ruleVersionId: uuid('rule_version_id')
       .notNull()
@@ -122,8 +137,12 @@ export const payrollAwardProposalVersion = pgTable(
     uniqueIndex('payroll_award_version').on(t.proposalId, t.version),
     uniqueIndex('payroll_award_command').on(t.actorId, t.requestId),
     check(
+      'payroll_award_review_valid',
+      sql`${t.status} <> 'approved' or ${t.evidenceVerified}`,
+    ),
+    check(
       'payroll_award_version_state_valid',
-      sql`${t.version} > 0 and ${t.status} in ('proposed','withdrawn')`,
+      sql`${t.version} > 0 and ${t.status} in ('proposed','withdrawn','approved','rejected','revoked')`,
     ),
     check(
       'payroll_award_work_date_valid',

@@ -20,6 +20,7 @@ import { bonusKindLabels, bonusUnitLabel } from '../bonus-rules.presentation'
 import {
   formatAwardQuantity,
   awardStatusLabels,
+  awardStatusVariants,
 } from '../award-proposals.presentation'
 import { formatSalary, salaryBasisLabels } from '../salary.presentation'
 import type { AwardSummary, AwardVersion } from '../award-proposals.types'
@@ -35,8 +36,14 @@ export function AwardAmount({ value }: { value: AwardVersion }) {
         {salaryBasisLabels[value.rule.amountBasis]}
       </span>
       <span className="text-xs text-muted-foreground">
-        {formatAwardQuantity(value.quantityMilli)} × {formatSalary(value.rule)}{' '}
-        · {bonusUnitLabel(value.rule)}
+        {value.allocation ? (
+          `ფონდის წილი · სულ ${formatSalary({ amountMinor: value.allocation.totalMinor })}`
+        ) : (
+          <>
+            {formatAwardQuantity(value.quantityMilli)} ×{' '}
+            {formatSalary(value.rule)} · {bonusUnitLabel(value.rule)}
+          </>
+        )}
       </span>
       <span className="text-xs text-muted-foreground">
         წესის ვერსია {value.rule.version}
@@ -70,7 +77,7 @@ export function AwardProposalsTable({ records }: { records: AwardSummary[] }) {
         }),
         helper.display({
           id: 'amount',
-          header: 'შემოთავაზებული თანხა',
+          header: 'თანხა',
           cell: ({ row }) => <AwardAmount value={row.original.current} />,
         }),
         helper.display({
@@ -83,13 +90,7 @@ export function AwardProposalsTable({ records }: { records: AwardSummary[] }) {
                 {row.original.current.sourceSnapshot.jobTitle ??
                   row.original.current.reference}
               </span>
-              <Badge
-                variant={
-                  row.original.current.status === 'proposed'
-                    ? 'orange'
-                    : 'secondary'
-                }
-              >
+              <Badge variant={awardStatusVariants[row.original.current.status]}>
                 {awardStatusLabels[row.original.current.status]}
               </Badge>
             </div>
@@ -143,11 +144,7 @@ export function AwardHistoryTable({ records }: { records: AwardVersion[] }) {
             <div className="flex min-w-44 flex-col gap-2">
               <span className="font-medium">ვერსია {row.original.version}</span>
               <span>{formatGeorgianDate(row.original.workDate)}</span>
-              <Badge
-                variant={
-                  row.original.status === 'proposed' ? 'orange' : 'secondary'
-                }
-              >
+              <Badge variant={awardStatusVariants[row.original.status]}>
                 {awardStatusLabels[row.original.status]}
               </Badge>
             </div>
@@ -191,6 +188,9 @@ export function AwardHistoryTable({ records }: { records: AwardVersion[] }) {
                 )}
               </time>
               <span className="text-sm">{row.original.reason}</span>
+              {row.original.evidenceVerified ? (
+                <Badge variant="green">მტკიცებულება გადამოწმებულია</Badge>
+              ) : null}
             </div>
           ),
         }),

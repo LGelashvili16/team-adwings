@@ -70,6 +70,7 @@ import { Route as AuthenticatedManagePayrollIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedManagePayrollUserIdRouteImport } from './routes/_authenticated/manage/payroll/$userId'
 import { Route as AuthenticatedManagePayrollCalendarRouteImport } from './routes/_authenticated/manage/payroll/calendar'
 import { Route as AuthenticatedManagePayrollSettingsRouteImport } from './routes/_authenticated/manage/payroll/settings'
+import { Route as AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport } from './routes/_authenticated/manage/payroll/award-pools/$poolId'
 import { Route as AuthenticatedManagePayrollAwardsIndexRouteImport } from './routes/_authenticated/manage/payroll/awards/index'
 import { Route as AuthenticatedManagePayrollAwardsProposalIdRouteImport } from './routes/_authenticated/manage/payroll/awards/$proposalId'
 import { Route as AuthenticatedManagePayrollBonusesIndexRouteImport } from './routes/_authenticated/manage/payroll/bonuses/index'
@@ -419,6 +420,12 @@ const AuthenticatedManagePayrollSettingsRoute =
     path: '/payroll/settings',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
+const AuthenticatedManagePayrollAwardPoolsPoolIdRoute =
+  AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport.update({
+    id: '/payroll/award-pools/$poolId',
+    path: '/payroll/award-pools/$poolId',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
 const AuthenticatedManagePayrollAwardsIndexRoute =
   AuthenticatedManagePayrollAwardsIndexRouteImport.update({
     id: '/payroll/awards/',
@@ -505,6 +512,7 @@ export interface FileRoutesByFullPath {
   '/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
   '/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
+  '/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
   '/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
   '/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
   '/manage/payroll/awards/': typeof AuthenticatedManagePayrollAwardsIndexRoute
@@ -569,6 +577,7 @@ export interface FileRoutesByTo {
   '/manage/attendance': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees': typeof AuthenticatedManageEmployeesIndexRoute
   '/manage/payroll': typeof AuthenticatedManagePayrollIndexRoute
+  '/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
   '/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
   '/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
   '/manage/payroll/awards': typeof AuthenticatedManagePayrollAwardsIndexRoute
@@ -637,6 +646,7 @@ export interface FileRoutesById {
   '/_authenticated/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/_authenticated/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
   '/_authenticated/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
+  '/_authenticated/manage/payroll/award-pools/$poolId': typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
   '/_authenticated/manage/payroll/awards/$proposalId': typeof AuthenticatedManagePayrollAwardsProposalIdRoute
   '/_authenticated/manage/payroll/bonuses/$ruleId': typeof AuthenticatedManagePayrollBonusesRuleIdRoute
   '/_authenticated/manage/payroll/awards/': typeof AuthenticatedManagePayrollAwardsIndexRoute
@@ -705,6 +715,7 @@ export interface FileRouteTypes {
     | '/manage/attendance/'
     | '/manage/employees/'
     | '/manage/payroll/'
+    | '/manage/payroll/award-pools/$poolId'
     | '/manage/payroll/awards/$proposalId'
     | '/manage/payroll/bonuses/$ruleId'
     | '/manage/payroll/awards/'
@@ -769,6 +780,7 @@ export interface FileRouteTypes {
     | '/manage/attendance'
     | '/manage/employees'
     | '/manage/payroll'
+    | '/manage/payroll/award-pools/$poolId'
     | '/manage/payroll/awards/$proposalId'
     | '/manage/payroll/bonuses/$ruleId'
     | '/manage/payroll/awards'
@@ -836,6 +848,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manage/attendance/'
     | '/_authenticated/manage/employees/'
     | '/_authenticated/manage/payroll/'
+    | '/_authenticated/manage/payroll/award-pools/$poolId'
     | '/_authenticated/manage/payroll/awards/$proposalId'
     | '/_authenticated/manage/payroll/bonuses/$ruleId'
     | '/_authenticated/manage/payroll/awards/'
@@ -1280,6 +1293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManagePayrollSettingsRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
+    '/_authenticated/manage/payroll/award-pools/$poolId': {
+      id: '/_authenticated/manage/payroll/award-pools/$poolId'
+      path: '/payroll/award-pools/$poolId'
+      fullPath: '/manage/payroll/award-pools/$poolId'
+      preLoaderRoute: typeof AuthenticatedManagePayrollAwardPoolsPoolIdRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
     '/_authenticated/manage/payroll/awards/': {
       id: '/_authenticated/manage/payroll/awards/'
       path: '/payroll/awards'
@@ -1405,6 +1425,7 @@ interface AuthenticatedManageRouteRouteChildren {
   AuthenticatedManagePayrollSettingsRoute: typeof AuthenticatedManagePayrollSettingsRoute
   AuthenticatedManageEmployeesIndexRoute: typeof AuthenticatedManageEmployeesIndexRoute
   AuthenticatedManagePayrollIndexRoute: typeof AuthenticatedManagePayrollIndexRoute
+  AuthenticatedManagePayrollAwardPoolsPoolIdRoute: typeof AuthenticatedManagePayrollAwardPoolsPoolIdRoute
   AuthenticatedManagePayrollAwardsProposalIdRoute: typeof AuthenticatedManagePayrollAwardsProposalIdRoute
   AuthenticatedManagePayrollBonusesRuleIdRoute: typeof AuthenticatedManagePayrollBonusesRuleIdRoute
   AuthenticatedManagePayrollAwardsIndexRoute: typeof AuthenticatedManagePayrollAwardsIndexRoute
@@ -1437,6 +1458,8 @@ const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildr
     AuthenticatedManageEmployeesIndexRoute:
       AuthenticatedManageEmployeesIndexRoute,
     AuthenticatedManagePayrollIndexRoute: AuthenticatedManagePayrollIndexRoute,
+    AuthenticatedManagePayrollAwardPoolsPoolIdRoute:
+      AuthenticatedManagePayrollAwardPoolsPoolIdRoute,
     AuthenticatedManagePayrollAwardsProposalIdRoute:
       AuthenticatedManagePayrollAwardsProposalIdRoute,
     AuthenticatedManagePayrollBonusesRuleIdRoute:

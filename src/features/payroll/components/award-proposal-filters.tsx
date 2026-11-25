@@ -25,12 +25,12 @@ import {
   awardSearchSchema,
 } from '../award-proposals.schemas'
 import type { AwardSearch } from '../award-proposals.schemas'
+import { awardStatusLabels } from '../award-proposals.presentation'
 
 const labels = {
   status: {
     all: 'ყველა სტატუსი',
-    proposed: 'განხილვის მოლოდინში',
-    withdrawn: 'გაუქმებული',
+    ...awardStatusLabels,
   },
   sort: { newest: 'ჯერ ახალი', oldest: 'ჯერ ძველი' },
 }

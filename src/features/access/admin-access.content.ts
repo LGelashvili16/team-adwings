@@ -45,6 +45,7 @@ export const permissionLabels: Record<Permission, string> = {
   'payroll.read.all': 'თანამშრომლების ხელფასების ნახვა',
   'payroll.terms.manage': 'თანამშრომლების ხელფასების განსაზღვრა',
   'payroll.awards.propose': 'წახალისების განაცხადების მომზადება',
+  'payroll.awards.review': 'წახალისების დამოუკიდებელი განხილვა',
   'security.configure': 'უსაფრთხოების პოლიტიკის მართვა',
   'notifications.configure': 'შეტყობინებების პარამეტრების მართვა',
   'locations.manage': 'სამუშაო ადგილების მართვა',

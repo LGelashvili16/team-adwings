@@ -1,5 +1,8 @@
 import type { BonusRuleVersion } from './bonus-rules.types'
 
+export type AwardStatus =
+  'proposed' | 'withdrawn' | 'approved' | 'rejected' | 'revoked'
+
 export type AwardChoice = {
   id: string
   label: string
@@ -16,8 +19,10 @@ export type AwardSourceSnapshot = {
   timezone: string
 }
 export type AwardVersion = {
+  allocation?: { poolId: string; totalMinor: number } | null
+  evidenceVerified?: boolean
   version: number
-  status: 'proposed' | 'withdrawn'
+  status: AwardStatus
   workDate: string
   quantityMilli: number
   amountMinor: number
@@ -31,6 +36,7 @@ export type AwardVersion = {
   sourceSnapshot: AwardSourceSnapshot
 }
 export type AwardSummary = {
+  poolId?: string | null
   proposalId: string
   employeeName: string
   userId: string
@@ -47,6 +53,7 @@ export type AwardDirectory = {
   pageSize: number
 }
 export type AwardDetail = AwardSummary & {
+  reviewEligible?: boolean
   today: string
   history: AwardVersion[]
   total: number

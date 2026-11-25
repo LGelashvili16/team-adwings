@@ -11,6 +11,7 @@ import {
   withdrawAwardSchema,
 } from './award-proposals.schemas'
 import {
+  reviewAwardProposal,
   AwardProposalError,
   lookupAwardInputs,
   readAwardProposal,
@@ -18,6 +19,7 @@ import {
   saveAwardProposal,
   withdrawAwardProposal,
 } from './server/award-proposals.service.server'
+import { reviewAwardSchema } from './award-review.schemas'
 
 async function safely<T>(action: () => Promise<T>) {
   setResponseHeader('Cache-Control', 'private, no-store')
@@ -69,4 +71,16 @@ export const cancelAwardProposal = createServerFn({ method: 'POST' })
   .validator(withdrawAwardSchema)
   .handler(({ context, data }) =>
     safely(() => withdrawAwardProposal(context.actor, data)),
+  )
+export const decideAwardProposal = createServerFn({ method: 'POST' })
+  .middleware([
+    permissionsMiddleware(
+      'manage.access',
+      'payroll.read.all',
+      'payroll.awards.review',
+    ),
+  ])
+  .validator(reviewAwardSchema)
+  .handler(({ context, data }) =>
+    safely(() => reviewAwardProposal(context.actor, data)),
   )

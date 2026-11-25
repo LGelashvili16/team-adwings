@@ -18,7 +18,10 @@ export const awardSearchSchema = z.object(
     page: bonusRuleSearchSchema.shape.page,
     q: bonusRuleSearchSchema.shape.q,
     status: z
-      .enum(['all', 'proposed', 'withdrawn'], { error: 'სტატუსი არასწორია.' })
+      .enum(
+        ['all', 'proposed', 'withdrawn', 'approved', 'rejected', 'revoked'],
+        { error: 'სტატუსი არასწორია.' },
+      )
       .default('proposed'),
     sort: z
       .enum(['newest', 'oldest'], { error: 'დალაგება არასწორია.' })
@@ -107,6 +110,7 @@ const fields = {
     .min(1, 'ხელახლა აირჩიეთ წესი.')
     .max(2147483647, 'ვერსია არასწორია.'),
 }
+export const awardInputFields = fields
 const source = (
   v: { jobId: string | null; reference: string },
   ctx: z.RefinementCtx,
@@ -130,6 +134,7 @@ const source = (
       message: 'სამუშაოს წყარო შეირჩევა სამუშაოების სიიდან.',
     })
 }
+export const validateAwardSourceReference = source
 export const awardFormSchema = z
   .object({
     ...fields,

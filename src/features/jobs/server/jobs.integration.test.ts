@@ -1013,7 +1013,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
   }, 30_000)
   beforeEach(async () => {
     await sql().query(
-      'TRUNCATE payroll_award_proposal_version, payroll_award_proposal, job_employee, job_read, job_event, job',
+      'TRUNCATE payroll_award_proposal_version, payroll_award_proposal, payroll_award_pool_version, payroll_award_pool, payroll_award_source, job_employee, job_read, job_event, job',
     )
     await sql().query(
       'TRUNCATE notification, notification_policy, notification_policy_audit',
@@ -1902,7 +1902,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     } finally {
       await Promise.all(readers.map((reader) => reader.cancel()))
       await sql().query(
-        'TRUNCATE payroll_award_proposal_version, payroll_award_proposal, job_employee, job_read, job_event, job, notification',
+        'TRUNCATE payroll_award_proposal_version, payroll_award_proposal, payroll_award_pool_version, payroll_award_pool, payroll_award_source, job_employee, job_read, job_event, job, notification',
       )
       await sql().query('DELETE FROM "user" WHERE id=$1', [sales.id])
     }

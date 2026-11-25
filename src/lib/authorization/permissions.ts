@@ -44,6 +44,7 @@ export const permissionSchema = z.enum(
     'payroll.read.all',
     'payroll.terms.manage',
     'payroll.awards.propose',
+    'payroll.awards.review',
     'security.configure',
     'notifications.configure',
     'locations.manage',
@@ -147,6 +148,7 @@ const administrationPermissions = [
   'payroll.read.all',
   'payroll.terms.manage',
   'payroll.awards.propose',
+  'payroll.awards.review',
   'leave.review',
   'security.configure',
   'notifications.configure',
@@ -239,6 +241,7 @@ export const roles = {
       'payroll.read.all',
       'payroll.terms.manage',
       'payroll.awards.propose',
+      'payroll.awards.review',
     ],
   }),
   // Employee account management is explicit; attendance review and job management remain separate.
