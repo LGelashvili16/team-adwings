@@ -7,7 +7,14 @@ import {
   IconAlertCircle,
   IconInfoCircle,
   IconDeviceFloppy,
+  IconHistory,
 } from '@tabler/icons-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '#/components/ui/accordion'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Badge } from '#/components/ui/badge'
@@ -26,14 +33,15 @@ import { formatGeorgianDateTime, formatGeorgianMonth } from '#/lib/date-format'
 import { accountInitials } from '#/features/access/access.presentation'
 import { formatWorkedTime } from '#/features/attendance/attendance.rules'
 import { monthlyEmployeeQuery } from '../monthly.queries'
-import { monthlyAdjustmentLabels } from '../monthly.rules'
+import { monthlyAdjustmentLabels, monthlySalaryLabels } from '../monthly.rules'
 import {
   formatSalary,
   salaryBasisLabels,
   salaryKindLabels,
 } from '../salary.presentation'
 import { MonthlyEntryForm } from './monthly-entry-form'
-import { MonthlyDecisionDialog } from './monthly-decision-dialog'
+import { MonthlyRemoveDialog } from './monthly-remove-dialog'
+import { PaymentBreakdown } from './payment-breakdown'
 import { DataPagination } from '#/components/common/data-pagination'
 
 export function MonthlyEntrySheet({
@@ -67,8 +75,14 @@ export function MonthlyEntrySheet({
     enabled: open,
   })
   const view = query.data?.ok ? query.data.value : null
+  const legacySalary =
+    !view?.closed && view?.source?.salary.amountBasis === 'gross'
   const editable =
-    canEdit && !view?.closed && actorId !== userId && view?.source
+    canEdit &&
+    !view?.closed &&
+    !legacySalary &&
+    actorId !== userId &&
+    view?.source
   return (
     <DraftSheet
       open={open}
@@ -129,6 +143,15 @@ export function MonthlyEntrySheet({
             </Alert>
           ) : (
             <>
+              {view.payments.length ? (
+                <section className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
+                  <h3 className="text-sm font-medium">გაცემული თანხები</h3>
+                  <PaymentBreakdown
+                    payments={view.payments}
+                    twice={view.firstPaymentEnabled}
+                  />
+                </section>
+              ) : null}
               {editable ? (
                 <MonthlyEntryForm
                   actorId={actorId}
@@ -136,6 +159,13 @@ export function MonthlyEntrySheet({
                   userId={userId}
                   source={editable}
                   current={view.current}
+                  firstPaymentEnabled={view.firstPaymentEnabled}
+                  firstAlreadyPaid={view.payments.some(
+                    (payment) => payment.stage !== 'adjustments',
+                  )}
+                  defaultFineStage={view.defaultFineStage}
+                  paymentWindows={view.paymentWindows}
+                  payments={view.payments}
                   onSaved={onClose}
                   showSubmit={false}
                   onPending={setPending}
@@ -164,13 +194,13 @@ export function MonthlyEntrySheet({
                     </>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      საბაზო თანხა დასადასტურებელია.
+                      თვის ხელფასი დასადასტურებელია.
                     </p>
                   )}
                   <dl className="grid grid-cols-[1fr_auto] gap-3 text-sm">
                     {view.current.salary ? (
                       <>
-                        <dt>საბაზო თანხა</dt>
+                        <dt>{monthlySalaryLabels.all}</dt>
                         <dd className="tabular-nums">
                           {formatSalary({
                             amountMinor: view.current.baseMinor,
@@ -213,6 +243,7 @@ export function MonthlyEntrySheet({
               )}
               {canEdit &&
               !view.closed &&
+              !view.payments.length &&
               actorId !== userId &&
               view.current?.status === 'draft' ? (
                 <Button
@@ -228,12 +259,33 @@ export function MonthlyEntrySheet({
                   ჩანაწერის ამოღება
                 </Button>
               ) : null}
-              {view.sourceMessage ? (
+              {view.sourceMessage || legacySalary ? (
                 <Alert variant="info" role="status">
                   <IconInfoCircle aria-hidden="true" />
                   <AlertDescription className="flex flex-col items-start gap-2">
-                    {view.sourceMessage}
-                    {view.salaryMissing ? (
+                    {legacySalary
+                      ? 'გაცემამდე განსაზღვრეთ თანამშრომლისთვის ხელზე ასაღები თანხა.'
+                      : view.sourceMessage}
+                    {view.employmentNeedsReview ? (
+                      view.canOpenEmployeeProfile ? (
+                        <Link
+                          className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
+                          to="/manage/employees/$employeeId"
+                          params={{ employeeId: userId }}
+                          search={{
+                            employmentPage: 1,
+                            employmentHistoryPage: 1,
+                          }}
+                          hash="employment-periods"
+                        >
+                          თანამშრომლის დასაქმების პერიოდებზე გადასვლა
+                        </Link>
+                      ) : (
+                        <span>
+                          მიმართეთ თანამშრომლების მართვაზე უფლებამოსილ პირს.
+                        </span>
+                      )
+                    ) : view.salaryMissing || legacySalary ? (
                       <Link
                         className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
                         to="/manage/payroll/$userId"
@@ -246,90 +298,105 @@ export function MonthlyEntrySheet({
                 </Alert>
               ) : null}
               {view.history.length ? (
-                <section
-                  className="flex flex-col gap-4 border-t pt-5"
-                  aria-label="ჩანაწერის ისტორია"
-                >
-                  <h3 className="font-medium">ცვლილებების ისტორია</h3>
-                  {view.history.map((item) => (
-                    <div
-                      key={item.version}
-                      className="flex flex-col gap-2 rounded-xl border p-4 text-sm"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Badge
-                          variant={
-                            item.status === 'finalized' ? 'green' : 'secondary'
-                          }
-                        >
-                          {item.status === 'finalized'
-                            ? 'დასრულებული'
-                            : item.status === 'voided'
-                              ? 'ამოღებული'
-                              : 'მონახაზი'}{' '}
-                          · {item.version}
-                        </Badge>
-                        <span className="font-medium tabular-nums">
-                          {formatSalary({ amountMinor: item.totalMinor })}
-                        </span>
-                      </div>
-                      <p>
-                        {item.actorName} ·{' '}
-                        {formatGeorgianDateTime(item.recordedAt, view.timezone)}
-                      </p>
-                      <p className="wrap-anywhere">{item.reason}</p>
-                      {item.salary ? (
-                        <p className="text-muted-foreground">
-                          {salaryKindLabels[item.salary.kind]}:{' '}
-                          {formatSalary(item.salary)}
-                          {item.salary.kind === 'hourly' ? (
-                            <>
-                              {' '}
-                              · დადასტურებული დრო:{' '}
-                              {formatWorkedTime(item.workedSeconds)}
-                            </>
-                          ) : null}
-                        </p>
-                      ) : (
-                        <p className="text-muted-foreground">
-                          საბაზო თანხა დასადასტურებელია.
-                        </p>
-                      )}
-                      <p className="text-muted-foreground">
-                        {item.salary
-                          ? `ბაზა: ${formatSalary({ amountMinor: item.baseMinor })}, `
-                          : null}
-                        ბონუსი: {formatSalary({ amountMinor: item.bonusMinor })}
-                        , პრემია:{' '}
-                        {formatSalary({ amountMinor: item.premiumMinor })},
-                        ჯარიმა: {formatSalary({ amountMinor: item.fineMinor })}
-                      </p>
-                      {item.baseReason ? (
-                        <p className="wrap-anywhere">{item.baseReason}</p>
-                      ) : null}
-                      {item.adjustments.map((a, i) => (
-                        <p key={i} className="wrap-anywhere">
-                          {monthlyAdjustmentLabels[a.kind]}:{' '}
-                          {formatSalary({ amountMinor: a.amountMinor })}
-                          {a.reason ? `. ${a.reason}` : null}
-                        </p>
-                      ))}
-                    </div>
-                  ))}
-                  <DataPagination
-                    page={page}
-                    total={view.total}
-                    pageSize={view.pageSize}
-                    renderLink={(next) => (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        disabled={pending}
-                        onClick={() => setPage(next)}
+                <Accordion className="rounded-xl border bg-card px-4">
+                  <AccordionItem value="history">
+                    <AccordionTrigger className="items-center gap-3 py-3">
+                      <IconHistory
+                        className="size-4 text-muted-foreground"
+                        aria-hidden="true"
                       />
-                    )}
-                  />
-                </section>
+                      ცვლილებების ისტორია
+                      <Badge variant="secondary">{view.total}</Badge>
+                    </AccordionTrigger>
+                    <AccordionContent className="flex flex-col gap-3 [&_p:not(:last-child)]:mb-0">
+                      {view.history.map((item) => (
+                        <div
+                          key={item.version}
+                          className="flex flex-col gap-2 rounded-xl border p-4 text-sm"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Badge
+                              variant={
+                                item.status === 'finalized'
+                                  ? 'green'
+                                  : 'secondary'
+                              }
+                            >
+                              {item.status === 'finalized'
+                                ? 'დასრულებული'
+                                : item.status === 'voided'
+                                  ? 'ამოღებული'
+                                  : 'მონახაზი'}{' '}
+                              · {item.version}
+                            </Badge>
+                            <span className="font-medium tabular-nums">
+                              {formatSalary({ amountMinor: item.totalMinor })}
+                            </span>
+                          </div>
+                          <p>
+                            {item.actorName} ·{' '}
+                            {formatGeorgianDateTime(
+                              item.recordedAt,
+                              view.timezone,
+                            )}
+                          </p>
+                          <p className="wrap-anywhere">{item.reason}</p>
+                          {item.salary ? (
+                            <p className="text-muted-foreground">
+                              {salaryKindLabels[item.salary.kind]}:{' '}
+                              {formatSalary(item.salary)}
+                              {item.salary.kind === 'hourly' ? (
+                                <>
+                                  {' '}
+                                  · დადასტურებული დრო:{' '}
+                                  {formatWorkedTime(item.workedSeconds)}
+                                </>
+                              ) : null}
+                            </p>
+                          ) : (
+                            <p className="text-muted-foreground">
+                              თვის ხელფასი დასადასტურებელია.
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            {item.salary
+                              ? `${monthlySalaryLabels.all} ${formatSalary({ amountMinor: item.baseMinor })}, `
+                              : null}
+                            ბონუსი:{' '}
+                            {formatSalary({ amountMinor: item.bonusMinor })},
+                            პრემია:{' '}
+                            {formatSalary({ amountMinor: item.premiumMinor })},
+                            ჯარიმა:{' '}
+                            {formatSalary({ amountMinor: item.fineMinor })}
+                          </p>
+                          {item.baseReason ? (
+                            <p className="wrap-anywhere">{item.baseReason}</p>
+                          ) : null}
+                          {item.adjustments.map((a, i) => (
+                            <p key={i} className="wrap-anywhere">
+                              {monthlyAdjustmentLabels[a.kind]}:{' '}
+                              {formatSalary({ amountMinor: a.amountMinor })}
+                              {a.reason ? `. ${a.reason}` : null}
+                            </p>
+                          ))}
+                        </div>
+                      ))}
+                      <DataPagination
+                        page={page}
+                        total={view.total}
+                        pageSize={view.pageSize}
+                        renderLink={(next) => (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={pending}
+                            onClick={() => setPage(next)}
+                          />
+                        )}
+                      />
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               ) : null}
             </>
           )}
@@ -362,12 +429,10 @@ export function MonthlyEntrySheet({
         ) : null}
       </SheetContent>
       {removeTarget ? (
-        <MonthlyDecisionDialog
+        <MonthlyRemoveDialog
           key={removeTarget.version}
           actorId={actorId}
           month={month}
-          token=""
-          closed={false}
           open={removeOpen}
           onClose={() => setRemoveOpen(false)}
           employee={removeTarget}

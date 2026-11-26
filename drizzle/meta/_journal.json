@@ -491,6 +491,34 @@
       "when": 1795616775564,
       "tag": "0069_job_geofence_diameter",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1795678217590,
+      "tag": "0070_job_geofence_setting",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795679783303,
+      "tag": "0071_job_geofence_manual_diameter",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795680325972,
+      "tag": "0072_payroll_payment_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795683598300,
+      "tag": "0073_payroll_adjustment_dates",
+      "breakpoints": true
     }
   ]
 }

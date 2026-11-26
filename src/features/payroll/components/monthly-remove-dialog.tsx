@@ -16,16 +16,14 @@ import {
 import { Field, FieldError, FieldLabel } from '#/components/ui/field'
 import { Textarea } from '#/components/ui/textarea'
 import { Spinner } from '#/components/ui/spinner'
-import { monthlyDecisionFormSchema } from '../monthly.schemas'
-import { setMonthlyDecision, deleteMonthlyEmployee } from '../monthly.functions'
+import { monthlyRemoveFormSchema } from '../monthly.schemas'
+import { deleteMonthlyEmployee } from '../monthly.functions'
 import { monthlyKey } from '../monthly.queries'
 import { formatGeorgianMonth } from '#/lib/date-format'
 
-export function MonthlyDecisionDialog({
+export function MonthlyRemoveDialog({
   actorId,
   month,
-  token,
-  closed,
   open,
   onClose,
   employee,
@@ -33,11 +31,9 @@ export function MonthlyDecisionDialog({
 }: {
   actorId: string
   month: string
-  token: string
-  closed: boolean
   open: boolean
   onClose: () => void
-  employee?: { userId: string; version: number }
+  employee: { userId: string; version: number }
   onRemoved?: () => void
 }) {
   const [requestId] = useState(() => crypto.randomUUID()),
@@ -45,33 +41,23 @@ export function MonthlyDecisionDialog({
     client = useQueryClient()
   const mutation = useMutation({
     mutationFn: (reason: string) =>
-      employee
-        ? deleteMonthlyEmployee({
-            data: {
-              month,
-              userId: employee.userId,
-              expectedVersion: employee.version,
-              reason,
-              requestId,
-            },
-          })
-        : setMonthlyDecision({
-            data: {
-              month,
-              expectedToken: token,
-              action: closed ? 'reopen' : 'finalize',
-              reason,
-              requestId,
-            },
-          }),
+      deleteMonthlyEmployee({
+        data: {
+          month,
+          userId: employee.userId,
+          expectedVersion: employee.version,
+          reason,
+          requestId,
+        },
+      }),
     retry: false,
   })
   const form = useForm({
     defaultValues: { reason: '' },
-    validators: { onSubmit: monthlyDecisionFormSchema },
+    validators: { onSubmit: monthlyRemoveFormSchema },
     onSubmitInvalid: () =>
       requestAnimationFrame(() =>
-        document.getElementById('monthly-decision-reason')?.focus(),
+        document.getElementById('monthly-remove-reason')?.focus(),
       ),
     onSubmit: async ({ value }) => {
       setError('')
@@ -82,16 +68,10 @@ export function MonthlyDecisionDialog({
           toast.error(result.message)
           return
         }
-        toast.success(
-          employee
-            ? 'ჩანაწერი ამოღებულია. ისტორია შენარჩუნებულია.'
-            : closed
-              ? 'უწყისი ცვლილებისთვის გახსნილია.'
-              : 'თვის უწყისი დასრულებულია.',
-        )
+        toast.success('ჩანაწერი ამოღებულია. ისტორია შენარჩუნებულია.')
         void client.invalidateQueries({ queryKey: monthlyKey(actorId) })
         onClose()
-        if (employee) onRemoved?.()
+        onRemoved?.()
       } catch {
         const message =
           'მოქმედება ვერ შესრულდა. გადაამოწმეთ უწყისი და სცადეთ ხელახლა.'
@@ -100,11 +80,7 @@ export function MonthlyDecisionDialog({
       }
     },
   })
-  const label = employee
-    ? 'ჩანაწერის ამოღება'
-    : closed
-      ? 'უწყისის გახსნა'
-      : 'თვის დასრულება'
+  const label = 'ჩანაწერის ამოღება'
   return (
     <Dialog
       open={open}
@@ -116,12 +92,8 @@ export function MonthlyDecisionDialog({
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription>
-            {formatGeorgianMonth(month)}.{' '}
-            {employee
-              ? 'თანამშრომლის ჩანაწერი ამოიღება ამ თვის სიიდან. ისტორია დარჩება.'
-              : closed
-                ? 'თანამშრომლები ამ თვის უწყისს ხელახლა დასრულებამდე ვერ ნახავენ. თანხების შეცვლა ხელმისაწვდომი გახდება.'
-                : 'თვის ყველა შენახული ჩანაწერი ჩაიკეტება და თანამშრომლები საკუთარ უწყისებს ნახავენ. ეს მოქმედება საბანკო გადარიცხვას არ ასრულებს.'}
+            {formatGeorgianMonth(month)}. თანამშრომლის ჩანაწერი ამოიღება ამ თვის
+            სიიდან. ისტორია დარჩება.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -141,11 +113,11 @@ export function MonthlyDecisionDialog({
           <form.Field name="reason">
             {(field) => (
               <Field data-invalid={!field.state.meta.isValid}>
-                <FieldLabel htmlFor="monthly-decision-reason">
+                <FieldLabel htmlFor="monthly-remove-reason">
                   მიზეზი <span aria-hidden="true">*</span>
                 </FieldLabel>
                 <Textarea
-                  id="monthly-decision-reason"
+                  id="monthly-remove-reason"
                   required
                   disabled={mutation.isPending}
                   value={field.state.value}
@@ -155,12 +127,12 @@ export function MonthlyDecisionDialog({
                   aria-invalid={!field.state.meta.isValid}
                   aria-describedby={
                     !field.state.meta.isValid
-                      ? 'monthly-decision-error'
+                      ? 'monthly-remove-error'
                       : undefined
                   }
                 />
                 <FieldError
-                  id="monthly-decision-error"
+                  id="monthly-remove-error"
                   errors={field.state.meta.errors}
                 />
               </Field>

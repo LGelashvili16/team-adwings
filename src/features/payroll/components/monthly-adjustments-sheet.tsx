@@ -4,8 +4,14 @@ import { IconAlertCircle, IconInfoCircle } from '@tabler/icons-react'
 import { DraftSheet } from '#/components/common/draft-sheet'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Field, FieldLabel } from '#/components/ui/field'
-import { SheetContent, SheetHeader, SheetTitle } from '#/components/ui/sheet'
+import {
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '#/components/ui/sheet'
 import { Skeleton } from '#/components/ui/skeleton'
+import { formatGeorgianMonth } from '#/lib/date-format'
 import { monthlyEmployeeQuery } from '../monthly.queries'
 import { monthlyAdjustmentLabels } from '../monthly.rules'
 import { formatSalary } from '../salary.presentation'
@@ -50,6 +56,7 @@ export function MonthlyAdjustmentsSheet({
           <SheetTitle>
             {initialEmployee?.label ?? 'ბონუსის, პრემიის ან ჯარიმის დამატება'}
           </SheetTitle>
+          <SheetDescription>{formatGeorgianMonth(month)}</SheetDescription>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
           {canEdit && !initialEmployee ? (
@@ -92,6 +99,10 @@ export function MonthlyAdjustmentsSheet({
                 userId={employee.id}
                 source={null}
                 current={view.current}
+                firstPaymentEnabled={view.firstPaymentEnabled}
+                defaultFineStage={view.defaultFineStage}
+                paymentWindows={view.paymentWindows}
+                payments={view.payments}
                 onSaved={onClose}
                 onPending={setPending}
               />

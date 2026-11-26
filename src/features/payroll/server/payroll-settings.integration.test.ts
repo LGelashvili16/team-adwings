@@ -15,6 +15,7 @@ import {
 import type { Actor } from '#/lib/authorization/actor'
 import type * as PayrollService from './payroll-settings.service.server'
 import type { db as Database } from '#/db'
+import { paymentScheduleDefaults } from '../payroll-settings.schemas'
 import { roleSchema } from '#/lib/authorization/permissions'
 
 vi.mock('@tanstack/react-start/server-only', () => ({}))
@@ -33,18 +34,7 @@ const actor = (role = 'accountant'): Actor => ({
   emailVerified: false,
   roles: ['accountant'],
 })
-const request = {
-  effectiveFrom: '2026-11-24',
-  amountBasis: 'gross',
-  dayBasis: 'scheduled_workdays',
-  incomeTaxEnabled: true,
-  incomeTaxBasisPoints: 2000,
-  pensionEnabled: true,
-  employeePensionBasisPoints: 200,
-  employerPensionBasisPoints: 200,
-  expectedVersion: 0,
-  reason: 'საწყისი წესების განსაზღვრა',
-}
+const request = { expectedVersion: 0, schedule: paymentScheduleDefaults }
 function sql() {
   if (!connection) throw new Error('Test connection unavailable')
   return connection
@@ -68,13 +58,41 @@ describe.runIf(enabled)(
       await connection.connect()
       for (const file of readdirSync('drizzle')
         .filter((name) => /^\d+.*\.sql$/.test(name))
-        .sort())
+        .sort()) {
+        if (file === '0072_payroll_payment_runs.sql') {
+          await sql().query(`
+            insert into "user" (id, name, email, roles)
+            values ('legacy-policy-author', 'Legacy policy author', 'legacy@payroll.invalid', 'accountant');
+            insert into payroll_policy (
+              version, effective_from, amount_basis, day_basis, income_tax_enabled, income_tax_basis_points,
+              pension_enabled, employee_pension_basis_points, employer_pension_basis_points, actor_id, reason
+            ) values (
+              1, '2026-01-01', 'gross', 'scheduled_workdays', false, 2000,
+              false, 200, 200, 'legacy-policy-author', 'Legacy configuration'
+            );
+          `)
+        }
         await sql().query(
           readFileSync(`drizzle/${file}`, 'utf8').replaceAll(
             '--> statement-breakpoint',
             '',
           ),
         )
+      }
+      expect(
+        (
+          await sql().query(
+            'select version, schedule, actor_id, reason from payroll_policy',
+          )
+        ).rows,
+      ).toEqual([
+        {
+          version: 1,
+          schedule: null,
+          actor_id: 'legacy-policy-author',
+          reason: 'Legacy configuration',
+        },
+      ])
       for (const role of roleSchema.options)
         await sql().query(
           'insert into "user" (id,name,email,roles) values ($1,$1,$2,$1)',
@@ -112,8 +130,6 @@ describe.runIf(enabled)(
 
     it('returns an unconfigured state without creating a policy on read', async () => {
       expect(await service.readPayrollSettings(actor())).toEqual({
-        today: request.effectiveFrom,
-        current: null,
         latest: null,
       })
       expect(
@@ -167,40 +183,35 @@ describe.runIf(enabled)(
         service.savePayrollSettings(actor(), request),
       ).rejects.toThrow()
     })
-    it('retains every same-date version with its trusted actor, reason and exact rates', async () => {
+    it('keeps immutable audited schedule versions and one-pay configuration', async () => {
       await service.savePayrollSettings(actor(), request)
+      const latest = {
+        ...request.schedule,
+        first: null,
+        adjustments: { ...request.schedule.adjustments, offset: 0 as const },
+      }
       await service.savePayrollSettings(actor('admin'), {
-        ...request,
+        schedule: latest,
         expectedVersion: 1,
-        employeePensionBasisPoints: 225,
-        reason: undefined,
       })
       const rows = (
-        await sql().query('select * from payroll_policy order by version')
+        await sql().query(
+          'select actor_id, version, schedule from payroll_policy order by version',
+        )
       ).rows
-      expect(rows).toHaveLength(2)
-      expect(rows[0]).toMatchObject({
-        actor_id: 'accountant',
-        version: 1,
-        employee_pension_basis_points: 200,
-        reason: request.reason,
-      })
-      expect(rows[1]).toMatchObject({
-        actor_id: 'admin',
-        version: 2,
-        employee_pension_basis_points: 225,
-        reason: 'ხელფასების პარამეტრები შენახულია.',
-      })
-      expect(
-        (await service.readPayrollSettings(actor())).current?.version,
-      ).toBe(2)
+      expect(rows).toEqual([
+        { actor_id: 'accountant', version: 1, schedule: request.schedule },
+        { actor_id: 'admin', version: 2, schedule: latest },
+      ])
+      expect((await service.readPayrollSettings(actor())).latest).toMatchObject(
+        { version: 2, schedule: latest },
+      )
     })
     it('rejects stale saves and concurrent first writes without losing audit history', async () => {
       const results = await Promise.allSettled([
         service.savePayrollSettings(actor(), request),
         service.savePayrollSettings(actor('admin'), {
           ...request,
-          reason: 'სხვა მომხმარებლის ცვლილება',
         }),
       ])
       expect(
@@ -214,28 +225,14 @@ describe.runIf(enabled)(
           .rows[0].total,
       ).toBe(1)
     })
-    it('separates scheduled policy from current policy and selects by effective date before version', async () => {
-      await service.savePayrollSettings(actor(), {
-        ...request,
-        effectiveFrom: '2026-12-01',
-      })
-      expect((await service.readPayrollSettings(actor())).current).toBeNull()
-      await service.savePayrollSettings(actor(), {
-        ...request,
-        expectedVersion: 1,
-      })
-      expect(
-        (await service.readPayrollSettings(actor())).current?.version,
-      ).toBe(2)
-      vi.setSystemTime(new Date('2026-12-02T10:00:00.000Z'))
-      expect(
-        (await service.readPayrollSettings(actor())).current?.version,
-      ).toBe(1)
-      vi.setSystemTime(new Date('2026-11-24T10:00:00.000Z'))
-    })
-    it('rejects retroactive policies, malformed inputs and client-supplied audit identities', async () => {
+    it('rejects legacy settings, malformed schedules and client-supplied audit identities', async () => {
       for (const changes of [
-        { effectiveFrom: '2026-11-23' },
+        {
+          schedule: {
+            ...request.schedule,
+            salary: { offset: 1, start: 31, end: 2 },
+          },
+        },
         { incomeTaxBasisPoints: 20.5 },
         { actorId: 'owner' },
       ])

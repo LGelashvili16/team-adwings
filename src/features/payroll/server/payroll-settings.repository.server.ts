@@ -1,5 +1,5 @@
 import '@tanstack/react-start/server-only'
-import { desc, eq, lte, sql } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { employee, payrollPolicy, user } from '#/db/schema'
 
@@ -46,13 +46,12 @@ export async function latestPolicy(tx: PayrollTransaction) {
       .limit(1)
   ).at(0)
 }
-export async function effectivePolicy(tx: PayrollTransaction, date: string) {
+export async function policyVersion(tx: PayrollTransaction, version: number) {
   return (
     await tx
       .select()
       .from(payrollPolicy)
-      .where(lte(payrollPolicy.effectiveFrom, date))
-      .orderBy(desc(payrollPolicy.effectiveFrom), desc(payrollPolicy.version))
+      .where(eq(payrollPolicy.version, version))
       .limit(1)
   ).at(0)
 }

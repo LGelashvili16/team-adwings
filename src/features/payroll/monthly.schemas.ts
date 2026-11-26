@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { fineStageSchema, payStageSchema } from './payroll-settings.schemas'
 import {
   payrollMonthSchema,
   salaryDetailSchema,
@@ -7,10 +8,14 @@ import {
 } from './salary.schemas'
 
 export { payrollMonthSchema } from './salary.schemas'
+export const monthlyPeriodSchema = z.enum(['all', 'first', 'salary'], {
+  error: 'აირჩიეთ სახელფასო პერიოდი.',
+})
 export const monthlySearchSchema = z.object(
   {
     view: z.literal('bonuses', { error: 'განყოფილება არასწორია.' }).optional(),
     month: payrollMonthSchema.optional(),
+    period: monthlyPeriodSchema.optional(),
     page: salaryDirectorySchema.shape.page,
     q: salaryDirectorySchema.shape.q,
     sort: salaryDirectorySchema.shape.sort,
@@ -39,6 +44,15 @@ const adjustmentNote = z
   .string({ error: 'შენიშვნა არასწორია.' })
   .trim()
   .max(500, 'შენიშვნა არ უნდა აღემატებოდეს 500 სიმბოლოს.')
+const paymentDate = z.iso.date({ error: 'აირჩიეთ სწორი გადახდის თარიღი.' })
+const paymentDatesSchema = z.strictObject(
+  {
+    salary: paymentDate.optional(),
+    adjustments: paymentDate.optional(),
+  },
+  { error: 'გადახდის თარიღები არასწორია.' },
+)
+export type MonthlyPaymentDates = z.infer<typeof paymentDatesSchema>
 const hasFineReason = (item: { kind: string; reason: string }) =>
   item.kind !== 'fine' || item.reason.length >= 5
 const fineReasonError = {
@@ -83,8 +97,11 @@ export const monthlySaveSchema = z
           'საათები მიუთითეთ მაქსიმუმ ორი ათწილადით.',
         ),
       baseOverrideMinor: money.nullable(),
+      firstPaymentMinor: money.nullable().optional(),
+      fineStage: fineStageSchema.nullable().optional(),
+      paymentDates: paymentDatesSchema.optional(),
       baseReason: z
-        .string({ error: 'მიუთითეთ საბაზო თანხის საფუძველი.' })
+        .string({ error: 'მიუთითეთ თვის ხელფასის საფუძველი.' })
         .trim()
         .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
         .optional(),
@@ -103,27 +120,27 @@ export const monthlySaveSchema = z
       v.baseReason.length >= 5,
     {
       path: ['baseReason'],
-      message: 'მიუთითეთ საბაზო თანხის საფუძველი, მინიმუმ 5 სიმბოლო.',
+      message: 'მიუთითეთ თვის ხელფასის საფუძველი, მინიმუმ 5 სიმბოლო.',
     },
   )
-export const monthlyDecisionSchema = z.strictObject(
-  {
-    month: payrollMonthSchema,
-    expectedToken: z
-      .string({ error: 'განაახლეთ უწყისი.' })
-      .regex(/^[a-f0-9]{64}$/, 'განაახლეთ უწყისი.'),
-    action: z.enum(['finalize', 'reopen'], { error: 'მოქმედება არასწორია.' }),
-    reason,
-    requestId,
-  },
-  { error: 'თვის გადაწყვეტილების მონაცემები არასწორია.' },
-)
+export const paymentPreviewSchema = z.strictObject({
+  month: payrollMonthSchema,
+  stage: payStageSchema,
+})
+export const publishPaymentsSchema = paymentPreviewSchema.extend({
+  expectedToken: z
+    .string({ error: 'განაახლეთ გასაცემი თანხები.' })
+    .regex(/^[a-f0-9]{64}$/, 'განაახლეთ გასაცემი თანხები.'),
+  requestId,
+})
 export const monthlyAdjustmentsSaveSchema = z.strictObject(
   {
     month: payrollMonthSchema,
     userId: monthlySaveSchema.shape.userId,
     expectedVersion: monthlySaveSchema.shape.expectedVersion,
     requestId,
+    fineStage: fineStageSchema.nullable().optional(),
+    paymentDates: paymentDatesSchema.optional(),
     adjustments: z
       .array(monthlyAdjustmentSchema, { error: 'ჩანაწერები არასწორია.' })
       .max(20, 'დაამატეთ მაქსიმუმ 20 ჩანაწერი.'),
@@ -149,9 +166,21 @@ export const monthlyFormSchema = z
           ),
           z.literal(''),
         ],
-        { error: 'მიუთითეთ სწორი საბაზო თანხა.' },
+        { error: 'მიუთითეთ თვის ხელფასის სწორი თანხა.' },
       ),
-      manualBase: z.boolean({ error: 'აირჩიეთ საბაზო თანხის დადასტურება.' }),
+      manualBase: z.boolean({ error: 'აირჩიეთ თვის ხელფასის დადასტურება.' }),
+      firstPayment: z.union([
+        decimal.refine(
+          (value) => salaryToMinor(value) <= 100000000,
+          'თანხა არ უნდა აღემატებოდეს 1 000 000 ლარს.',
+        ),
+        z.literal(''),
+      ]),
+      fineStage: fineStageSchema.nullable(),
+      paymentDates: z.object({
+        salary: paymentDate.or(z.literal('')),
+        adjustments: paymentDate.or(z.literal('')),
+      }),
       adjustments: z
         .array(
           z
@@ -175,11 +204,11 @@ export const monthlyFormSchema = z
   )
   .refine((v) => !v.manualBase || v.base !== '', {
     path: ['base'],
-    message: 'მიუთითეთ საბაზო თანხა.',
+    message: 'მიუთითეთ თვის ხელფასი.',
   })
-export const monthlyDecisionFormSchema = z.object(
+export const monthlyRemoveFormSchema = z.object(
   { reason },
-  { error: 'მიუთითეთ გადაწყვეტილების მიზეზი.' },
+  { error: 'მიუთითეთ ჩანაწერის ამოღების მიზეზი.' },
 )
 export const monthlyRemoveSchema = z.strictObject(
   {

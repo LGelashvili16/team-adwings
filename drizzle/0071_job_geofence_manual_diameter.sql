@@ -1,0 +1,2 @@
+ALTER TABLE "job_geofence_setting" DROP CONSTRAINT "job_geofence_setting_valid";--> statement-breakpoint
+ALTER TABLE "job_geofence_setting" ADD CONSTRAINT "job_geofence_setting_valid" CHECK ("job_geofence_setting"."version" > 0 and "job_geofence_setting"."diameter" > 0);

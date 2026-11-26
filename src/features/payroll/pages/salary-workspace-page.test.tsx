@@ -32,7 +32,6 @@ const actor: Actor = {
   roles: ['employee'],
 }
 const view: MySalaryDetail = {
-  defaultAmountBasis: 'gross',
   employee: {
     userId: 'worker',
     name: 'თანამშრომელი',
@@ -76,7 +75,7 @@ it('reads only the authenticated employee salary and presents missing agreements
   expect(
     screen.queryByRole('button', { name: 'ხელფასის განსაზღვრა' }),
   ).not.toBeInTheDocument()
-  expect(screen.getByText('დასრულებული უწყისები ჯერ არ არის')).toBeVisible()
+  expect(screen.getByText('გაცემული თანხები ჯერ არ არის')).toBeVisible()
 })
 it('shows the real agreed rate and upcoming change without inventing monthly take-home totals', async () => {
   vi.mocked(getMySalary).mockResolvedValue({

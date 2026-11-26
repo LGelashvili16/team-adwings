@@ -3,6 +3,7 @@ import {
   findJobLocations,
   readJob,
   readJobs,
+  readJobGeofenceSettings,
   readUnreadJobs,
   suggestJobAddress,
   readJobAssignmentCandidates,
@@ -12,6 +13,17 @@ import type { JobAssignmentSearch } from './jobs.schemas'
 import type { JobMapPosition, JobSearch } from './jobs.types'
 
 export const jobsKeys = { all: (actorId: string) => ['jobs', actorId] as const }
+export const jobGeofenceSettingsQueryOptions = (actorId: string) =>
+  queryOptions({
+    queryKey: [...jobsKeys.all(actorId), 'geofence-settings'],
+    queryFn: async () => {
+      const result = await readJobGeofenceSettings()
+      if (!result.ok) throw new Error(result.message)
+      return result.value
+    },
+    staleTime: 15_000,
+    retry: false,
+  })
 export const jobAssignmentCandidatesQueryOptions = (
   actorId: string,
   search: Omit<JobAssignmentSearch, 'page'>,

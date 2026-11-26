@@ -19,9 +19,6 @@ const page = z.coerce
 export const salaryKindSchema = z.enum(['monthly', 'hourly'], {
   error: 'აირჩიეთ ხელფასის ტიპი.',
 })
-export const salaryBasisSchema = z.enum(['gross', 'net'], {
-  error: 'აირჩიეთ თანხის საფუძველი.',
-})
 export const salaryDirectorySchema = z.object(
   {
     page,
@@ -102,7 +99,9 @@ export const salarySaveSchema = z.strictObject(
       ),
     effectiveFrom: salaryDateSchema,
     kind: salaryKindSchema,
-    amountBasis: salaryBasisSchema,
+    amountBasis: z
+      .literal('net', { error: 'მიუთითეთ გასაცემი თანხა.' })
+      .optional(),
     amountMinor: z
       .number({ error: 'მიუთითეთ სწორი თანხა.' })
       .int('თანხა უნდა შეიცავდეს მაქსიმუმ ორ ათწილადს.')
@@ -129,7 +128,6 @@ const amount = z
 export const salaryFormSchema = z.object({
   effectiveFrom: salaryDateSchema,
   kind: salaryKindSchema,
-  amountBasis: salaryBasisSchema,
   amount,
 })
 /** Parse decimal text into exact integer tetri without binary floating-point rounding. */

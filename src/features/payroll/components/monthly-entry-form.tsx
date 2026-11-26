@@ -33,11 +33,16 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { Spinner } from '#/components/ui/spinner'
+import { DatePicker } from '#/components/common/date-picker'
+import { formatGeorgianDate } from '#/lib/date-format'
 import { monthlyFormSchema } from '../monthly.schemas'
+import { payStageLabel } from '../payroll-settings.schemas'
 import {
   hourlyBase,
   monthlyAdjustmentLabels,
+  monthlySalaryLabels,
   monthlyTotals,
+  paymentDateIssue,
 } from '../monthly.rules'
 import {
   formatSalary,
@@ -59,6 +64,11 @@ export function MonthlyEntryForm({
   onSaved,
   onPending,
   showSubmit = true,
+  firstPaymentEnabled = false,
+  firstAlreadyPaid = false,
+  defaultFineStage = 'salary',
+  paymentWindows = [],
+  payments = [],
 }: {
   actorId: string
   month: string
@@ -68,22 +78,62 @@ export function MonthlyEntryForm({
   onSaved: () => void
   onPending: (value: boolean) => void
   showSubmit?: boolean
+  firstPaymentEnabled?: boolean
+  firstAlreadyPaid?: boolean
+  defaultFineStage?: MonthlyDetail['defaultFineStage']
+  paymentWindows?: MonthlyDetail['paymentWindows']
+  payments?: MonthlyDetail['payments']
 }) {
   const [{ source, current }] = useState(() => ({
     source: initialSource,
     current: initialCurrent,
   }))
   const adjustmentsOnly = !source
+  const salaryPaid = payments.some((payment) => payment.stage === 'salary')
+  const formSchema = monthlyFormSchema.superRefine(
+    ({ paymentDates }, context) => {
+      for (const stage of ['salary', 'adjustments'] as const) {
+        const date = paymentDates[stage]
+        if (!date || date === current?.paymentDates?.[stage]) continue
+        const opening = paymentWindows.find(
+          (window) => window.stage === stage,
+        )?.start
+        const issue = paymentDateIssue(month, date, opening)
+        if (issue)
+          context.addIssue({
+            code: 'custom',
+            path: ['paymentDates', stage],
+            message: issue,
+          })
+      }
+    },
+  )
+  const canSetFirstPayment =
+    firstPaymentEnabled && source?.salary.kind === 'monthly'
   const client = useQueryClient(),
     [requestId] = useState(() => crypto.randomUUID()),
     [error, setError] = useState('')
   const mutation = useMutation({
     mutationFn: (values: z.output<typeof monthlyFormSchema>) => {
+      const paymentDates = {
+        ...(values.paymentDates.salary
+          ? { salary: values.paymentDates.salary }
+          : {}),
+        ...(values.paymentDates.adjustments
+          ? { adjustments: values.paymentDates.adjustments }
+          : {}),
+      }
       const data = {
         month,
         userId,
         expectedVersion: current?.version ?? 0,
         requestId,
+        ...(current?.paymentDates || Object.keys(paymentDates).length
+          ? { paymentDates }
+          : {}),
+        ...(values.adjustments.some((item) => item.kind === 'fine')
+          ? { fineStage: values.fineStage }
+          : {}),
         adjustments: values.adjustments.map((a) => ({
           kind: a.kind,
           amountMinor: salaryToMinor(a.amount),
@@ -102,6 +152,13 @@ export function MonthlyEntryForm({
           baseOverrideMinor: values.manualBase
             ? salaryToMinor(values.base)
             : null,
+          ...(!firstAlreadyPaid && canSetFirstPayment
+            ? {
+                firstPaymentMinor: values.firstPayment
+                  ? salaryToMinor(values.firstPayment)
+                  : null,
+              }
+            : {}),
         },
       })
     },
@@ -111,22 +168,30 @@ export function MonthlyEntryForm({
     current && (!adjustmentsOnly || current.status !== 'voided')
       ? current.adjustments
       : []
+  const savedBase =
+    current?.salary &&
+    (!source?.requiresBaseConfirmation || current.manualBase || salaryPaid)
+      ? current.baseMinor
+      : null
+  const defaultBase =
+    savedBase ??
+    (source?.salary.kind === 'monthly' ? source.salary.amountMinor : null)
   const form = useForm({
     defaultValues: {
       hours: source && current ? String(current.workedSeconds / 3600) : '0',
-      base:
-        source?.requiresBaseConfirmation && !current?.manualBase
-          ? ''
-          : salaryAmountInput(
-              source
-                ? current?.salary
-                  ? current.baseMinor
-                  : source.salary.amountMinor
-                : 0,
-            ),
+      base: defaultBase === null ? '' : salaryAmountInput(defaultBase),
       manualBase:
         !!source &&
         (source.requiresBaseConfirmation || (current?.manualBase ?? false)),
+      firstPayment:
+        current?.firstPaymentMinor != null
+          ? salaryAmountInput(current.firstPaymentMinor)
+          : '',
+      fineStage: current?.fineStage ?? null,
+      paymentDates: {
+        salary: current?.paymentDates?.salary ?? '',
+        adjustments: current?.paymentDates?.adjustments ?? '',
+      },
       adjustments:
         adjustmentsOnly && !existingAdjustments.length
           ? [{ kind: 'bonus' as const, amount: '', reason: '' }]
@@ -136,7 +201,7 @@ export function MonthlyEntryForm({
               reason: a.reason,
             })),
     },
-    validators: { onSubmit: monthlyFormSchema },
+    validators: { onSubmit: formSchema },
     onSubmitInvalid: () =>
       requestAnimationFrame(() =>
         document
@@ -149,7 +214,7 @@ export function MonthlyEntryForm({
       setError('')
       onPending(true)
       try {
-        const values = monthlyFormSchema.parse(value)
+        const values = formSchema.parse(value)
         const result = await mutation.mutateAsync(values)
         if (!result.ok) {
           setError(result.message)
@@ -210,8 +275,8 @@ export function MonthlyEntryForm({
         <Alert variant="warning" role="status">
           <IconAlertTriangle aria-hidden="true" />
           <AlertDescription>
-            თვე არასრულია ან ტარიფი იცვლება. გადაამოწმეთ და ცალკე დაადასტურეთ ამ
-            თვის საბაზო თანხა.
+            დასაქმება ან ხელფასის შეთანხმება მთელ თვეს არ მოიცავს, ან თვეში
+            ტარიფი იცვლება. შენახვამდე გადაამოწმეთ თვის ხელფასი.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -249,8 +314,9 @@ export function MonthlyEntryForm({
                       }
                     />
                     <FieldDescription id="monthly-hours-help">
-                      შეიყვანეთ ბუღალტრის მიერ გადამოწმებული საათები. დასწრების
-                      ჩანაწერები ავტომატურად არ ითვლება ასანაზღაურებელ დროდ.
+                      {firstPaymentEnabled
+                        ? 'შეიყვანეთ თვის დასაწყისიდან დადასტურებული საათები. მეორე ნაწილის გამოთვლისას უკვე გაცემული თანხა გამოაკლდება.'
+                        : 'შეიყვანეთ ბუღალტრის მიერ გადამოწმებული საათები.'}
                     </FieldDescription>
                     <FieldError
                       id="monthly-hours-error"
@@ -264,13 +330,17 @@ export function MonthlyEntryForm({
               {(field) => (
                 <Field orientation="horizontal">
                   <FieldLabel htmlFor="monthly-manual">
-                    საბაზო თანხის ცალკე დადასტურება
+                    {source.requiresBaseConfirmation
+                      ? 'თვის ხელფასის დადასტურება'
+                      : 'თვის ხელფასის შეცვლა'}
                   </FieldLabel>
                   <Switch
                     id="monthly-manual"
                     checked={field.state.value}
                     disabled={
-                      source.requiresBaseConfirmation || mutation.isPending
+                      source.requiresBaseConfirmation ||
+                      mutation.isPending ||
+                      salaryPaid
                     }
                     onCheckedChange={field.handleChange}
                   />
@@ -284,12 +354,14 @@ export function MonthlyEntryForm({
                     {(field) => (
                       <Field data-invalid={!field.state.meta.isValid}>
                         <FieldLabel htmlFor="monthly-base">
-                          საბაზო თანხა ლარში <span aria-hidden="true">*</span>
+                          {monthlySalaryLabels.all} ლარში{' '}
+                          <span aria-hidden="true">*</span>
                         </FieldLabel>
                         <Input
                           id="monthly-base"
                           className="font-medium tabular-nums"
                           required
+                          readOnly={salaryPaid}
                           inputMode="decimal"
                           value={field.state.value}
                           onBlur={field.handleBlur}
@@ -311,6 +383,33 @@ export function MonthlyEntryForm({
                 ) : null
               }
             </form.Subscribe>
+            {canSetFirstPayment && !firstAlreadyPaid ? (
+              <form.Field name="firstPayment">
+                {(field) => (
+                  <Field data-invalid={!field.state.meta.isValid}>
+                    <FieldLabel htmlFor="monthly-first-payment">
+                      {monthlySalaryLabels.first} ლარში
+                    </FieldLabel>
+                    <Input
+                      id="monthly-first-payment"
+                      inputMode="decimal"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      aria-invalid={!field.state.meta.isValid}
+                      aria-describedby="monthly-first-payment-help monthly-first-payment-error"
+                    />
+                    <FieldDescription id="monthly-first-payment-help">
+                      ცარიელი ველის შემთხვევაში გაიცემა თვის ხელფასის ნახევარი.
+                    </FieldDescription>
+                    <FieldError
+                      id="monthly-first-payment-error"
+                      errors={field.state.meta.errors}
+                    />
+                  </Field>
+                )}
+              </form.Field>
+            ) : null}
           </FieldGroup>
         ) : null}
         <form.Field name="adjustments" mode="array">
@@ -333,6 +432,71 @@ export function MonthlyEntryForm({
                   ჩანაწერის დამატება
                 </Button>
               </div>
+              <form.Subscribe selector={(state) => state.values}>
+                {({ fineStage: selectedStage, adjustments }) => {
+                  const fineStage = selectedStage ?? defaultFineStage
+                  return (['adjustments', 'salary'] as const).map((stage) => {
+                    const hasItems = adjustments.some(({ kind }) =>
+                      kind === 'fine'
+                        ? fineStage === stage
+                        : stage === 'adjustments',
+                    )
+                    if (!hasItems) return null
+                    const paid = payments.find(
+                      (payment) => payment.stage === stage,
+                    )
+                    const start = paymentWindows.find(
+                      (window) => window.stage === stage,
+                    )?.start
+                    const label =
+                      stage === 'salary'
+                        ? 'ჯარიმის დაქვითვის თარიღი'
+                        : 'გაცემის თარიღი'
+                    const id = `monthly-${stage}-payment-date`
+                    return paid ? (
+                      <div
+                        key={stage}
+                        className="flex flex-col gap-1 rounded-lg border bg-muted/20 p-3"
+                      >
+                        <span className="text-sm font-medium">{label}</span>
+                        <time
+                          className="text-sm text-muted-foreground"
+                          dateTime={paid.paidOn}
+                        >
+                          {formatGeorgianDate(paid.paidOn)}
+                        </time>
+                      </div>
+                    ) : (
+                      <form.Field name={`paymentDates.${stage}`} key={stage}>
+                        {(date) => (
+                          <Field data-invalid={!date.state.meta.isValid}>
+                            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+                            <DatePicker
+                              id={id}
+                              value={date.state.value}
+                              today={start ?? `${month}-01`}
+                              invalid={!date.state.meta.isValid}
+                              clearLabel="გადახდის თარიღის გასუფთავება"
+                              onBlur={date.handleBlur}
+                              onChange={date.handleChange}
+                            />
+                            {start &&
+                            (!date.state.value || date.state.value < start) ? (
+                              <FieldDescription>
+                                გრაფიკით {formatGeorgianDate(start)}-დან
+                              </FieldDescription>
+                            ) : null}
+                            <FieldError
+                              id={`${id}-error`}
+                              errors={date.state.meta.errors}
+                            />
+                          </Field>
+                        )}
+                      </form.Field>
+                    )
+                  })
+                }}
+              </form.Subscribe>
               {!field.state.value.length ? (
                 <p className="text-sm text-muted-foreground">
                   დამატებითი ჩანაწერები არ არის.
@@ -466,6 +630,60 @@ export function MonthlyEntryForm({
             </div>
           )}
         </form.Field>
+        <form.Subscribe
+          selector={(s) =>
+            s.values.adjustments.some((item) => item.kind === 'fine')
+          }
+        >
+          {(hasFine) =>
+            hasFine ? (
+              <form.Field name="fineStage">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="monthly-fine-stage">
+                      ჯარიმის დაქვითვის ეტაპი
+                    </FieldLabel>
+                    <Select
+                      value={field.state.value ?? 'default'}
+                      onValueChange={(value) => {
+                        if (
+                          value === 'default' ||
+                          value === 'salary' ||
+                          value === 'adjustments'
+                        )
+                          field.handleChange(value === 'default' ? null : value)
+                      }}
+                    >
+                      <SelectTrigger id="monthly-fine-stage" className="w-full">
+                        <SelectValue>
+                          {field.state.value
+                            ? payStageLabel(
+                                field.state.value,
+                                firstPaymentEnabled,
+                              )
+                            : `გრაფიკის მიხედვით (${payStageLabel(defaultFineStage, firstPaymentEnabled)})`}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="default">
+                            გრაფიკის მიხედვით
+                          </SelectItem>
+                          <SelectItem value="salary">
+                            {payStageLabel('salary', firstPaymentEnabled)}
+                          </SelectItem>
+                          <SelectItem value="adjustments">
+                            {payStageLabel('adjustments', firstPaymentEnabled)}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                )}
+              </form.Field>
+            ) : null
+          }
+        </form.Subscribe>
         {source ? (
           <form.Subscribe selector={(s) => s.values}>
             {(values) => {
@@ -492,16 +710,13 @@ export function MonthlyEntryForm({
                   aria-live="polite"
                 >
                   <span className="text-sm text-muted-foreground">
-                    შეთანხმების ჯამი
+                    თვის ჯამი
                   </span>
                   <strong className="text-2xl tabular-nums">
                     {total >= 0 && total <= 100000000
                       ? formatSalary({ amountMinor: total })
                       : 'გადაამოწმეთ თანხები'}
                   </strong>
-                  <span className="text-sm text-muted-foreground">
-                    გადასახადები და საპენსიო შენატანები აქ არ გამოითვლება.
-                  </span>
                 </div>
               )
             }}

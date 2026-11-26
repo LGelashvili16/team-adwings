@@ -39,13 +39,13 @@ const personColumns = {
 export async function person(
   tx: PayrollTransaction,
   userId: string,
-  lock = false,
+  lock?: 'share' | 'update',
 ) {
   const query = tx
     .select(personColumns)
     .from(employee)
     .where(eq(employee.userId, userId))
-  return (await (lock ? query.for('update') : query)).at(0)
+  return (await (lock ? query.for(lock) : query)).at(0)
 }
 export async function latestVersion(
   tx: PayrollTransaction,

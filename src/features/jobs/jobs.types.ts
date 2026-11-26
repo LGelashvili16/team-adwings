@@ -1,12 +1,16 @@
 import type { z } from 'zod'
 import type {
   jobKindSchema,
+  jobGeofenceSettingsSchema,
   jobSearchSchema,
   jobStatusSchema,
 } from './jobs.schemas'
 
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type JobKind = z.infer<typeof jobKindSchema>
+export type JobGeofenceDiameter = z.infer<
+  typeof jobGeofenceSettingsSchema
+>['diameter']
 export type JobMapPosition = {
   longitude: number
   latitude: number
@@ -40,6 +44,7 @@ export type JobMarker = Pick<JobSummary, 'id' | 'title' | 'kind' | 'status'> & {
   latitude: number
 }
 export type JobDetail = JobSummary & {
+  geofenceDiameter?: JobGeofenceDiameter
   assignments: JobAssignments
   createdBy: string
   streetNameKa: string | null
@@ -76,6 +81,7 @@ export type JobAssignments = {
   gpsDevice: { id: string; name: string } | null
 }
 export type JobsWorkspace = {
+  geofenceDiameter: JobGeofenceDiameter
   items: Array<JobSummary>
   markers: Array<JobMarker>
   total: number

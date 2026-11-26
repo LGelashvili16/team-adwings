@@ -1,3 +1,5 @@
+import type { PublishedPayment } from './monthly.types'
+
 export type SalaryTerm = {
   version: number
   effectiveFrom: string
@@ -21,7 +23,6 @@ export type SalaryEmployee = {
   next: SalaryTerm | null
 }
 export type SalaryDetail = {
-  defaultAmountBasis: 'gross' | 'net'
   employee: SalaryEmployee
   today: string
   timezone: string
@@ -37,6 +38,7 @@ export type SalaryStatement = {
   premiumMinor: number
   fineMinor: number
   totalMinor: number
+  payments?: PublishedPayment[]
 }
 export type MySalaryDetail = SalaryDetail & {
   statements: {
@@ -47,7 +49,6 @@ export type MySalaryDetail = SalaryDetail & {
   }
 }
 export type SalaryDirectory = {
-  defaultAmountBasis: 'gross' | 'net'
   today: string
   records: SalaryEmployee[]
   total: number

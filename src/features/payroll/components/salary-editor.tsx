@@ -49,14 +49,14 @@ import { Spinner } from '#/components/ui/spinner'
 import { accountInitials } from '#/features/access/access.presentation'
 import {
   salaryAmountInput,
-  salaryBasisSchema,
   salaryFormSchema,
   salaryKindSchema,
   salaryToMinor,
 } from '../salary.schemas'
-import { salaryBasisLabels, salaryKindLabels } from '../salary.presentation'
+import { salaryKindLabels } from '../salary.presentation'
 import { setSalaryTerms } from '../salary.functions'
 import { salaryKey } from '../salary.queries'
+import { monthlyKey } from '../monthly.queries'
 import type { SalaryEmployee } from '../salary.types'
 
 export function SalaryEditor({
@@ -65,14 +65,12 @@ export function SalaryEditor({
   today,
   open,
   onClose,
-  defaultAmountBasis = 'gross',
 }: {
   actorId: string
   targets: SalaryEmployee[]
   today: string
   open: boolean
   onClose: () => void
-  defaultAmountBasis?: 'gross' | 'net'
 }) {
   const client = useQueryClient()
   const [error, setError] = useState('')
@@ -81,8 +79,10 @@ export function SalaryEditor({
       targets.length === 1 ? (targets[0].current ?? targets[0].next) : null
     return {
       kind: existing?.kind ?? ('monthly' as const),
-      amountBasis: existing?.amountBasis ?? defaultAmountBasis,
-      amount: existing ? salaryAmountInput(existing.amountMinor) : '',
+      amount:
+        existing?.amountBasis === 'net'
+          ? salaryAmountInput(existing.amountMinor)
+          : '',
       effectiveFrom: today,
     }
   })
@@ -112,7 +112,6 @@ export function SalaryEditor({
             })),
             effectiveFrom: parsed.effectiveFrom,
             kind: parsed.kind,
-            amountBasis: parsed.amountBasis,
             amountMinor: salaryToMinor(parsed.amount),
             currency: 'GEL',
           },
@@ -128,6 +127,7 @@ export function SalaryEditor({
             : `${result.value.saved} თანამშრომლის ხელფასი შენახულია.`,
         )
         void client.invalidateQueries({ queryKey: salaryKey(actorId) })
+        void client.invalidateQueries({ queryKey: monthlyKey(actorId) })
         onClose()
       } catch {
         const message =
@@ -292,7 +292,8 @@ export function SalaryEditor({
                             return (
                               <Field data-invalid={invalid}>
                                 <FieldLabel htmlFor="salary-amount">
-                                  თანხა ლარში <span aria-hidden="true">*</span>
+                                  გასაცემი თანხა ლარში{' '}
+                                  <span aria-hidden="true">*</span>
                                 </FieldLabel>
                                 <InputGroup>
                                   <InputGroupInput
@@ -333,44 +334,6 @@ export function SalaryEditor({
                               </Field>
                             )
                           }}
-                        </form.Field>
-                        <form.Field name="amountBasis">
-                          {(field) => (
-                            <Field className="sm:col-span-2">
-                              <FieldLabel htmlFor="salary-basis">
-                                თანხის საფუძველი{' '}
-                                <span aria-hidden="true">*</span>
-                              </FieldLabel>
-                              <Select
-                                value={field.state.value}
-                                onValueChange={(value) => {
-                                  const parsed =
-                                    salaryBasisSchema.safeParse(value)
-                                  if (parsed.success)
-                                    field.handleChange(parsed.data)
-                                }}
-                              >
-                                <SelectTrigger
-                                  id="salary-basis"
-                                  aria-description="სავალდებულო ველი"
-                                  className="w-full"
-                                >
-                                  <SelectValue>
-                                    {salaryBasisLabels[field.state.value]}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    {salaryBasisSchema.options.map((value) => (
-                                      <SelectItem key={value} value={value}>
-                                        {salaryBasisLabels[value]}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </Field>
-                          )}
                         </form.Field>
                         <form.Field name="effectiveFrom">
                           {(field) => {

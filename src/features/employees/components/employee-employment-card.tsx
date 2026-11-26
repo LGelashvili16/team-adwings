@@ -98,7 +98,10 @@ export function EmployeeEmploymentCard({
       />
     ) : null
   return (
-    <Card className="rounded-2xl py-4 sm:py-5">
+    <Card
+      id="employment-periods"
+      className="scroll-mt-4 rounded-2xl py-4 sm:py-5"
+    >
       <CardHeader className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5">
         <CardTitle className="flex items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-muted/70 text-muted-foreground">

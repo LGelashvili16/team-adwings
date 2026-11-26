@@ -1,16 +1,10 @@
-import {
-  IconCalendarClock,
-  IconInfoCircle,
-  IconAlertCircle,
-  IconAlertTriangle,
-} from '@tabler/icons-react'
+import { IconAlertCircle, IconAlertTriangle } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi } from '@tanstack/react-router'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
-import { formatGeorgianDate } from '#/lib/date-format'
 import { PayrollSettingsForm } from '../components/payroll-settings-form'
 import { payrollSettingsQuery } from '../payroll-settings.queries'
 import { PayrollPageHeader } from '../components/payroll-page-header'
@@ -20,11 +14,7 @@ const route = getRouteApi('/_authenticated/manage/payroll/settings')
 export function PayrollSettingsPage() {
   const { actor } = route.useRouteContext()
   const query = useQuery(payrollSettingsQuery(actor.id))
-  const { latest, current } = query.data ?? {}
-  const scheduled =
-    latest && query.data && latest.effectiveFrom > query.data.today
-      ? latest
-      : null
+  const latest = query.data?.latest
   return (
     <div className="flex w-full min-w-0 flex-col gap-6">
       <PayrollPageHeader
@@ -32,17 +22,10 @@ export function PayrollSettingsPage() {
         active="settings"
         title="ხელფასების პარამეტრები"
       >
-        {current ? (
-          <Badge variant="green">მოქმედი ვერსია {current.version}</Badge>
-        ) : query.data && !latest ? (
+        {latest?.schedule ? (
+          <Badge variant="green">გრაფიკი შენახულია</Badge>
+        ) : query.data ? (
           <Badge variant="secondary">ჯერ არ არის შენახული</Badge>
-        ) : null}
-        {scheduled ? (
-          <Badge variant="outline" className="h-auto whitespace-normal">
-            <IconCalendarClock aria-hidden="true" />
-            ვერსია {scheduled.version} ამოქმედდება{' '}
-            {formatGeorgianDate(scheduled.effectiveFrom)}
-          </Badge>
         ) : null}
       </PayrollPageHeader>
       {query.isError && !query.data ? (
@@ -68,13 +51,6 @@ export function PayrollSettingsPage() {
               </AlertDescription>
             </Alert>
           ) : null}
-          <Alert variant="info" role="status">
-            <IconInfoCircle aria-hidden="true" />
-            <AlertDescription>
-              თვის უწყისში დღიური თანხის, საშემოსავლოსა და საპენსიოს ავტომატური
-              გამოთვლა ჯერ არ არის ჩართული.
-            </AlertDescription>
-          </Alert>
           <PayrollSettingsForm
             key={actor.id}
             actorId={actor.id}
@@ -92,13 +68,10 @@ function PayrollSettingsSkeleton() {
       role="status"
       aria-busy="true"
       aria-label="ხელფასების პარამეტრები იტვირთება"
-      className="flex flex-col gap-6"
+      className="grid items-start gap-5 xl:grid-cols-[18rem_minmax(0,1fr)]"
     >
-      <div aria-hidden="true" className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-84 rounded-2xl" />
-        <Skeleton className="h-84 rounded-2xl" />
-      </div>
-      <Skeleton aria-hidden="true" className="h-36 rounded-2xl" />
+      <Skeleton aria-hidden="true" className="h-60 rounded-2xl" />
+      <Skeleton aria-hidden="true" className="h-96 rounded-2xl" />
     </div>
   )
 }

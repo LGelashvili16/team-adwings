@@ -12,6 +12,8 @@ import {
   it,
   vi,
 } from 'vitest'
+import { paymentScheduleDefaults } from '../payroll-settings.schemas'
+import type { PayStage } from '../payroll-settings.schemas'
 import type * as Service from './monthly.service.server'
 import type { db as Database } from '#/db'
 import type { Actor } from '#/lib/authorization/actor'
@@ -52,18 +54,20 @@ async function input(extra = {}) {
     ...extra,
   }
 }
-async function decision(
-  action: 'finalize' | 'reopen' = 'finalize',
-  extra = {},
-) {
+const setDate = (date: string) =>
+  vi.setSystemTime(new Date(date + 'T12:00:00+04:00'))
+const preview = (stage: PayStage = 'first', earningMonth = month) =>
+  service.previewMonthlyPayments(actor, { month: earningMonth, stage })
+async function decision(stage: PayStage = 'first', earningMonth = month) {
   return {
-    month,
-    expectedToken: (await service.readMonthlyPayroll(actor, { month })).token,
-    action,
-    reason: 'თვის თანხები გადამოწმებულია',
+    month: earningMonth,
+    stage,
+    expectedToken: (await preview(stage, earningMonth)).token,
     requestId: randomUUID(),
-    ...extra,
   }
+}
+async function publish(stage: PayStage = 'first') {
+  return service.publishMonthlyPayments(actor, await decision(stage))
 }
 async function salary(
   userId: string,
@@ -71,7 +75,7 @@ async function salary(
   effectiveFrom: string,
   kind = 'monthly',
   amount = 100000,
-  basis = 'gross',
+  basis = 'net',
 ) {
   await sql().query(
     `insert into employee_salary_term(employee_id,version,effective_from,kind,amount_minor,amount_basis,currency,actor_id,reason) select id,$2,$3,$4,$5,$6,'GEL','monthly-accountant','შეთანხმებული ტარიფი' from employee where user_id=$1`,
@@ -132,8 +136,9 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       vi.setSystemTime(new Date('2026-11-25T12:00:00+04:00'))
     }, 30000)
     beforeEach(async () => {
+      setDate('2026-11-25')
       await sql().query(
-        'truncate payroll_monthly_entry,employee_salary_term,employee_employment_period cascade',
+        'truncate payroll_payment,payroll_policy,payroll_monthly_entry,employee_salary_term,employee_employment_period cascade',
       )
       await sql().query(
         `update employee set status='active',employment_revision=1`,
@@ -143,6 +148,14 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       )
       await sql().query(
         `insert into employee_employment_period(employee_id,start_date) select id,'2026-01-01' from employee`,
+      )
+      await sql().query(
+        'insert into payroll_policy (version, schedule, actor_id, reason) values (1, $1, $2, $3)',
+        [
+          JSON.stringify(paymentScheduleDefaults),
+          actor.id,
+          'Test payment schedule',
+        ],
       )
       await salary('monthly-worker', 1, '2026-01-01')
       await salary('monthly-other', 1, '2026-01-01', 'hourly', 12345)
@@ -159,10 +172,41 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       }
     })
 
-    it('saves fixed salaries, distinct reasoned additions/fines and minimal immutable history', async () => {
+    it('shows the assigned salary before monthly confirmation and retains edited drafts', async () => {
+      const before = await service.readMonthlyPayroll(actor, {
+        month,
+        period: 'all',
+        q: 'monthly-worker',
+      })
+      expect(before.records).toMatchObject([
+        {
+          salary: { amountMinor: 100000, kind: 'monthly' },
+          baseMinor: 100000,
+          totalMinor: 100000,
+          baseNeedsConfirmation: false,
+          status: null,
+        },
+      ])
+      await service.saveMonthlyAdjustments(actor, {
+        month,
+        userId: 'monthly-worker',
+        expectedVersion: 0,
+        requestId: randomUUID(),
+        adjustments: [{ kind: 'bonus', amountMinor: 1500 }],
+      })
+      expect(
+        (
+          await service.readMonthlyPayroll(actor, {
+            month,
+            period: 'all',
+            q: 'monthly-worker',
+          })
+        ).records,
+      ).toMatchObject([{ baseMinor: 100000, totalMinor: 101500 }])
       await service.saveMonthlyEmployee(
         actor,
         await input({
+          expectedVersion: 1,
           adjustments: [
             { kind: 'bonus', amountMinor: 10001, reason: 'დამატებითი სამუშაო' },
             {
@@ -274,9 +318,24 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         `update employee_employment_period set start_date='2026-11-15' where employee_id=(select id from employee where user_id='monthly-worker')`,
       )
       expect((await detail()).source?.requiresBaseConfirmation).toBe(true)
+      expect(
+        (
+          await service.readMonthlyPayroll(actor, {
+            month,
+            q: 'monthly-worker',
+          })
+        ).records,
+      ).toMatchObject([
+        {
+          salary: { amountMinor: 100000 },
+          baseMinor: null,
+          totalMinor: null,
+          baseNeedsConfirmation: true,
+        },
+      ])
       await expect(
         service.saveMonthlyEmployee(actor, await input()),
-      ).rejects.toThrow('საბაზო')
+      ).rejects.toThrow('დაადასტურეთ თვის ხელფასი')
       await service.saveMonthlyEmployee(
         actor,
         await input({
@@ -286,15 +345,15 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       )
       expect((await detail()).current).toMatchObject({
         baseMinor: 50000,
-        baseReason: 'საბაზო თანხა დადასტურებულია.',
+        baseReason: 'თვის ხელფასი დადასტურებულია.',
       })
       await salary('monthly-other', 2, '2026-11-15', 'hourly', 15000)
       expect(
         (await detail('monthly-other')).source?.requiresBaseConfirmation,
       ).toBe(true)
-      await salary('monthly-other', 3, '2026-11-20', 'hourly', 15000, 'net')
+      await salary('monthly-other', 3, '2026-11-20', 'hourly', 15000, 'gross')
       expect((await detail('monthly-other')).source).toBeNull()
-      await salary('monthly-other', 4, '2026-11-20', 'hourly', 15000, 'gross')
+      await salary('monthly-other', 4, '2026-11-20', 'hourly', 15000, 'net')
       expect(
         (await detail('monthly-other')).source?.requiresBaseConfirmation,
       ).toBe(true)
@@ -309,7 +368,7 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       })
       await expect(
         service.saveMonthlyEmployee(actor, await input()),
-      ).rejects.toThrow('საბაზო')
+      ).rejects.toThrow('დაადასტურეთ თვის ხელფასი')
       await service.saveMonthlyEmployee(
         actor,
         await input({
@@ -320,12 +379,13 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
           ],
         }),
       )
-      await service.decideMonthlyPayroll(actor, await decision())
+      expect(await publish()).toEqual({ saved: 1 })
+      expect((await detail()).payments[0]?.baseMinor).toBe(25000)
       expect((await detail()).current).toMatchObject({
         baseMinor: 50000,
         bonusMinor: 10000,
         totalMinor: 60000,
-        status: 'finalized',
+        status: 'draft',
       })
     })
     it('rejects a first salary effective after employment ended in the selected month', async () => {
@@ -340,7 +400,7 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         salaryMissing: true,
       })
     })
-    it('rejects missing employment and stale salary/employment sources at save or finalization', async () => {
+    it('rejects missing employment and stale salary/employment sources at save or publication', async () => {
       const stale = await input()
       await salary('monthly-worker', 2, '2026-01-01', 'monthly', 120000)
       await expect(service.saveMonthlyEmployee(actor, stale)).rejects.toThrow(
@@ -350,9 +410,10 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       await sql().query(
         `update employee set employment_revision=2 where user_id='monthly-worker'`,
       )
-      await expect(
-        service.decideMonthlyPayroll(actor, await decision()),
-      ).rejects.toThrow('შეიცვალა')
+      expect((await preview()).pending).toContainEqual({
+        name: 'ანა თანამშრომელი',
+        message: expect.stringContaining('შეიცვალა'),
+      })
       expect((await detail()).current?.status).toBe('draft')
       await sql().query(
         `delete from employee_employment_period where employee_id=(select id from employee where user_id='monthly-worker')`,
@@ -367,6 +428,18 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
       expect(await detail()).toMatchObject({
         sourceMessage: expect.stringContaining('დასაქმების'),
         salaryMissing: true,
+        employmentNeedsReview: true,
+        canOpenEmployeeProfile: false,
+      })
+      await sql().query(`update "user" set roles='owner' where id='monthly-hr'`)
+      expect(
+        await service.readMonthlyEmployee(
+          { ...actor, id: 'monthly-hr', roles: ['owner'] },
+          { month, userId: 'monthly-worker' },
+        ),
+      ).toMatchObject({
+        employmentNeedsReview: true,
+        canOpenEmployeeProfile: true,
       })
       expect((await detail('monthly-other')).salaryMissing).toBe(false)
     })
@@ -383,14 +456,19 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
           reason: 'შეცვლილი მოთხოვნა',
         }),
       ).rejects.toThrow('მოთხოვნა')
-      const finalize = await decision()
-      await Promise.all([
-        service.decideMonthlyPayroll(actor, finalize),
-        service.decideMonthlyPayroll(actor, finalize),
-      ])
-      expect((await detail()).total).toBe(2)
+      const command = await decision()
+      expect(
+        await Promise.all([
+          service.publishMonthlyPayments(actor, command),
+          service.publishMonthlyPayments(actor, command),
+        ]),
+      ).toEqual([{ saved: 1 }, { saved: 1 }])
+      expect((await detail()).payments).toHaveLength(1)
+      await expect(
+        service.publishMonthlyPayments(actor, { ...command, stage: 'salary' }),
+      ).rejects.toThrow()
     })
-    it('only exposes the employee’s own latest finalized statements and filters and pages them', async () => {
+    it('only exposes the employee’s own legacy statements and filters and pages them', async () => {
       const { readMySalary } = await import('./salary.service.server')
       const worker: Actor = {
         ...actor,
@@ -420,13 +498,15 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         }),
       )
       expect((await readMySalary(worker, {})).statements.total).toBe(0)
-      await service.decideMonthlyPayroll(actor, await decision())
+      await sql().query(
+        "update payroll_monthly_entry set status='finalized' where month='2026-11-01'",
+      )
       expect(
         (await readMySalary(worker, { month })).statements.records,
       ).toEqual([
         {
           month,
-          amountBasis: 'gross',
+          amountBasis: 'net',
           baseMinor: 100000,
           bonusMinor: 10000,
           premiumMinor: 2000,
@@ -455,75 +535,390 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
           await readMySalary(worker, { statementPage: 2 })
         ).statements.records.map((record) => record.month),
       ).toEqual(['2026-01'])
-      await service.decideMonthlyPayroll(actor, await decision('reopen'))
-      expect((await readMySalary(worker, { month })).statements.total).toBe(0)
+      expect(await preview().catch((error: unknown) => error)).toBeInstanceOf(
+        Error,
+      )
     })
-    it('finalizes the whole month atomically, blocks new/edited rows and reopens with retained history', async () => {
-      await service.saveMonthlyEmployee(actor, await input())
+    it('serializes different publishers without locking out each other’s eligible salary', async () => {
+      await sql().query(`update "user" set roles='owner' where id='monthly-hr'`)
+      const owner: Actor = { ...actor, id: 'monthly-hr', roles: ['owner'] }
+      await salary(actor.id, 1, '2026-01-01')
+      await salary(owner.id, 1, '2026-01-01')
+      const accountantCommand = await decision()
+      const ownerPreview = await service.previewMonthlyPayments(owner, {
+        month,
+        stage: 'first',
+      })
+      const results = await Promise.allSettled([
+        service.publishMonthlyPayments(actor, accountantCommand),
+        service.publishMonthlyPayments(owner, {
+          ...accountantCommand,
+          expectedToken: ownerPreview.token,
+          requestId: randomUUID(),
+        }),
+      ])
+      expect(
+        results.filter((result) => result.status === 'fulfilled'),
+      ).toHaveLength(1)
+      const rejected = results.find((result) => result.status === 'rejected')
+      expect(rejected?.reason).toBeInstanceOf(service.MonthlyPayrollError)
+      expect(rejected?.reason.message).toContain('შეიცვალა')
+      expect(
+        (
+          await sql().query(
+            'select count(*)::int as total from payroll_payment',
+          )
+        ).rows[0].total,
+      ).toBe(2)
+    })
+    it('pays ready employees, leaving incomplete employees eligible for later runs', async () => {
+      const first = await preview()
+      expect(first.ready).toMatchObject([
+        { name: 'ანა თანამშრომელი', totalMinor: 50000 },
+      ])
+      expect(first.pending).toMatchObject([{ name: 'ბექა თანამშრომელი' }])
+      await publish()
+      expect((await detail()).payments).toMatchObject([
+        { stage: 'first', baseMinor: 50000 },
+      ])
+      expect((await detail('monthly-other')).payments).toEqual([])
+      const hourly = await detail('monthly-other')
       await service.saveMonthlyEmployee(
         actor,
         await input({
           userId: 'monthly-other',
-          sourceToken: (await detail('monthly-other')).source!.sourceToken,
+          sourceToken: hourly.source!.sourceToken,
           workedSeconds: 3600,
         }),
       )
-      expect(
-        await service.decideMonthlyPayroll(actor, await decision()),
-      ).toEqual({ saved: 2 })
-      expect((await detail()).closed).toBe(true)
-      await expect(
-        service.saveMonthlyEmployee(actor, await input({ expectedVersion: 2 })),
-      ).rejects.toThrow('დასრულებულია')
-      await expect(
-        service.removeMonthlyEmployee(actor, {
-          month,
-          userId: 'monthly-other',
-          expectedVersion: 2,
-          reason: 'შეცდომით შეტანილი ჩანაწერი',
-          requestId: randomUUID(),
-        }),
-      ).rejects.toThrow('გახსენით')
-      await service.decideMonthlyPayroll(actor, await decision('reopen'))
+      expect(await publish()).toEqual({ saved: 1 })
+      expect((await detail('monthly-other')).payments[0]?.totalMinor).toBe(
+        12345,
+      )
       await service.saveMonthlyEmployee(
         actor,
         await input({
-          expectedVersion: 3,
-          baseOverrideMinor: 99999,
-          baseReason: 'გადამოწმებული საბაზო თანხა',
+          userId: 'monthly-other',
+          sourceToken: hourly.source!.sourceToken,
+          expectedVersion: 1,
+          workedSeconds: 7200,
         }),
       )
-      expect((await detail()).history.map((r) => r.status)).toEqual([
-        'draft',
-        'draft',
-        'finalized',
-        'draft',
-      ])
-      expect((await detail()).current?.totalMinor).toBe(99999)
+      setDate('2026-12-10')
+      await publish('salary')
+      expect(
+        (await detail('monthly-other')).payments.map((line) => line.totalMinor),
+      ).toEqual([12345, 12345])
     })
-    it('detects competing saves and stale month confirmations without partial writes', async () => {
-      const draft = await input(),
-        staleDecision = await decision()
-      const results = await Promise.allSettled([
-        service.saveMonthlyEmployee(actor, draft),
-        service.saveMonthlyEmployee(actor, {
-          ...draft,
+
+    it('follows the current company-local half unless the period is selected explicitly', async () => {
+      vi.setSystemTime(new Date('2026-11-15T19:59:59Z'))
+      expect(await service.readMonthlyPayroll(actor, {})).toMatchObject({
+        month,
+        period: 'first',
+        nextPeriodChangeAt: Date.parse('2026-11-15T20:00:00Z'),
+      })
+      vi.setSystemTime(new Date('2026-11-15T20:00:00Z'))
+      expect(await service.readMonthlyPayroll(actor, { month })).toMatchObject({
+        month,
+        period: 'salary',
+        nextPeriodChangeAt: Date.parse('2026-11-30T20:00:00Z'),
+      })
+      expect(
+        await service.readMonthlyPayroll(actor, { month, period: 'all' }),
+      ).toMatchObject({
+        period: 'all',
+        nextPeriodChangeAt: null,
+      })
+      expect(
+        await service.readMonthlyPayroll(actor, { month: '2026-10' }),
+      ).toMatchObject({
+        period: 'all',
+        nextPeriodChangeAt: null,
+      })
+      vi.setSystemTime(new Date('2026-11-30T20:00:00Z'))
+      expect(await service.readMonthlyPayroll(actor, {})).toMatchObject({
+        month: '2026-12',
+        period: 'first',
+      })
+      expect(await service.readMonthlyPayroll(actor, { month })).toMatchObject({
+        period: 'all',
+        nextPeriodChangeAt: null,
+      })
+    })
+
+    it('validates the approved preview and prevents changing a published payment', async () => {
+      const viewed = await decision()
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({
+          firstPaymentMinor: 40000,
+          fineStage: 'salary',
+          paymentDates: { salary: '2026-12-12' },
+          adjustments: [
+            { kind: 'bonus', amountMinor: 2000 },
+            {
+              kind: 'fine',
+              amountMinor: 1000,
+              reason: 'დადასტურებული საფუძველი',
+            },
+          ],
+        }),
+      )
+      const search = { month, q: 'monthly-worker' }
+      const first = await service.readMonthlyPayroll(actor, {
+        ...search,
+        period: 'first',
+      })
+      expect(first).toMatchObject({
+        period: 'first',
+        records: [
+          {
+            baseMinor: 40000,
+            totalMinor: 40000,
+            paidMinor: null,
+            bonusMinor: null,
+            fineMinor: 0,
+            payoutDates: { first: { start: '2026-11-25', end: '2026-11-29' } },
+          },
+        ],
+      })
+      expect(
+        await service.readMonthlyPayroll(actor, {
+          ...search,
+          period: 'salary',
+        }),
+      ).toMatchObject({
+        period: 'salary',
+        records: [
+          {
+            baseMinor: 60000,
+            totalMinor: 59000,
+            paidMinor: null,
+            bonusMinor: null,
+            fineMinor: 1000,
+            payoutDates: { salary: { start: '2026-12-12', end: '2026-12-12' } },
+          },
+        ],
+      })
+      expect(
+        await service.readMonthlyPayroll(actor, { ...search, period: 'all' }),
+      ).toMatchObject({
+        records: [
+          {
+            baseMinor: 100000,
+            totalMinor: 101000,
+            bonusMinor: 2000,
+            payoutDates: {
+              adjustments: { start: '2026-12-15', end: '2026-12-20' },
+            },
+          },
+        ],
+      })
+      expect(
+        await service.readMonthlyPayroll(
+          actor,
+          { ...search, period: 'first', page: 2 },
+          true,
+        ),
+      ).toEqual(first)
+      await expect(
+        service.publishMonthlyPayments(actor, viewed),
+      ).rejects.toThrow('შეიცვალა')
+      setDate('2026-11-26')
+      await publish()
+      expect((await detail()).payments[0]?.baseMinor).toBe(40000)
+      expect(
+        await service.readMonthlyPayroll(actor, { ...search, period: 'first' }),
+      ).toMatchObject({
+        records: [
+          {
+            baseMinor: 40000,
+            totalMinor: 40000,
+            paidMinor: 40000,
+            payoutDates: {
+              first: {
+                start: '2026-11-25',
+                end: '2026-11-29',
+                paidOn: '2026-11-26',
+              },
+            },
+          },
+        ],
+      })
+      await expect(
+        service.saveMonthlyEmployee(
+          actor,
+          await input({ expectedVersion: 1, firstPaymentMinor: 41000 }),
+        ),
+      ).rejects.toThrow('გაცემული')
+      await expect(
+        service.removeMonthlyEmployee(actor, {
+          month,
+          userId: 'monthly-worker',
+          expectedVersion: 1,
+          reason: 'Incorrect draft',
           requestId: randomUUID(),
         }),
-      ])
-      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
-      await expect(
-        service.decideMonthlyPayroll(actor, staleDecision),
-      ).rejects.toThrow('უწყისი შეიცვალა')
-      const correction = await input({ expectedVersion: 1 }),
-        finalize = await decision()
-      const race = await Promise.allSettled([
-        service.saveMonthlyEmployee(actor, correction),
-        service.decideMonthlyPayroll(actor, finalize),
-      ])
-      expect(race.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
-      expect((await detail()).total).toBe(2)
+      ).rejects.toThrow('გაცემული')
     })
+
+    it('publishes distinct stages and exposes only paid components to the employee', async () => {
+      const { readMySalary } = await import('./salary.service.server')
+      const worker: Actor = {
+        ...actor,
+        id: 'monthly-worker',
+        roles: ['employee'],
+      }
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({
+          firstPaymentMinor: 40000,
+          fineStage: 'adjustments',
+          adjustments: [
+            { kind: 'premium', amountMinor: 10000 },
+            { kind: 'bonus', amountMinor: 1000 },
+            { kind: 'fine', amountMinor: 3000, reason: 'Internal audit note' },
+          ],
+        }),
+      )
+      expect((await readMySalary(worker, { month })).statements.total).toBe(0)
+      await publish()
+      expect(
+        (await readMySalary(worker, { month })).statements.records[0],
+      ).toMatchObject({
+        bonusMinor: 0,
+        premiumMinor: 0,
+        fineMinor: 0,
+        totalMinor: 40000,
+        payments: [{ stage: 'first', paidOn: '2026-11-25', totalMinor: 40000 }],
+      })
+      const command = await decision('salary')
+      expect((await preview('salary')).available).toBe(false)
+      await expect(
+        service.publishMonthlyPayments(actor, command),
+      ).rejects.toThrow()
+      await sql().query(
+        'insert into payroll_policy (version, schedule, actor_id, reason) values (2, $1, $2, $3)',
+        [
+          JSON.stringify({
+            ...paymentScheduleDefaults,
+            first: null,
+            fineStage: 'salary',
+          }),
+          actor.id,
+          'Next month schedule',
+        ],
+      )
+      setDate('2026-12-15')
+      await publish('salary')
+      await publish('adjustments')
+      const result = await readMySalary(worker, { month })
+      expect(result.statements.records[0]).toMatchObject({
+        baseMinor: 100000,
+        bonusMinor: 1000,
+        premiumMinor: 10000,
+        fineMinor: 3000,
+        totalMinor: 108000,
+        payments: [
+          { stage: 'first', totalMinor: 40000 },
+          { stage: 'salary', totalMinor: 60000 },
+          { stage: 'adjustments', totalMinor: 8000 },
+        ],
+      })
+      expect(JSON.stringify(result)).not.toContain('Internal audit note')
+      expect(
+        (await readMySalary(worker, { month: '2026-12' })).statements.total,
+      ).toBe(0)
+      expect(
+        (
+          await sql().query(
+            'select distinct policy_version from payroll_payment',
+          )
+        ).rows,
+      ).toEqual([{ policy_version: 1 }])
+    })
+
+    it('schedules same-month bonuses and a salary-stage fine on selected dates', async () => {
+      await sql().query('update payroll_policy set schedule = $1', [
+        JSON.stringify({
+          ...paymentScheduleDefaults,
+          first: null,
+          adjustments: { ...paymentScheduleDefaults.adjustments, offset: 0 },
+        }),
+      ])
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({
+          paymentDates: { adjustments: '2026-11-27', salary: '2026-12-12' },
+          adjustments: [
+            { kind: 'fine', amountMinor: 3000, reason: 'Approved fine' },
+            { kind: 'bonus', amountMinor: 1000 },
+          ],
+        }),
+      )
+      await expect(preview()).rejects.toThrow()
+      expect(await preview('adjustments')).toMatchObject({
+        start: '2026-11-15',
+        end: '2026-11-20',
+        available: true,
+        ready: [],
+        pending: [{ name: 'ანა თანამშრომელი' }],
+      })
+      expect(
+        (await service.readMonthlyPayroll(actor, { month, view: 'bonuses' }))
+          .records[0].adjustmentDates,
+      ).toEqual([
+        { stage: 'adjustments', start: '2026-11-27', paid: false },
+        { stage: 'salary', start: '2026-12-12', paid: false },
+      ])
+      setDate('2026-11-28')
+      await publish('adjustments')
+      expect(
+        (await service.readMonthlyPayroll(actor, { month, view: 'bonuses' }))
+          .records[0].adjustmentDates[0],
+      ).toEqual({ stage: 'adjustments', start: '2026-11-28', paid: true })
+      await expect(
+        service.saveMonthlyEmployee(
+          actor,
+          await input({
+            expectedVersion: 1,
+            paymentDates: { adjustments: '2026-11-29', salary: '2026-12-12' },
+          }),
+        ),
+      ).rejects.toThrow('თარიღი ვერ შეიცვლება')
+      setDate('2026-12-10')
+      expect((await preview('salary')).ready).toEqual([])
+      setDate('2026-12-12')
+      await publish('salary')
+      expect((await detail()).payments).toMatchObject([
+        { stage: 'adjustments', paidOn: '2026-11-28', totalMinor: 1000 },
+        {
+          stage: 'salary',
+          baseMinor: 100000,
+          fineMinor: 3000,
+          totalMinor: 97000,
+        },
+      ])
+      const report = await service.readMonthlyPayroll(actor, {
+        month,
+        q: 'monthly-worker',
+      })
+      expect(report.records[0].payoutDates).toMatchObject({
+        adjustments: {
+          start: '2026-11-27',
+          end: '2026-11-27',
+          paidOn: '2026-11-28',
+        },
+        salary: {
+          start: '2026-12-12',
+          end: '2026-12-12',
+          paidOn: '2026-12-12',
+        },
+      })
+      await expect(publish('salary')).rejects.toThrow()
+    })
+
     it('removes an erroneous draft without deleting history and allows explicit restoration', async () => {
       await service.saveMonthlyEmployee(actor, await input())
       const remove = {
@@ -539,9 +934,6 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         (await service.readMonthlyPayroll(actor, { month })).entryCount,
       ).toBe(0)
       expect((await detail()).current?.status).toBe('voided')
-      await expect(
-        service.decideMonthlyPayroll(actor, await decision()),
-      ).rejects.toThrow('დაამატეთ')
       await service.saveMonthlyEmployee(
         actor,
         await input({ expectedVersion: 2 }),
@@ -551,7 +943,7 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         (await service.readMonthlyPayroll(actor, { month })).entryCount,
       ).toBe(1)
     })
-    it('rolls back the entire month if any audit insert fails', async () => {
+    it('rolls back a payment run if any payment insert fails', async () => {
       await service.saveMonthlyEmployee(actor, await input())
       await service.saveMonthlyEmployee(
         actor,
@@ -562,21 +954,28 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         }),
       )
       await sql().query(
-        `create function fail_monthly_final() returns trigger language plpgsql as $$ begin if NEW.status = 'finalized' and NEW.employee_id = (select id from employee where user_id='monthly-other') then raise exception 'test rollback'; end if; return NEW; end $$; create trigger fail_monthly_final before insert on payroll_monthly_entry for each row execute function fail_monthly_final()`,
+        `create function fail_monthly_final() returns trigger language plpgsql as $$ begin if NEW.employee_id = (select id from employee where user_id='monthly-other') then raise exception 'test rollback'; end if; return NEW; end $$; create trigger fail_monthly_final before insert on payroll_payment for each row execute function fail_monthly_final()`,
       )
       try {
-        await expect(
-          service.decideMonthlyPayroll(actor, await decision()),
-        ).rejects.toThrow()
+        await expect(publish()).rejects.toThrow()
       } finally {
         await sql().query(
-          'drop trigger fail_monthly_final on payroll_monthly_entry; drop function fail_monthly_final()',
+          'drop trigger fail_monthly_final on payroll_payment; drop function fail_monthly_final()',
         )
       }
       expect((await detail()).total).toBe(1)
-      expect((await detail('monthly-other')).total).toBe(1)
+      expect((await detail('monthly-other')).payments).toEqual([])
+      expect((await detail()).payments).toEqual([])
     })
     it('keeps filtering and paginated history scoped, and preserves agreement bases', async () => {
+      await salary(
+        'monthly-worker',
+        2,
+        '2026-01-01',
+        'monthly',
+        100000,
+        'gross',
+      )
       await service.saveMonthlyEmployee(actor, await input())
       for (let version = 1; version <= 11; version++)
         await service.saveMonthlyEmployee(
@@ -614,34 +1013,14 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
           })
         ).records,
       ).toEqual([])
-      await service.decideMonthlyPayroll(actor, await decision())
-      expect(
-        (await service.readMonthlyPayroll(actor, { month, q: 'monthly-other' }))
-          .records,
-      ).toEqual([])
-      const futureSource = await service.readMonthlyEmployee(actor, {
-        month: '2026-12',
-        userId: 'monthly-worker',
+      expect((await preview()).pending).toContainEqual({
+        name: 'ანა თანამშრომელი',
+        message: expect.stringContaining('გასაცემი თანხა'),
       })
-      await service.saveMonthlyEmployee(actor, {
-        ...(await input()),
-        month: '2026-12',
-        sourceToken: futureSource.source!.sourceToken,
-      })
-      await expect(
-        service.decideMonthlyPayroll(
-          actor,
-          await decision('finalize', {
-            month: '2026-12',
-            expectedToken: (
-              await service.readMonthlyPayroll(actor, { month: '2026-12' })
-            ).token,
-          }),
-        ),
-      ).rejects.toThrow('მომავალი')
+      expect((await preview('first', '2026-12')).available).toBe(false)
     })
 
-    it('records adjustments before salary setup and requires base pay before finalizing', async () => {
+    it('records adjustments before salary setup and publishes once a valid salary is configured', async () => {
       await sql().query(
         `delete from employee_salary_term where employee_id=(select id from employee where user_id='monthly-worker')`,
       )
@@ -672,27 +1051,21 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         (await service.readMonthlyPayroll(actor, { month, view: 'bonuses' }))
           .total,
       ).toBe(1)
-      await expect(
-        service.decideMonthlyPayroll(actor, await decision()),
-      ).rejects.toThrow('საბაზო')
+      expect((await preview()).pending).toMatchObject([
+        { name: 'ბექა თანამშრომელი' },
+        { name: 'ანა თანამშრომელი' },
+      ])
 
       await salary('monthly-worker', 1, '2026-01-01')
       await service.saveMonthlyEmployee(
         actor,
         await input({ expectedVersion: 1, adjustments }),
       )
-      await service.decideMonthlyPayroll(actor, await decision())
+      expect(await publish()).toEqual({ saved: 1 })
       expect((await detail()).current).toMatchObject({
-        status: 'finalized',
+        status: 'draft',
         totalMinor: 95000,
       })
-      await expect(
-        service.saveMonthlyAdjustments(actor, {
-          ...data,
-          expectedVersion: 3,
-          requestId: randomUUID(),
-        }),
-      ).rejects.toThrow('დასრულებულია')
     })
 
     it('edits adjustments without overwriting existing base pay or hours', async () => {
@@ -831,7 +1204,10 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         month,
         view: 'bonuses',
       })
-      const payroll = await service.readMonthlyPayroll(actor, { month })
+      const payroll = await service.readMonthlyPayroll(actor, {
+        month,
+        period: 'all',
+      })
       expect(bonuses.total).toBe(2)
       expect(
         bonuses.records.find((row) => row.userId === 'monthly-other'),

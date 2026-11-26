@@ -1,18 +1,19 @@
+import type { JobGeofenceDiameter } from './jobs.types'
+
 const earthRadiusMetres = 6_371_008.8
 const radiansPerDegree = Math.PI / 180
 const ringSegments = 64
 
 export const jobGeofenceColor = '#8250df'
-export const jobGeofenceDiameter = 200
 
 /** The geographic ring uses half the diameter as the distance from the center. */
-export function jobGeofenceRing(center: {
-  longitude: number
-  latitude: number
-}): Array<[number, number]> {
+export function jobGeofenceRing(
+  center: { longitude: number; latitude: number },
+  diameter: JobGeofenceDiameter,
+): Array<[number, number]> {
   const longitude = center.longitude * radiansPerDegree
   const latitude = center.latitude * radiansPerDegree
-  const angularRadius = jobGeofenceDiameter / 2 / earthRadiusMetres
+  const angularRadius = diameter / 2 / earthRadiusMetres
   const sinLatitude = Math.sin(latitude)
   const cosLatitude = Math.cos(latitude)
   const sinRadius = Math.sin(angularRadius)

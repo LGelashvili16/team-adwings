@@ -32,11 +32,20 @@ it('saves a premium and fine together without any base-pay fields', async () => 
       source: null,
       sourceMessage: 'ხელფასი არ არის განსაზღვრული.',
       salaryMissing: true,
+      employmentNeedsReview: false,
+      canOpenEmployeeProfile: false,
       current: null,
       history: [],
       total: 0,
       pageSize: 10,
       closed: false,
+      payments: [],
+      firstPaymentEnabled: true,
+      defaultFineStage: 'salary',
+      paymentWindows: [
+        { stage: 'adjustments', start: '2026-12-15', end: '2026-12-20' },
+        { stage: 'salary', start: '2026-12-10', end: '2026-12-15' },
+      ],
     },
   })
   vi.mocked(setMonthlyAdjustments).mockResolvedValue({
@@ -62,7 +71,11 @@ it('saves a premium and fine together without any base-pay fields', async () => 
   await user.click(await screen.findByRole('button', { name: 'გიორგი' }))
   await user.click(await screen.findByRole('combobox', { name: /^ტიპი/ }))
   await user.click(await screen.findByRole('option', { name: 'პრემია' }))
-  expect(screen.queryByText(/საბაზო თანხა/)).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'გაცემის თარიღი' }))
+  await user.click(
+    await screen.findByRole('button', { name: /18 დეკემბერი 2026/ }),
+  )
+  expect(screen.queryByText('ხელფასი(თვე) ლარში')).not.toBeInTheDocument()
   await user.type(
     screen.getByRole('textbox', { name: /^თანხა ლარში/ }),
     '100.50',
@@ -71,6 +84,12 @@ it('saves a premium and fine together without any base-pay fields', async () => 
   await user.click(screen.getByRole('button', { name: 'ჩანაწერის დამატება' }))
   await user.click(screen.getAllByRole('combobox', { name: /^ტიპი/ })[1])
   await user.click(await screen.findByRole('option', { name: 'ჯარიმა' }))
+  await user.click(
+    screen.getByRole('button', { name: 'ჯარიმის დაქვითვის თარიღი' }),
+  )
+  await user.click(
+    await screen.findByRole('button', { name: /12 დეკემბერი 2026/ }),
+  )
   await user.type(
     screen.getAllByRole('textbox', { name: /^თანხა ლარში/ })[1],
     '20',
@@ -86,6 +105,8 @@ it('saves a premium and fine together without any base-pay fields', async () => 
       month: '2026-11',
       userId: 'worker',
       expectedVersion: 0,
+      fineStage: null,
+      paymentDates: { adjustments: '2026-12-18', salary: '2026-12-12' },
       requestId: expect.any(String),
       adjustments: [
         { kind: 'premium', amountMinor: 10050, reason: '' },
@@ -93,4 +114,4 @@ it('saves a premium and fine together without any base-pay fields', async () => 
       ],
     },
   })
-})
+}, 10000)

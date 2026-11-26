@@ -1,98 +1,90 @@
 import { z } from 'zod'
 
-export const amountBasisLabels = {
-  gross: 'დარიცხული თანხა',
-  net: 'ხელზე ასაღები თანხა',
-} as const
-export const dayBasisLabels = {
-  scheduled_workdays: 'თვის სამუშაო დღეებით',
-  calendar_days: 'თვის კალენდარული დღეებით',
-  fixed_30: 'ფიქსირებული 30 დღით',
-} as const
-
-const basisPoints = z
-  .number({ error: 'მიუთითეთ პროცენტი.' })
-  .int('პროცენტს შეიძლება ჰქონდეს მაქსიმუმ ორი ათწილადი.')
-  .min(1, 'პროცენტი უნდა იყოს მინიმუმ 0.01.')
-  .max(10000, 'პროცენტი არ უნდა აღემატებოდეს 100-ს.')
-
-export const payrollPolicySchema = z.object({
-  effectiveFrom: z.iso.date({ error: 'მიუთითეთ სწორი თარიღი.' }),
-  amountBasis: z.enum(['gross', 'net'], { error: 'აირჩიეთ თანხის ტიპი.' }),
-  dayBasis: z.enum(['scheduled_workdays', 'calendar_days', 'fixed_30'], {
-    error: 'აირჩიეთ დღიური თანხის გამოთვლის წესი.',
-  }),
-  incomeTaxEnabled: z.boolean({
-    error: 'აირჩიეთ საშემოსავლოს გამოთვლის რეჟიმი.',
-  }),
-  incomeTaxBasisPoints: basisPoints,
-  pensionEnabled: z.boolean({ error: 'აირჩიეთ საპენსიოს გამოთვლის რეჟიმი.' }),
-  employeePensionBasisPoints: basisPoints,
-  employerPensionBasisPoints: basisPoints,
+export const payStageSchema = z.enum(['first', 'salary', 'adjustments'], {
+  error: 'აირჩიეთ გადახდის ეტაპი.',
 })
+export const fineStageSchema = z.enum(['salary', 'adjustments'], {
+  error: 'აირჩიეთ ჯარიმის დაქვითვის ეტაპი.',
+})
+const payStageLabels = {
+  first: 'ხელფასის პირველი ნაწილი',
+  salary: 'ხელფასის მეორე ნაწილი',
+  adjustments: 'ბონუსები და პრემიები',
+} as const
+export function payStageLabel(stage: PayStage, twice: boolean) {
+  return stage === 'salary' && !twice
+    ? 'ხელფასის გადახდა'
+    : payStageLabels[stage]
+}
 
-const revision = z
-  .number({ error: 'განაახლეთ პარამეტრები.' })
-  .int('ვერსია არასწორია.')
-  .min(0, 'ვერსია არასწორია.')
-  .max(2147483646, 'ვერსიის ლიმიტი ამოწურულია.')
-const reason = z
-  .string({ error: 'მიუთითეთ ცვლილების მიზეზი.' })
-  .trim()
-  .min(5, 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.')
-  .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
+const day = z
+  .number({ error: 'მიუთითეთ თვის დღე.' })
+  .int('მიუთითეთ მთელი რიცხვი.')
+  .min(1, 'დღე უნდა იყოს 1-დან 31-მდე.')
+  .max(31, 'დღე უნდა იყოს 1-დან 31-მდე.')
+const windowSchema = z
+  .strictObject(
+    {
+      offset: z.union([z.literal(0), z.literal(1)], { error: 'აირჩიეთ თვე.' }),
+      start: day,
+      end: day,
+    },
+    { error: 'მიუთითეთ გაცემის თვე და დღეები.' },
+  )
+  .refine(({ start, end }) => start <= end, {
+    path: ['end'],
+    message: 'ბოლო დღე საწყის დღეზე ადრე ვერ იქნება.',
+  })
+
+export const paymentScheduleSchema = z
+  .strictObject(
+    {
+      first: windowSchema.nullable(),
+      salary: windowSchema,
+      adjustments: windowSchema,
+      fineStage: fineStageSchema,
+    },
+    { error: 'გაცემის გრაფიკი არასწორია.' },
+  )
+  .superRefine((value, context) => {
+    const { first, salary } = value
+    if (
+      first &&
+      first.offset * 31 + first.end >= salary.offset * 31 + salary.start
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['salary', 'start'],
+        message:
+          'მეორე ნაწილის გაცემა პირველი ნაწილის პერიოდის შემდეგ უნდა დაიწყოს.',
+      })
+  })
 
 export const savePayrollSettingsSchema = z.strictObject(
   {
-    ...payrollPolicySchema.shape,
-    expectedVersion: revision,
-    reason: reason.optional(),
+    schedule: paymentScheduleSchema,
+    expectedVersion: z
+      .number({ error: 'განაახლეთ პარამეტრები.' })
+      .int('ვერსია არასწორია.')
+      .min(0, 'ვერსია არასწორია.')
+      .max(2147483646, 'ვერსიის ლიმიტი ამოწურულია.'),
   },
   { error: 'ხელფასების პარამეტრები არასწორია.' },
 )
 
-export function percentageToBasisPoints(value: string) {
-  const [whole, fraction = ''] = value.split('.')
-  return Number(whole) * 100 + Number(fraction.padEnd(2, '0'))
+export type PayStage = z.infer<typeof payStageSchema>
+export type FineStage = z.infer<typeof fineStageSchema>
+export type PaymentSchedule = z.infer<typeof paymentScheduleSchema>
+export type PaymentWindow = NonNullable<PaymentSchedule['first']>
+
+export const firstPaymentDefault: PaymentWindow = {
+  offset: 0,
+  start: 25,
+  end: 29,
 }
-export function formatPercentage(value: number) {
-  return (value / 100).toFixed(2).replace(/\.?0+$/, '')
-}
-const percentage = z
-  .string({ error: 'მიუთითეთ პროცენტი.' })
-  .trim()
-  .regex(/^\d{1,3}(\.\d{1,2})?$/, 'მიუთითეთ პროცენტი მაქსიმუმ ორი ათწილადით.')
-  .refine((value) => {
-    const parsed = percentageToBasisPoints(value)
-    return parsed >= 1 && parsed <= 10000
-  }, 'პროცენტი უნდა იყოს 0.01-დან 100-მდე.')
-
-export const payrollSettingsFormSchema = savePayrollSettingsSchema
-  .omit({ reason: true })
-  .extend({
-    incomeTaxBasisPoints: percentage,
-    employeePensionBasisPoints: percentage,
-    employerPensionBasisPoints: percentage,
-  })
-
-export type PayrollPolicy = z.infer<typeof payrollPolicySchema>
-export type PayrollSettingsFormValues = z.infer<
-  typeof payrollSettingsFormSchema
->
-
-/** Suggested values are an unsaved draft, not an active payroll policy. */
-export function payrollSettingsDefaults(
-  today: string,
-): PayrollSettingsFormValues {
-  return {
-    effectiveFrom: today,
-    amountBasis: 'gross',
-    dayBasis: 'scheduled_workdays',
-    incomeTaxEnabled: false,
-    incomeTaxBasisPoints: '20',
-    pensionEnabled: false,
-    employeePensionBasisPoints: '2',
-    employerPensionBasisPoints: '2',
-    expectedVersion: 0,
-  }
+export const paymentScheduleDefaults: PaymentSchedule = {
+  first: firstPaymentDefault,
+  salary: { offset: 1, start: 10, end: 15 },
+  adjustments: { offset: 1, start: 15, end: 20 },
+  fineStage: 'salary',
 }

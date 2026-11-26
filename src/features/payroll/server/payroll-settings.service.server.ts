@@ -2,7 +2,6 @@ import '@tanstack/react-start/server-only'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { assertPermissions } from '#/lib/authorization/access'
 import { currentAuthorization } from '#/lib/authorization/permissions'
-import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
 import type { Actor } from '#/lib/authorization/actor'
 import { savePayrollSettingsSchema } from '../payroll-settings.schemas'
 import * as repository from './payroll-settings.repository.server'
@@ -32,10 +31,7 @@ export async function readPayrollSettings(actor: Actor | null) {
   return repository.transactPayrollSettings(
     async (tx) => {
       await authorize(tx, actor)
-      const { date: today } = await getCompanyWorkday(new Date(), tx)
-      const latest = await repository.latestPolicy(tx)
-      const current = await repository.effectivePolicy(tx, today)
-      return { today, latest: view(latest), current: view(current) }
+      return { latest: view(await repository.latestPolicy(tx)) }
     },
     { isolationLevel: 'repeatable read' },
   )
@@ -51,19 +47,12 @@ export async function savePayrollSettings(actor: Actor | null, input: unknown) {
       throw new PayrollSettingsError(
         'პარამეტრები სხვა მომხმარებელმა შეცვალა. განაახლეთ გვერდი და გადაამოწმეთ ცვლილებები.',
       )
-    const { date: today } = await getCompanyWorkday(new Date(), tx)
-    if (data.effectiveFrom < today)
-      throw new PayrollSettingsError(
-        'მოქმედების თარიღი დღევანდელ დღეზე ადრე ვერ იქნება.',
-      )
-    const { expectedVersion, reason, ...policy } = data
-    // The policy row is also the atomic audit record. No previous version is updated or deleted.
     return view(
       await repository.insertPolicy(tx, {
-        ...policy,
-        version: expectedVersion + 1,
+        schedule: data.schedule,
+        version: data.expectedVersion + 1,
         actorId,
-        reason: reason ?? 'ხელფასების პარამეტრები შენახულია.',
+        reason: 'გაცემის გრაფიკი შენახულია.',
       }),
     )
   })

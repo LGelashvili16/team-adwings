@@ -180,7 +180,10 @@ types. Do not introduce separate competing task or measurement modules.
 ### Areas and device presence
 
 - [x] Display a circular geofence at every mapped job location. The job
-  coordinates give its center and the standard diameter is 200 m.
+  coordinates give its center. The company diameter defaults to 200 m and GPS
+  managers can enter and save a whole-meter diameter from 1 through 32767 in the
+  map legend on `/manage/gps`. Saved revisions retain the author and timestamp,
+  and open jobs maps redraw through the existing jobs live topic.
 - [x] Jobs without map coordinates have no zone. The map tools can hide or show
   the geofence layer, which is visible initially.
 - [ ] Define eligible devices/targets and their relationship explicitly. Track

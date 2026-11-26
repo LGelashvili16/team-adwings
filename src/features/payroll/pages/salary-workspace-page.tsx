@@ -150,7 +150,6 @@ export function SalaryWorkspace({
             <SalaryEditor
               key={draft.key}
               actorId={actor.id}
-              defaultAmountBasis={view.defaultAmountBasis}
               targets={draft.targets}
               today={view.today}
               open={open}

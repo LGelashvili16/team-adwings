@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Empty, EmptyHeader, EmptyTitle } from '#/components/ui/empty'
 import { Skeleton } from '#/components/ui/skeleton'
 import { DataPagination } from '#/components/common/data-pagination'
+import { cn } from '#/lib/utils'
 import { salaryDirectoryQuery } from '../salary.queries'
 import { PayrollPageHeader } from '../components/payroll-page-header'
 import { SalaryDirectoryFilters } from '../components/salary-directory-filters'
@@ -60,7 +61,7 @@ function SalaryDirectoryResults({
             <Skeleton key={item} className="h-28 rounded-xl" />
           ))}
         </div>
-        <div className="flex min-w-0 flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-2">
           {filters}
           <div role="status" aria-busy="true" aria-label="ხელფასები იტვირთება">
             <Skeleton aria-hidden="true" className="h-80 rounded-xl" />
@@ -70,7 +71,7 @@ function SalaryDirectoryResults({
     )
   if (!view)
     return (
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-2">
         {filters}
         <Alert variant="destructive">
           <IconAlertCircle aria-hidden="true" />
@@ -100,11 +101,26 @@ function SalaryDirectoryResults({
             label: 'განსასაზღვრი ხელფასი',
             value: view.counts.unconfigured,
             icon: IconUsers,
+            attention: view.counts.unconfigured > 0,
           },
-        ].map(({ label, value, icon: Icon }) => (
-          <Card key={label}>
+        ].map(({ label, value, icon: Icon, attention }) => (
+          <Card
+            key={label}
+            className={
+              attention
+                ? 'bg-badge-red/45 text-badge-red-foreground ring-badge-red-foreground/20'
+                : undefined
+            }
+          >
             <CardContent className="flex items-center gap-4">
-              <span className="flex size-10 items-center justify-center rounded-xl border bg-muted/40 text-muted-foreground">
+              <span
+                className={cn(
+                  'flex size-10 items-center justify-center rounded-xl border',
+                  attention
+                    ? 'border-badge-red-foreground/20 bg-badge-red text-badge-red-foreground'
+                    : 'bg-muted/40 text-muted-foreground',
+                )}
+              >
                 <Icon className="size-5" aria-hidden="true" />
               </span>
               <div>
@@ -125,7 +141,7 @@ function SalaryDirectoryResults({
           განყოფილებაში „თვის ხელფასები“.
         </AlertDescription>
       </Alert>
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-2">
         {filters}
         {view.records.length ? (
           <div className="min-w-0 overflow-hidden rounded-xl border bg-card">

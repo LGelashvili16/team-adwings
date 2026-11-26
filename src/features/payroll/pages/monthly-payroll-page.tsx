@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useId, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, getRouteApi } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import {
-  IconLock,
-  IconLockOpen,
+  IconWallet,
+  IconDownload,
   IconPlus,
   IconInfoCircle,
   IconAlertCircle,
@@ -24,15 +24,18 @@ import { ConfirmModalContent } from '#/components/common/confirm-modal-content'
 import { useModal } from '#/hooks/use-modal'
 import { hasPermission } from '#/lib/authorization/permissions'
 import { monthlyKey, monthlyPayrollQuery } from '../monthly.queries'
-import { setMonthlyAdjustments } from '../monthly.functions'
+import {
+  getMonthlyPayrollCsv,
+  setMonthlyAdjustments,
+} from '../monthly.functions'
+import { Spinner } from '#/components/ui/spinner'
 import type { MonthlyDirectoryRow } from '../monthly.types'
 import { PayrollPageHeader } from '../components/payroll-page-header'
-import { PayrollMonthControl } from '../components/payroll-month-control'
 import { MonthlyFilters } from '../components/monthly-filters'
 import { MonthlyTable } from '../components/monthly-table'
 import { MonthlyEntrySheet } from '../components/monthly-entry-sheet'
 import { MonthlyAdjustmentsSheet } from '../components/monthly-adjustments-sheet'
-import { MonthlyDecisionDialog } from '../components/monthly-decision-dialog'
+import { MonthlyPaymentDialog } from '../components/monthly-payment-dialog'
 
 const route = getRouteApi('/_authenticated/manage/payroll/monthly')
 export function MonthlyPayrollPage() {
@@ -43,6 +46,39 @@ export function MonthlyPayrollPage() {
     view = query.data?.ok ? query.data.value : null
   const canEdit = hasPermission(actor, 'payroll.manage')
   const adjustmentsOnly = search.view === 'bonuses'
+  const resultsId = useId()
+  const showPeriod =
+    !adjustmentsOnly &&
+    (view?.paymentWindows.some((window) => window.stage === 'first') ??
+      Boolean(search.period))
+  const exportPayroll = useMutation({
+    mutationFn: () =>
+      getMonthlyPayrollCsv({
+        data: {
+          page: 1,
+          month: view?.month,
+          period: view?.period,
+          q: search.q,
+          sort: search.sort,
+        },
+      }),
+    onSuccess: (result) => {
+      if (!result.ok) {
+        toast.error(result.message)
+        return
+      }
+      const url = URL.createObjectURL(
+        new Blob([result.value.csv], { type: 'text/csv;charset=utf-8' }),
+      )
+      const link = document.createElement('a')
+      link.href = url
+      link.download = result.value.filename
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    },
+    onError: () =>
+      toast.error('უწყისის ექსპორტი ვერ შესრულდა. სცადეთ ხელახლა.'),
+  })
   const { openModal } = useModal()
   const client = useQueryClient()
   const removing = useRef(false)
@@ -54,13 +90,8 @@ export function MonthlyPayrollPage() {
       employee: { id: string; label: string } | null
     } | null>(null),
     [open, setOpen] = useState(false)
-  const [decision, setDecision] = useState<{
-      key: number
-      month: string
-      token: string
-      closed: boolean
-    } | null>(null),
-    [decisionOpen, setDecisionOpen] = useState(false)
+  const [paymentDialog, setPaymentDialog] = useState({ key: 0, open: false })
+  const firstWindow = view?.paymentWindows.at(0)
   const displayedMonth = view?.month
   const edit = useCallback(
     (employee: { id: string; label: string } | null) => {
@@ -152,125 +183,154 @@ export function MonthlyPayrollPage() {
             დამატება
           </Button>
         ) : null}
-        {view && canEdit && !adjustmentsOnly ? (
+        {view && canEdit && !adjustmentsOnly && !view.closed ? (
           <Button
-            variant={view.closed ? 'outline' : 'default'}
-            disabled={!view.entryCount}
-            onClick={() => {
-              setDecision({
-                key: (decision?.key ?? 0) + 1,
-                month: view.month,
-                token: view.token,
-                closed: view.closed,
-              })
-              setDecisionOpen(true)
-            }}
+            className="h-11 w-full md:h-10 md:w-auto"
+            disabled={!firstWindow}
+            onClick={() =>
+              setPaymentDialog((previous) => ({
+                key: previous.key + 1,
+                open: true,
+              }))
+            }
           >
-            {view.closed ? (
-              <IconLockOpen aria-hidden="true" data-icon="inline-start" />
-            ) : (
-              <IconLock aria-hidden="true" data-icon="inline-start" />
-            )}
-            {view.closed ? 'უწყისის გახსნა' : 'თვის დასრულება'}
+            <IconWallet aria-hidden="true" data-icon="inline-start" />
+            ხელფასის გაცემა
           </Button>
         ) : null}
       </PayrollPageHeader>
-      <MonthlyFilters
-        search={search}
-        onChange={(next) => {
-          void navigate({ search: next, replace: true, resetScroll: false })
-        }}
-        monthPicker={
-          view ? (
-            <PayrollMonthControl
-              month={view.month}
-              onChange={(month) => {
-                void navigate({
-                  search: { ...search, month, page: 1 },
-                  resetScroll: false,
-                })
-              }}
-            />
-          ) : null
-        }
-      >
-        {view?.closed ? (
-          <Badge className="md:self-center" variant="green">
-            დასრულებული თვე
-          </Badge>
+      <div className="flex min-w-0 flex-col gap-2">
+        <MonthlyFilters
+          search={search}
+          periodPanelId={showPeriod ? resultsId : undefined}
+          onChange={(next) => {
+            void navigate({ search: next, replace: true, resetScroll: false })
+          }}
+          payrollMonth={view?.month ?? search.month}
+          payrollPeriod={view?.period}
+          onMonthChange={(month) => {
+            void navigate({
+              search: { ...search, month, page: 1 },
+              resetScroll: false,
+            })
+          }}
+        >
+          {view?.closed ? (
+            <Badge className="md:self-center" variant="green">
+              დასრულებული თვე
+            </Badge>
+          ) : null}
+          {!adjustmentsOnly ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-11 w-full md:ml-auto md:h-9 md:w-auto"
+              disabled={!view?.total || exportPayroll.isPending}
+              onClick={() => exportPayroll.mutate()}
+            >
+              {exportPayroll.isPending ? (
+                <Spinner data-icon="inline-start" aria-hidden="true" />
+              ) : (
+                <IconDownload data-icon="inline-start" aria-hidden="true" />
+              )}
+              CSV ექსპორტი
+            </Button>
+          ) : null}
+        </MonthlyFilters>
+        {!adjustmentsOnly && view && !view.closed && canEdit && !firstWindow ? (
+          <Alert variant="info" role="status">
+            <IconInfoCircle aria-hidden="true" />
+            <AlertDescription>
+              ხელფასის გასაცემად ჯერ შეინახეთ გაცემის გრაფიკი.
+              {hasPermission(actor, 'payroll.configure') ? (
+                <>
+                  {' '}
+                  <Link to="/manage/payroll/settings">პარამეტრები</Link>
+                </>
+              ) : null}
+            </AlertDescription>
+          </Alert>
         ) : null}
-      </MonthlyFilters>
-      {adjustmentsOnly ? null : (
-        <Alert variant="info" role="status">
-          <IconInfoCircle aria-hidden="true" />
-          <AlertDescription>
-            ჯამი ინარჩუნებს ხელფასის შეთანხმების საფუძველს. გადასახადები და
-            საპენსიო შენატანები არ გამოითვლება.
-          </AlertDescription>
-        </Alert>
-      )}
-      {query.isPending ? (
-        <div role="status" aria-label="თვის უწყისი იტვირთება" aria-busy="true">
-          <Skeleton className="h-80 rounded-xl" aria-hidden="true" />
-        </div>
-      ) : !view ? (
-        <Alert variant="destructive">
-          <IconAlertCircle aria-hidden="true" />
-          <AlertDescription>
-            {query.data && !query.data.ok
-              ? query.data.message
-              : 'უწყისი ვერ ჩაიტვირთა. განაახლეთ გვერდი.'}
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <>
-          {view.records.length ? (
-            <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-              <MonthlyTable
-                records={view.records}
-                adjustmentsOnly={adjustmentsOnly}
-                adjustmentActions={
-                  adjustmentsOnly && canEdit && !view.closed
-                    ? {
-                        actorId: actor.id,
-                        onRemove: (record) =>
-                          removeAdjustments(record, view.month),
-                      }
-                    : undefined
-                }
-                onOpen={openEmployee}
-              />
+        <div
+          id={showPeriod ? resultsId : undefined}
+          role={showPeriod ? 'tabpanel' : undefined}
+          aria-labelledby={
+            showPeriod
+              ? `${resultsId}-${view?.period ?? search.period ?? 'all'}`
+              : undefined
+          }
+          className="flex min-w-0 flex-col gap-6"
+        >
+          {query.isPending ? (
+            <div
+              role="status"
+              aria-label="თვის უწყისი იტვირთება"
+              aria-busy="true"
+            >
+              <Skeleton className="h-80 rounded-xl" aria-hidden="true" />
             </div>
+          ) : !view ? (
+            <Alert variant="destructive">
+              <IconAlertCircle aria-hidden="true" />
+              <AlertDescription>
+                {query.data && !query.data.ok
+                  ? query.data.message
+                  : 'უწყისი ვერ ჩაიტვირთა. განაახლეთ გვერდი.'}
+              </AlertDescription>
+            </Alert>
           ) : (
-            <Empty className="rounded-xl border border-dashed py-12">
-              <EmptyHeader>
-                <EmptyTitle>
-                  {search.q
-                    ? 'შესაბამისი ჩანაწერი არ მოიძებნა'
-                    : adjustmentsOnly
-                      ? 'ამ თვეში დამატებითი ჩანაწერები ჯერ არ არის'
-                      : 'ამ თვის უწყისი ჯერ ცარიელია'}
-                </EmptyTitle>
-                {search.q ? (
-                  <EmptyContent>შეცვალეთ ძიების პირობა.</EmptyContent>
-                ) : null}
-              </EmptyHeader>
-            </Empty>
-          )}
-          <DataPagination
-            page={search.page}
-            total={view.total}
-            pageSize={view.pageSize}
-            renderLink={(page) => (
-              <Link
-                to="/manage/payroll/monthly"
-                search={{ ...search, page }}
-                resetScroll={false}
+            <>
+              {view.records.length ? (
+                <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
+                  <MonthlyTable
+                    records={view.records}
+                    period={view.period}
+                    adjustmentsOnly={adjustmentsOnly}
+                    adjustmentActions={
+                      adjustmentsOnly && canEdit && !view.closed
+                        ? {
+                            actorId: actor.id,
+                            onRemove: (record) =>
+                              removeAdjustments(record, view.month),
+                          }
+                        : undefined
+                    }
+                    onOpen={openEmployee}
+                  />
+                </div>
+              ) : (
+                <Empty className="rounded-xl border border-dashed py-12">
+                  <EmptyHeader>
+                    <EmptyTitle>
+                      {search.q
+                        ? 'შესაბამისი ჩანაწერი არ მოიძებნა'
+                        : adjustmentsOnly
+                          ? 'ამ თვეში დამატებითი ჩანაწერები ჯერ არ არის'
+                          : 'ამ თვის უწყისი ჯერ ცარიელია'}
+                    </EmptyTitle>
+                    {search.q ? (
+                      <EmptyContent>შეცვალეთ ძიების პირობა.</EmptyContent>
+                    ) : null}
+                  </EmptyHeader>
+                </Empty>
+              )}
+              <DataPagination
+                page={search.page}
+                total={view.total}
+                pageSize={view.pageSize}
+                renderLink={(page) => (
+                  <Link
+                    to="/manage/payroll/monthly"
+                    search={{ ...search, page }}
+                    resetScroll={false}
+                  />
+                )}
               />
-            )}
-          />
-        </>
-      )}
+            </>
+          )}
+        </div>
+      </div>
       {draft?.adjustmentsOnly === true && adjustmentsOnly ? (
         <MonthlyAdjustmentsSheet
           key={draft.key}
@@ -297,15 +357,16 @@ export function MonthlyPayrollPage() {
           onClose={() => setOpen(false)}
         />
       ) : null}
-      {decision ? (
-        <MonthlyDecisionDialog
-          key={decision.key}
+      {view && firstWindow && paymentDialog.key ? (
+        <MonthlyPaymentDialog
+          key={`${view.month}-${paymentDialog.key}`}
           actorId={actor.id}
-          month={decision.month}
-          token={decision.token}
-          closed={decision.closed}
-          open={decisionOpen}
-          onClose={() => setDecisionOpen(false)}
+          month={view.month}
+          windows={[firstWindow, ...view.paymentWindows.slice(1)]}
+          open={paymentDialog.open}
+          onClose={() =>
+            setPaymentDialog((previous) => ({ ...previous, open: false }))
+          }
         />
       ) : null}
     </div>

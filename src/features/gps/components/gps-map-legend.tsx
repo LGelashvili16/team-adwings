@@ -1,6 +1,7 @@
 import { IconGps } from '@tabler/icons-react'
 import { Card, CardContent } from '#/components/ui/card'
 import { cn } from '#/lib/utils'
+import { GpsGeofenceSettings } from './gps-geofence-settings'
 
 const gpsPinStates = [
   {
@@ -89,15 +90,22 @@ export function GpsMapLegendSections() {
   )
 }
 
-export function GpsMapLegend() {
+export function GpsMapLegend({
+  actorId,
+  canManage,
+}: {
+  actorId: string
+  canManage: boolean
+}) {
   return (
     <Card size="sm">
       <CardContent
         role="group"
         aria-label="რუკის ნიშნების განმარტება"
-        className="py-1"
+        className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4 py-1"
       >
         <GpsMapLegendSections />
+        <GpsGeofenceSettings actorId={actorId} canManage={canManage} />
       </CardContent>
     </Card>
   )

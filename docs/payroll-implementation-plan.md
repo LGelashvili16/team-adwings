@@ -1,10 +1,36 @@
 # Payroll implementation instructions and progress
 
-Updated: 2026-11-25. This is the execution checklist for Team Adwings payroll. [Payroll architecture and rules](payroll.md), `AGENTS.md` and the [UI standard](ui-design-guidelines.md) remain applicable.
+Updated: 2026-11-26. This is the execution checklist for Team Adwings payroll. [Payroll architecture and rules](payroll.md), `AGENTS.md` and the [UI standard](ui-design-guidelines.md) remain applicable.
 
-## Current delivery scope, simplified 2026-11-25
+## Current delivery scope, updated 2026-11-26
 
-The user narrowed delivery to fixed or hourly salaries, bonuses, premiums and fines. This section supersedes the remaining broad roadmap below. Enter bonuses, premiums and fines in one adjustments tab or directly in Monthly Payroll. The former deduction review is retired.
+Replace month closing with published payments for ready employees. Scheduled payments record payouts made externally. Prior finalized statements stay available in the read-only archive.
+
+- [x] Verify one or two salary payments, either bonus and premium payment month with the following month as default, and company and employee fine-stage settings.
+- [x] Verify publication for ready employees, fixed first-payment overrides, confirmed hourly calculations, independent retries and month-filtered employee payment history.
+- [x] Verify migration 0072 removes the retired calculation settings and preserves salary history.
+- [ ] Implement overtime and rest-day formulas after the user supplies calculation rules. Hourly work can fall on any calendar day.
+
+Verification, 2026-11-26. All 73 payroll tests passed, including 37 checks against isolated PostgreSQL databases. Tests covered an upgrade with an existing configuration, two concurrent publishers, duplicate command retries, payment isolation, and archived and published statements. TypeScript, targeted ESLint and formatting, Drizzle validation and the production build passed. Chrome checks used synthetic data with the actual settings, entry and payment-history components at desktop and mobile widths. The real database was left for deployment of the verified migration.
+
+Payroll settings group payment rules and schedule dates into two responsive panels. Split schedules show `ხელფასის პირველი ნაწილი` and `ხელფასის მეორე ნაწილი`. The frequency selector and schedule layout were checked in Chrome at desktop and mobile widths.
+
+Monthly Payroll now displays assigned base salaries before draft preparation, with explicit confirmation for partial months. Both edit sheets support payment dates, and the adjustments table shows planned or actual dates beside the earning-month totals. All 73 payroll tests passed, including date-based publication and paid-date protection in PostgreSQL. Migration `0073_payroll_adjustment_dates.sql` was verified in isolated tests and was present in the local development database. The production build and desktop and mobile Chrome previews passed.
+
+- [x] Show the automatic full-month base on rows that previously contained only adjustments, add first-part and second-part views with matching CSV export, and link missing employment dates to the employee profile. Verified by 74 payroll tests, including installment, export and role checks in isolated PostgreSQL databases. Checked keyboard operation and desktop and mobile layouts in Chrome with synthetic records.
+- [x] Prefill the month editor with the applicable fixed salary when the monthly base needs review, label the first installment separately, and start the paginated history accordion collapsed. Verified by 74 payroll tests and a Chrome check of the prefilled field, keyboard expansion and collapsed state after reopening on mobile.
+- [x] Use the selected period’s salary label in the table and CSV, and include the earning month, planned window and recorded payment date for each relevant stage. Verified by 74 payroll tests, including default and overridden payout dates, and a Chrome preview of all three headings at desktop and mobile widths.
+- [x] Show compact period tabs beside the dropdown for comparison on split schedules. Both controls share the selected period for the table and export. Verified synchronization in both directions, keyboard activation and desktop and mobile layout in Chrome with sample records.
+- [x] Keep the period tabs after the comparison and use the collapsed Jobs-style filter accordion on mobile. Verified desktop layout, mobile search, sorting, month selection and preservation of filters when switching periods in Chrome with sample records.
+- [x] Fix desktop search sizing and keep the payroll toolbar on one row. Use full-width payout, period and CSV controls on mobile. Verified desktop input at the reported width, keyboard access on narrower desktop layouts and matching control widths on mobile in Chrome with sample records.
+- [x] Select the active half of the current company-local month on split schedules, refresh at the next boundary, and preserve explicit tab choices. Verified with 75 payroll tests, including the company-local midnight and month rollover, and a simulated open-page rollover in Chrome.
+- [x] Align CSV export with the right edge of the desktop payroll toolbar and keep it full width on mobile. Verified both widths in a Chrome preview.
+- [x] Highlight nonzero fines and the unset-salary summary count with semantic red. Verified the treatment in light and dark Chrome previews.
+- [x] Reduce the gap between payroll filters and table results to 8px. Verified rendered spacing in Chrome.
+
+## Historical simplified delivery, 2026-11-25
+
+The user narrowed delivery to fixed or hourly salaries, bonuses, premiums and fines. The notes below record earlier delivery and verification. Enter bonuses, premiums and fines in one adjustments tab or directly in Monthly Payroll. The former deduction review is retired.
 
 - [x] Deliver one monthly workspace with employee selection, fixed salary or hourly rate times accountant-confirmed hours, bonus and premium lines with optional notes, reasoned fine lines and an explainable contractual total.
 - [x] Reuse dated salary terms and confirmed employment. Require explicit base confirmation for partial months or changing terms instead of building an automatic proration engine. Do not infer payable hours from raw attendance.
@@ -41,7 +67,7 @@ Chrome verified the same tab position across all five tabs at 320, 390 and 1440 
 - [x] Remove the general change-reason field from the shared monthly entry sheet and record an automatic audit note on save. Verified with seven focused tests and 14 monthly PostgreSQL checks.
 - [x] Remove the base-pay explanation from the monthly entry sheet. Require an explicit amount when needed and record the confirmation automatically. Verified with seven focused tests, 17 monthly PostgreSQL checks and desktop and mobile browser previews.
 - [x] Replace the Monthly Payroll employee popup with table search by name or username. Editors can open rows without a saved entry in an open month. The entire row opens the sheet, and keyboard focus returns to the employee button after closing. Verified with 17 PostgreSQL checks and a desktop and mobile browser preview.
-- [x] Link directly from the Monthly Payroll sheet to the selected employee’s salary page when the applicable salary is missing, including when employment dates also need confirmation.
+- [x] Link directly from the Monthly Payroll sheet to the selected employee’s salary page when the applicable salary is missing. When employment dates need attention, link authorized users to the employment periods on the employee profile.
 - [x] Show employees their own finalized monthly payroll statements with a calendar-month filter and server pagination. Reopening hides the statement until it is finalized again. Keep payment tracking outside this flow. Verified with 28 payroll and salary PostgreSQL checks, 17 focused tests and a desktop and mobile browser preview.
 - [x] Restrict payroll management pages and server actions to accountants, administrators and owners, even if another role has individual payroll grants. Explicit denials still apply and personal salary access stays employee-scoped. Verified with 59 focused tests and 35 payroll PostgreSQL checks.
 - [x] Remove the unused payroll history search component and add an employee-first index for personal monthly statements. Verified the new migration with 35 disposable PostgreSQL checks. On a synthetic history of 192,000 revisions, the employee query changed from 193 index searches and a sort to one ordered index scan. The older deduction tables remain as audit storage.

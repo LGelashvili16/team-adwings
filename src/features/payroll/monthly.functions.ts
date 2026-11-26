@@ -3,12 +3,14 @@ import { setResponseHeader } from '@tanstack/react-start/server'
 import { permissionsMiddleware } from '#/lib/auth/auth.middleware'
 import { enforcePolicy } from '#/lib/authorization/guards.server'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
+import { formatMonthlyPayrollCsv } from './monthly.rules'
 import {
   monthlySearchSchema,
   monthlyDetailSchema,
   monthlySaveSchema,
   monthlyAdjustmentsSaveSchema,
-  monthlyDecisionSchema,
+  paymentPreviewSchema,
+  publishPaymentsSchema,
   monthlyRemoveSchema,
 } from './monthly.schemas'
 import {
@@ -18,7 +20,8 @@ import {
   readMonthlyEmployees,
   saveMonthlyEmployee,
   saveMonthlyAdjustments,
-  decideMonthlyPayroll,
+  previewMonthlyPayments,
+  publishMonthlyPayments,
   removeMonthlyEmployee,
 } from './server/monthly.service.server'
 
@@ -49,6 +52,16 @@ export const getMonthlyPayroll = createServerFn({ method: 'GET' })
   .handler(({ context, data }) =>
     safely(() => readMonthlyPayroll(context.actor, data)),
   )
+export const getMonthlyPayrollCsv = createServerFn({ method: 'GET' })
+  .middleware([reader])
+  .validator(monthlySearchSchema.omit({ view: true }))
+  .handler(({ context, data }) =>
+    safely(async () =>
+      formatMonthlyPayrollCsv(
+        await readMonthlyPayroll(context.actor, data, true),
+      ),
+    ),
+  )
 export const getMonthlyEmployee = createServerFn({ method: 'GET' })
   .middleware([reader])
   .validator(monthlyDetailSchema)
@@ -73,11 +86,17 @@ export const setMonthlyAdjustments = createServerFn({ method: 'POST' })
   .handler(({ context, data }) =>
     safely(() => saveMonthlyAdjustments(context.actor, data)),
   )
-export const setMonthlyDecision = createServerFn({ method: 'POST' })
+export const getMonthlyPaymentPreview = createServerFn({ method: 'GET' })
   .middleware([writer])
-  .validator(monthlyDecisionSchema)
+  .validator(paymentPreviewSchema)
   .handler(({ context, data }) =>
-    safely(() => decideMonthlyPayroll(context.actor, data)),
+    safely(() => previewMonthlyPayments(context.actor, data)),
+  )
+export const setMonthlyPayments = createServerFn({ method: 'POST' })
+  .middleware([writer])
+  .validator(publishPaymentsSchema)
+  .handler(({ context, data }) =>
+    safely(() => publishMonthlyPayments(context.actor, data)),
   )
 export const deleteMonthlyEmployee = createServerFn({ method: 'POST' })
   .middleware([writer])

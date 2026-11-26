@@ -1,0 +1,1 @@
+ALTER TABLE "payroll_monthly_entry" ADD COLUMN "payment_dates" jsonb;

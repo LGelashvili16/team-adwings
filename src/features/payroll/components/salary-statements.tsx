@@ -26,6 +26,7 @@ import { formatGeorgianMonth } from '#/lib/date-format'
 import { formatSalary, salaryBasisLabels } from '../salary.presentation'
 import type { ReactNode } from 'react'
 import type { SalaryStatement } from '../salary.types'
+import { PaymentBreakdown } from './payment-breakdown'
 
 const components = [
   { key: 'baseMinor', label: 'საბაზო ხელფასი' },
@@ -93,6 +94,16 @@ const columns = column.columns([
     header: 'ჯამი',
     cell: ({ row }) => <StatementTotal statement={row.original} />,
   }),
+  column.display({
+    id: 'payments',
+    header: 'გადახდები',
+    cell: ({ row }) =>
+      row.original.payments?.length ? (
+        <PaymentBreakdown payments={row.original.payments} />
+      ) : (
+        <Badge variant="secondary">არქივი</Badge>
+      ),
+  }),
 ])
 const getRowId = (record: SalaryStatement) => record.month
 
@@ -118,13 +129,10 @@ export function SalaryStatements({
             <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent text-accent-foreground">
               <IconCalendarDollar className="size-5" aria-hidden="true" />
             </span>
-            <h2>თვის უწყისები</h2>
+            <h2>გაცემული ხელფასები</h2>
           </CardTitle>
           {filter}
         </div>
-        <p className="text-sm text-muted-foreground">
-          აქ ჩანს დასრულებული უწყისები. გადარიცხვის სტატუსი აქ არ აისახება.
-        </p>
       </CardHeader>
       <CardContent className="px-0">
         {loading ? (
@@ -148,7 +156,9 @@ export function SalaryStatements({
                     <time dateTime={record.month} className="font-semibold">
                       {formatGeorgianMonth(record.month)}
                     </time>
-                    <Badge variant="green">დასრულებული</Badge>
+                    {record.payments?.length ? null : (
+                      <Badge variant="secondary">არქივი</Badge>
+                    )}
                   </div>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-3">
                     {components.map(({ key, label }) => (
@@ -168,13 +178,16 @@ export function SalaryStatements({
                       </dd>
                     </div>
                   </dl>
+                  {record.payments?.length ? (
+                    <PaymentBreakdown payments={record.payments} />
+                  ) : null}
                 </li>
               ))}
             </ul>
             <div className="hidden md:block">
               <Table>
                 <TableCaption className="sr-only">
-                  დასრულებული სახელფასო უწყისები
+                  სახელფასო გადახდების ისტორია
                 </TableCaption>
                 <TableHeader className="border-t bg-muted/35">
                   {table.getHeaderGroups().map((group) => (
@@ -216,8 +229,8 @@ export function SalaryStatements({
               </EmptyMedia>
               <EmptyTitle>
                 {filtered
-                  ? 'ამ თვეში დასრულებული უწყისი არ არის'
-                  : 'დასრულებული უწყისები ჯერ არ არის'}
+                  ? 'ამ თვეში გაცემული თანხები არ არის'
+                  : 'გაცემული თანხები ჯერ არ არის'}
               </EmptyTitle>
             </EmptyHeader>
           </Empty>

@@ -24,6 +24,7 @@ import {
   job,
   jobEvent,
   jobRead,
+  jobGeofenceSetting,
   jobEmployee,
   user,
 } from '#/db/schema'
@@ -31,14 +32,48 @@ import {
   readAssignments,
   employeeAssignmentCounts,
 } from './job-assignments.repository.server'
-import { jobsMapLimit, jobsPageSize } from '../jobs.schemas'
+import {
+  defaultJobGeofenceDiameter,
+  jobsMapLimit,
+  jobsPageSize,
+} from '../jobs.schemas'
 import { hasJobCoordinates } from '../jobs.rules'
-import type { JobSearch } from '../jobs.types'
+import type { JobGeofenceDiameter, JobSearch } from '../jobs.types'
 
 export type JobsTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0]
 export const transactJobs = db.transaction.bind(db)
+export async function readGeofenceSetting(tx: JobsTransaction) {
+  const current = (
+    await tx
+      .select({
+        version: jobGeofenceSetting.version,
+        diameter: jobGeofenceSetting.diameter,
+      })
+      .from(jobGeofenceSetting)
+      .orderBy(desc(jobGeofenceSetting.version))
+      .limit(1)
+  ).at(0)
+  return current ?? { version: 0, diameter: defaultJobGeofenceDiameter }
+}
+
+export async function saveGeofenceSetting(
+  tx: JobsTransaction,
+  actorId: string,
+  diameter: JobGeofenceDiameter,
+) {
+  // Serialize revisions, including the first save, and keep retries idempotent.
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('team-adwings-job-geofence-settings'))`,
+  )
+  const current = await readGeofenceSetting(tx)
+  if (current.diameter === diameter) return { setting: current, changed: false }
+  const setting = { diameter, version: current.version + 1 }
+  await tx.insert(jobGeofenceSetting).values({ ...setting, actorId })
+  return { setting, changed: true }
+}
+
 function unreadJob(actorId: string) {
   return sql<boolean>`${job.tracksReads} and not exists (select 1 from ${jobRead} where ${jobRead.userId} = ${actorId} and ${jobRead.jobId} = ${job.id})`
 }

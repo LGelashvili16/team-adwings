@@ -31,7 +31,7 @@ import {
   jobStatuses,
 } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
-import { jobGeofenceDiameter } from '../jobs.geofence'
+import { defaultJobGeofenceDiameter } from '../jobs.schemas'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
 import { JobOverdueBadge } from './job-overdue-badge'
@@ -172,7 +172,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
               </dt>
               <dd className="pl-7">
                 {located
-                  ? `დიამეტრი ${jobGeofenceDiameter} მ`
+                  ? `დიამეტრი ${job.geofenceDiameter ?? defaultJobGeofenceDiameter} მ`
                   : 'რუკაზე მდებარეობა არ არის მითითებული'}
               </dd>
             </div>

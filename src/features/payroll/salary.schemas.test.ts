@@ -9,7 +9,6 @@ import {
 
 const form = {
   kind: 'monthly',
-  amountBasis: 'gross',
   amount: '2500.29',
   effectiveFrom: '2026-11-25',
 }
@@ -35,13 +34,13 @@ it('validates boundary payloads, dates and unique bulk target revisions', () => 
     targets: [{ userId: 'worker', expectedVersion: 0 }],
     effectiveFrom: form.effectiveFrom,
     amountMinor: 250029,
-    amountBasis: form.amountBasis,
     kind: form.kind,
     currency: 'GEL',
   }
   expect(salarySaveSchema.safeParse(input).success).toBe(true)
   for (const override of [
     { actorId: 'admin' },
+    { amountBasis: 'gross' },
     { amountMinor: 2.5 },
     { amountMinor: 0 },
     { currency: 'USD' },

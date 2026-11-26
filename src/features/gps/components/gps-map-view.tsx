@@ -70,10 +70,12 @@ function Skeletons() {
 
 export function GpsMapView({
   actorId,
+  canManage,
   q,
   onEdit,
 }: {
   actorId: string
+  canManage: boolean
   q: string
   onEdit?: (device: GpsMapDevice) => void
 }) {
@@ -176,7 +178,7 @@ export function GpsMapView({
           </div>
         </aside>
       </div>
-      <GpsMapLegend />
+      <GpsMapLegend actorId={actorId} canManage={canManage} />
     </div>
   )
 }

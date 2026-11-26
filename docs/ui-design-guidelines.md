@@ -92,7 +92,7 @@ The jobs map starts with flat buildings. Its separate 3D buildings control expos
 
 Map cartography has its own reference palette, maintained in `src/components/ui/map-styles.ts`. Dark maps use the approved slate terrain (`#314256`), deep blue water (`#1c347a`), teal parks (`#00615e`), and muted gray road/building hierarchy with colored place labels. Apply the palette to geographic layers rather than tinting the canvas with a CSS filter. Map controls, search, dialogs, job markers and statuses continue to use the existing application tokens. Light map colors remain provider-owned.
 
-Every mapped job gets a 200 m translucent violet ring. Draw the rings above building footprints and 3D buildings, keeping the top map labels and pins clear. The map tools include a geofence toggle, on by default, that preserves camera position and carries over to fullscreen. When enabled, frame the selected ring and use a stronger outlined edge. Respect reduced-motion preferences. Show the diameter in the job information card and include the ring in the map legend.
+Every mapped job gets a translucent violet ring at the company diameter, which defaults to 200 m. The GPS Devices map legend shows the shared diameter. GPS managers edit it in a single labeled meter input with inline validation and save explicitly. Draw the rings above building footprints and 3D buildings, keeping the top map labels and pins clear. The map tools include a geofence toggle, on by default, that preserves camera position and carries over to fullscreen. When enabled, frame the selected ring and use a stronger outlined edge. Respect reduced-motion preferences. Show the diameter in the job information card and include the ring in the jobs map legend.
 
 ## Shared components are the default
 
@@ -301,6 +301,14 @@ When the user changes a shared UI standard, update this file instead of creating
 ## Payroll configuration
 
 Payroll tabs use compensation-specific Tabler icons and place settings last. Use the shared shadcn Calendar to choose a whole payroll month. Payroll filters use the compact, rounded Jobs toolbar styling and wrap within the available width. Give payroll alerts an icon that matches their severity. Show the month status in the toolbar after finalization. Use one tab and one entry sheet for bonuses, premiums and fines.
+
+Use an 8px gap between the payroll filters and table results.
+
+The monthly payroll table and its CSV use `ხელფასი(თვე)`, `ხელფასი(1/2)` and `ხელფასი(2/2)` for the selected view. The sheet edits the full earning month from every view and labels the monthly amount and the first-installment override with the corresponding names. Prefill the applicable fixed amount when the salary needs confirmation and explain why it needs review before saving. Keep paginated change history in a closed-by-default shadcn Accordion.
+
+Use the semantic red text token for nonzero fines in the management payroll tables. Keep zero fines neutral. Tint the employee salary directory’s `განსასაზღვრი ხელფასი` summary card when its count is above zero.
+
+Use the compact `თვე`, `1/2` and `2/2` tabs for split payroll periods. Select the current half of the company-local month by default and keep explicit tab choices in the URL. Keep the desktop toolbar on one row with a usable minimum width for search and place CSV export at the far right. Allow scrolling within the toolbar when the available width is smaller. On mobile, group employee search, the month picker and sorting in the collapsed `ფილტრები` Accordion, using the Jobs filter style. Show the selected month on the trigger. Give the salary payment action, period tab strip and CSV export button the full available width on mobile.
 
 The management salary detail uses the full available content width. Give the current agreement more emphasis than the scheduled change. Show salary history as a table on wider screens and as stacked entries on narrow screens so dates, amounts and audit details remain readable.
 

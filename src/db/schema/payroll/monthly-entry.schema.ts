@@ -14,8 +14,12 @@ import {
 import { createdAt, uuidv7PrimaryKey } from '../_shared/columns'
 import { employee } from '../employees/employee.schema'
 import { user } from '../auth/auth.schema'
-import type { MonthlyAdjustment } from '#/features/payroll/monthly.schemas'
+import type {
+  MonthlyAdjustment,
+  MonthlyPaymentDates,
+} from '#/features/payroll/monthly.schemas'
 import type { SalaryTerm } from '#/features/payroll/salary.types'
+import type { FineStage } from '#/features/payroll/payroll-settings.schemas'
 
 /** One immutable revision of an employee's monthly payroll. Latest revision wins; month decisions append every affected row atomically. No payment or tax posting is represented. */
 export const payrollMonthlyEntry = pgTable(
@@ -45,6 +49,9 @@ export const payrollMonthlyEntry = pgTable(
     baseReason: text('base_reason').notNull(),
     /** Exact base earnings in tetri, separate from fines and statutory withholdings. */
     baseMinor: integer('base_minor').notNull(),
+    firstPaymentMinor: integer('first_payment_minor'),
+    fineStage: text('fine_stage').$type<FineStage>(),
+    paymentDates: jsonb('payment_dates').$type<MonthlyPaymentDates>(),
     /** Up to twenty simple amount/reason lines, validated at the server boundary. */
     adjustments: jsonb('adjustments').$type<MonthlyAdjustment[]>().notNull(),
     /** Exact bonus subtotal in tetri. */
@@ -95,6 +102,10 @@ export const payrollMonthlyEntry = pgTable(
     check(
       'payroll_monthly_entry_time',
       sql`${t.workedSeconds} between 0 and 2678400`,
+    ),
+    check(
+      'payroll_monthly_entry_payment_options',
+      sql`(${t.firstPaymentMinor} is null or ${t.firstPaymentMinor} between 0 and ${t.baseMinor}) and (${t.fineStage} is null or ${t.fineStage} in ('salary','adjustments'))`,
     ),
     check(
       'payroll_monthly_entry_salary_snapshot',

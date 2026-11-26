@@ -35,7 +35,6 @@ const input = (extra = {}) => ({
   targets: [{ userId: 'salary-worker', expectedVersion: 0 }],
   effectiveFrom: '2026-01-01',
   kind: 'monthly',
-  amountBasis: 'gross',
   amountMinor: 250050,
   currency: 'GEL',
   reason: 'დადასტურებული ხელშეკრულება',
@@ -103,7 +102,7 @@ describe.runIf(process.env.RUN_SALARY_DB_TESTS === '1')(
       vi.setSystemTime(new Date('2026-11-25T12:00:00+04:00'))
     }, 30000)
     beforeEach(async () => {
-      await sql().query('truncate employee_salary_term, payroll_policy')
+      await sql().query('truncate employee_salary_term')
       await sql().query("update employee set status='active'")
       await sql().query(
         `update "user" set access_state='active',permission_overrides='{"allow":[],"deny":[]}',roles=case when id='salary-admin' then 'admin' when id='salary-accountant' then 'accountant' when id='salary-hr_manager' then 'hr_manager' else 'employee' end`,
@@ -132,17 +131,12 @@ describe.runIf(process.env.RUN_SALARY_DB_TESTS === '1')(
         counts: { monthly: 0, hourly: 0, unconfigured: 5 },
       })
     })
-    it('uses the currently applicable company agreement default without rewriting existing terms', async () => {
-      await sql().query(
-        `insert into payroll_policy (version,effective_from,amount_basis,day_basis,income_tax_enabled,income_tax_basis_points,pension_enabled,employee_pension_basis_points,employer_pension_basis_points,actor_id,reason) values (1,'2026-01-01','net','scheduled_workdays',false,2000,false,200,200,$1,'დადასტურებული წესი'), (2,'2026-12-01','gross','scheduled_workdays',false,2000,false,200,200,$1,'მომავალი შეთანხმება')`,
-        [actor.id],
-      )
-      expect((await read()).defaultAmountBasis).toBe('net')
-      expect(
-        (await service.readSalaryDirectory(actor, {})).defaultAmountBasis,
-      ).toBe('net')
+    it('requires take-home amounts for new salary agreements', async () => {
+      await expect(
+        service.saveSalaryTerms(actor, input({ amountBasis: 'gross' })),
+      ).rejects.toThrow()
       await service.saveSalaryTerms(actor, input())
-      expect((await read()).employee.current?.amountBasis).toBe('gross')
+      expect((await read()).employee.current?.amountBasis).toBe('net')
     })
     it('retains exact money, historical changes and trusted audit while protecting employee privacy', async () => {
       await service.saveSalaryTerms(actor, input())

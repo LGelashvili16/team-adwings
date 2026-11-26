@@ -70,7 +70,6 @@ it('saves exact bulk terms without a change reason on the first valid click', as
       ],
       effectiveFrom: '2026-11-25',
       kind: 'monthly',
-      amountBasis: 'gross',
       currency: 'GEL',
       amountMinor: 240029,
     },

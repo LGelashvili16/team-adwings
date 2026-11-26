@@ -9,10 +9,7 @@ import {
   salarySelfReadSchema,
   salarySaveSchema,
 } from '../salary.schemas'
-import {
-  currentAccount,
-  effectivePolicy,
-} from './payroll-settings.repository.server'
+import { currentAccount } from './payroll-settings.repository.server'
 import * as repository from './salary.repository.server'
 import { employeeStatements } from './monthly.repository.server'
 import type { PayrollTransaction } from './payroll-settings.repository.server'
@@ -61,8 +58,6 @@ async function detail(
   const rows = await repository.history(tx, target.id, page, audit)
   const total = await repository.totalHistory(tx, target.id)
   return {
-    defaultAmountBasis:
-      (await effectivePolicy(tx, workday.date))?.amountBasis ?? 'gross',
     employee: {
       userId: target.userId,
       name: target.name,
@@ -138,8 +133,6 @@ export async function readSalaryDirectory(
       const workday = await getCompanyWorkday(new Date(), tx)
       return {
         ...(await repository.directory(tx, data, workday.date)),
-        defaultAmountBasis:
-          (await effectivePolicy(tx, workday.date))?.amountBasis ?? 'gross',
       }
     },
     { isolationLevel: 'repeatable read' },
@@ -157,7 +150,7 @@ export async function saveSalaryTerms(actor: Actor | null, input: unknown) {
     for (const target of [...data.targets].sort((a, b) =>
       a.userId.localeCompare(b.userId),
     )) {
-      const person = await repository.person(tx, target.userId, true)
+      const person = await repository.person(tx, target.userId, 'update')
       if (!person)
         throw new SalaryError(
           'ერთ-ერთი თანამშრომელი ვერ მოიძებნა. განაახლეთ სია.',
@@ -174,7 +167,7 @@ export async function saveSalaryTerms(actor: Actor | null, input: unknown) {
         effectiveFrom: data.effectiveFrom,
         kind: data.kind,
         amountMinor: data.amountMinor,
-        amountBasis: data.amountBasis,
+        amountBasis: 'net',
         currency: data.currency,
         reason: data.reason ?? 'ხელფასის შეთანხმება შენახულია.',
       })

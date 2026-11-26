@@ -4,6 +4,7 @@ import {
 } from '#/features/notifications/server/notifications.service.server'
 import { readJobNotificationRoles } from '#/features/notifications/server/notification-settings.service.server'
 import { signalRealtime } from '#/lib/realtime/postgres-events.server'
+import { assertPermissions } from '#/lib/authorization/access'
 import '@tanstack/react-start/server-only'
 import {
   createJobSchema,
@@ -14,6 +15,7 @@ import {
   jobAssignmentsSchema,
   jobAssignmentSearchSchema,
   jobAssignmentTeamSchema,
+  jobGeofenceSettingsSchema,
 } from '../jobs.schemas'
 import {
   hasJobCoordinates,
@@ -183,6 +185,7 @@ export async function listCompanyJobs(
       const result = await repository.listJobs(tx, current.id, search)
       return {
         ...result,
+        geofenceDiameter: (await repository.readGeofenceSetting(tx)).diameter,
         markers: result.markers.map((marker) => ({
           ...marker,
           createdAt: marker.createdAt.toISOString(),
@@ -209,6 +212,7 @@ export async function getCompanyJob(
       if (!record) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
       return {
         ...record,
+        geofenceDiameter: (await repository.readGeofenceSetting(tx)).diameter,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         locationResolvedAt: record.locationResolvedAt?.toISOString() ?? null,
@@ -224,6 +228,33 @@ export async function getCompanyJob(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
+}
+export async function getCompanyJobGeofenceSettings(actor: Actor | null) {
+  return repository.transactJobs(
+    async (tx) => {
+      await requireJobActor(tx, actor)
+      return repository.readGeofenceSetting(tx)
+    },
+    { accessMode: 'read only' },
+  )
+}
+
+export async function saveCompanyJobGeofenceSettings(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { diameter } = validateInput(jobGeofenceSettingsSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    assertPermissions(current, ['manage.access', 'gps.read', 'gps.manage'])
+    const { setting, changed } = await repository.saveGeofenceSetting(
+      tx,
+      current.id,
+      diameter,
+    )
+    if (changed) await signalRealtime(tx, { topic: 'jobs' })
+    return setting
+  })
 }
 export async function getUnreadCompanyJobs(actor: Actor | null) {
   return repository.transactJobs(

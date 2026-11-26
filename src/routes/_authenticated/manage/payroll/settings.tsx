@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_authenticated/manage/payroll/settings')(
     head: () =>
       pageHead(
         'ხელფასების პარამეტრები',
-        'ანაზღაურების, საშემოსავლო გადასახადისა და საპენსიო შენატანების წესები.',
+        'ხელფასის, ბონუსებისა და პრემიების გაცემის გრაფიკი.',
       ),
     component: PayrollSettingsPage,
   },

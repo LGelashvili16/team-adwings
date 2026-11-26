@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { setResponseHeader } from '@tanstack/react-start/server'
-import { authenticatedMiddleware } from '#/lib/auth/auth.middleware'
+import {
+  authenticatedMiddleware,
+  permissionsMiddleware,
+} from '#/lib/auth/auth.middleware'
 import { enforcePolicy } from '#/lib/authorization/guards.server'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import {
@@ -13,6 +16,7 @@ import {
   jobAssignmentsSchema,
   jobAssignmentSearchSchema,
   jobAssignmentTeamSchema,
+  jobGeofenceSettingsSchema,
 } from './jobs.schemas'
 import { JobConflictError, JobWorkflowError } from './jobs.rules'
 import { locationSearchSchema } from './job-locations.schemas'
@@ -31,6 +35,8 @@ import {
   saveCompanyJobAssignments,
   listJobAssignmentCandidates,
   getJobAssignmentTeam,
+  getCompanyJobGeofenceSettings,
+  saveCompanyJobGeofenceSettings,
 } from './server/jobs.service.server'
 
 async function safely<T>(action: () => Promise<T>) {
@@ -57,6 +63,20 @@ export const readJobs = createServerFn({ method: 'GET' })
   .validator(jobSearchSchema)
   .handler(({ context, data }) =>
     safely(() => listCompanyJobs(context.actor, data)),
+  )
+export const readJobGeofenceSettings = createServerFn({ method: 'GET' })
+  .middleware([authenticatedMiddleware])
+  .handler(({ context }) =>
+    safely(() => getCompanyJobGeofenceSettings(context.actor)),
+  )
+
+export const updateJobGeofenceSettings = createServerFn({ method: 'POST' })
+  .middleware([
+    permissionsMiddleware('manage.access', 'gps.read', 'gps.manage'),
+  ])
+  .validator(jobGeofenceSettingsSchema)
+  .handler(({ context, data }) =>
+    safely(() => saveCompanyJobGeofenceSettings(context.actor, data)),
   )
 export const readJobAssignmentCandidates = createServerFn({ method: 'GET' })
   .middleware([authenticatedMiddleware])

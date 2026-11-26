@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import JobsMap from './jobs-map'
+import { jobGeofenceRing } from '../jobs.geofence'
 import type { ReactNode } from 'react'
 
 vi.mock('#/db', async () => ({
@@ -250,6 +251,22 @@ it('frames default geofences and can hide or show them without changing the came
     'place-label',
     'place-label',
   ])
+  const resizedSource = { setData: vi.fn() }
+  map.getSource.mockReturnValueOnce(resizedSource)
+  view.rerender(<JobsMap {...props} geofenceDiameter={100} />)
+  expect(resizedSource.setData).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      features: expect.arrayContaining([
+        expect.objectContaining({
+          geometry: {
+            type: 'Polygon',
+            coordinates: [jobGeofenceRing(first, 100)],
+          },
+        }),
+      ]),
+    }),
+  )
+  expect(map.fitBounds).toHaveBeenCalledTimes(1)
   await userEvent.click(
     screen.getByRole('button', { name: 'რუკის ხელსაწყოების ჩვენება' }),
   )

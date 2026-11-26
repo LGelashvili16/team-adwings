@@ -48,6 +48,7 @@ export function GpsPage({
       <GpsDeviceSearch search={search} onSearch={onSearch} />
       <GpsMapView
         actorId={actorId}
+        canManage={canManage}
         q={search.q}
         onEdit={canManage ? edit : undefined}
       />

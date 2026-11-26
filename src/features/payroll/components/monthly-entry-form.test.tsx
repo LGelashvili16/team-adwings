@@ -145,28 +145,29 @@ it('keeps failed drafts and their source revision after a background refresh', a
   })
   expect(result.saved).not.toHaveBeenCalled()
 })
-it('requires an explicit base amount for partial months without a reason field', async () => {
+it('prefills the editable fixed base for a partial month and requires an amount on save', async () => {
   const user = userEvent.setup()
   mount({
     ...source,
     requiresBaseConfirmation: true,
-    salary: { ...source.salary, kind: 'monthly' },
+    salary: { ...source.salary, kind: 'monthly', amountMinor: 300000 },
   })
   expect(
-    screen.getByRole('switch', { name: 'საბაზო თანხის ცალკე დადასტურება' }),
+    screen.getByRole('switch', { name: 'თვის ხელფასის დადასტურება' }),
   ).toBeChecked()
   expect(
-    screen.getByRole('switch', { name: 'საბაზო თანხის ცალკე დადასტურება' }),
+    screen.getByRole('switch', { name: 'თვის ხელფასის დადასტურება' }),
   ).toHaveAttribute('aria-disabled', 'true')
+  const base = screen.getByRole('textbox', { name: 'ხელფასი(თვე) ლარში' })
+  expect(base).toHaveValue('3000.00')
+  expect(setMonthlyEmployee).not.toHaveBeenCalled()
+  await user.clear(base)
   await user.click(screen.getByRole('button', { name: 'ჩანაწერის შენახვა' }))
   expect(setMonthlyEmployee).not.toHaveBeenCalled()
   expect(
-    screen.queryByRole('textbox', { name: /^საბაზო თანხის საფუძველი/ }),
+    screen.queryByRole('textbox', { name: /^თვის ხელფასის საფუძველი/ }),
   ).not.toBeInTheDocument()
-  await user.type(
-    screen.getByRole('textbox', { name: /^საბაზო თანხა ლარში/ }),
-    '500',
-  )
+  await user.type(base, '500')
   await user.click(screen.getByRole('button', { name: 'ჩანაწერის შენახვა' }))
   await waitFor(() => expect(setMonthlyEmployee).toHaveBeenCalledOnce())
   expect(setMonthlyEmployee).toHaveBeenCalledWith({

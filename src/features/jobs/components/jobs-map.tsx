@@ -19,9 +19,14 @@ import { JobsMapMenu, MapContextLocation } from './jobs-map-menu'
 import { JobMarker as JobMapMarker } from './job-marker'
 import { jobIndicators, jobMarkerPriority } from '../jobs.indicators'
 import { jobGeofenceRing } from '../jobs.geofence'
+import { defaultJobGeofenceDiameter } from '../jobs.schemas'
 import { JobsGeofenceLayer } from './jobs-geofence-layer'
 import type { Actor } from '#/lib/authorization/actor'
-import type { JobMapPosition, JobMarker } from '../jobs.types'
+import type {
+  JobGeofenceDiameter,
+  JobMapPosition,
+  JobMarker,
+} from '../jobs.types'
 import type { ReactNode, RefObject } from 'react'
 import type { MapCamera } from '#/components/ui/map'
 import type { ResolvedLocation } from '../job-locations.types'
@@ -43,6 +48,7 @@ function MapFocus({
   actor,
   controls,
   showGeofences,
+  geofenceDiameter,
   expanded,
   onExpand,
 }: {
@@ -58,6 +64,7 @@ function MapFocus({
   actor: Actor
   controls?: ReactNode
   showGeofences: boolean
+  geofenceDiameter: JobGeofenceDiameter
   expanded: boolean
   onExpand: () => void
 }) {
@@ -144,7 +151,8 @@ function MapFocus({
       : 500
     if (fitGeofence) {
       const bounds = new library.LngLatBounds()
-      for (const point of jobGeofenceRing(target)) bounds.extend(point)
+      for (const point of jobGeofenceRing(target, geofenceDiameter))
+        bounds.extend(point)
       map.fitBounds(bounds, {
         padding: geofenceFocusPadding,
         maxZoom: 17,
@@ -171,6 +179,7 @@ function MapFocus({
     focusRequest,
     initialPin,
     showGeofences,
+    geofenceDiameter,
   ])
   const visiblePins = useMemo(() => {
     if (!selected) return pins
@@ -192,6 +201,7 @@ function MapFocus({
         pins={visiblePins}
         selectedId={selected?.id}
         visible={showGeofences}
+        diameter={geofenceDiameter}
       />
       {location ? (
         <MapMarker longitude={location.longitude} latitude={location.latitude}>
@@ -314,6 +324,7 @@ export default function JobsMap({
   showBuildings,
   onBuildingsChange,
   showGeofences = true,
+  geofenceDiameter = defaultJobGeofenceDiameter,
   onGeofencesChange,
   showCompleted = true,
   onCompletedChange,
@@ -340,6 +351,7 @@ export default function JobsMap({
   showBuildings: boolean
   onBuildingsChange: (show: boolean) => void
   showGeofences?: boolean
+  geofenceDiameter?: JobGeofenceDiameter
   onGeofencesChange?: (show: boolean) => void
   showCompleted?: boolean
   onCompletedChange?: (show: boolean) => void
@@ -370,6 +382,7 @@ export default function JobsMap({
         expanded={expanded}
         onExpand={onExpand}
         showGeofences={showGeofences}
+        geofenceDiameter={geofenceDiameter}
         controls={
           <>
             <Button

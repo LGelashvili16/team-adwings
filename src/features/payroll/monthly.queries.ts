@@ -9,6 +9,14 @@ export const monthlyPayrollQuery = (actorId: string, search: MonthlySearch) =>
     queryKey: [...monthlyKey(actorId), 'directory', search],
     queryFn: () => getMonthlyPayroll({ data: search }),
     staleTime: 0,
+    refetchInterval: ({ state }) => {
+      const boundary = state.data?.ok
+        ? state.data.value.nextPeriodChangeAt
+        : null
+      return boundary && state.status !== 'error'
+        ? Math.max(1000, boundary - Date.now())
+        : false
+    },
     retry: false,
   })
 export const monthlyEmployeeQuery = (

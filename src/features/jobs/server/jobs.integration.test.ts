@@ -1012,6 +1012,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     )
   }, 30_000)
   beforeEach(async () => {
+    await sql().query('TRUNCATE job_geofence_setting')
     await sql().query('TRUNCATE job_employee, job_read, job_event, job')
     await sql().query(
       'TRUNCATE notification, notification_policy, notification_policy_audit',
@@ -1448,6 +1449,44 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
         requestId: randomUUID(),
       }),
     ).rejects.toThrow('მოთხოვნა არასწორია')
+  })
+  it('audits shared geofence settings and applies them to map and detail reads', async () => {
+    const { id } = await createPin()
+    expect(await service.getCompanyJobGeofenceSettings(worker)).toEqual({
+      diameter: 200,
+      version: 0,
+    })
+    await expect(service.getCompanyJobGeofenceSettings(null)).rejects.toThrow()
+    await expect(
+      service.saveCompanyJobGeofenceSettings(worker, { diameter: 100 }),
+    ).rejects.toThrow('წვდომა')
+    await expect(
+      service.saveCompanyJobGeofenceSettings(platformAdmin, {
+        diameter: 32768,
+      }),
+    ).rejects.toThrow('მოთხოვნა არასწორია')
+    const setting = { diameter: 350, version: 1 }
+    expect(
+      await Promise.all([
+        service.saveCompanyJobGeofenceSettings(platformAdmin, {
+          diameter: 350,
+        }),
+        service.saveCompanyJobGeofenceSettings(platformAdmin, {
+          diameter: 350,
+        }),
+      ]),
+    ).toEqual([setting, setting])
+    expect(
+      (await service.listCompanyJobs(worker, search)).geofenceDiameter,
+    ).toBe(350)
+    expect((await detail(id)).geofenceDiameter).toBe(350)
+    expect(
+      (
+        await sql().query(
+          'SELECT version, diameter, actor_id FROM job_geofence_setting',
+        )
+      ).rows,
+    ).toEqual([{ ...setting, actor_id: platformAdmin.id }])
   })
   it('keeps legacy diameters on edit and clears them when removing the mapped location', async () => {
     const { id } = await createPin()

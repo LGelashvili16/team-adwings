@@ -22,6 +22,7 @@ import type { ReactNode } from 'react'
 import type { MapCamera } from '#/components/ui/map'
 import type {
   JobDetail,
+  JobGeofenceDiameter,
   JobMarker,
   JobSearch,
   JobMapPosition,
@@ -44,6 +45,7 @@ export function JobsMapPanel({
   search,
   pins,
   pinsReady,
+  geofenceDiameter,
   selected,
   canCreate,
   location,
@@ -60,6 +62,7 @@ export function JobsMapPanel({
   search: JobSearch
   pins: Array<JobMarker>
   pinsReady: boolean
+  geofenceDiameter?: JobGeofenceDiameter
   selected?: JobDetail
   canCreate: boolean
   location: ResolvedLocation | null
@@ -143,6 +146,7 @@ export function JobsMapPanel({
               onGeofencesChange={setShowGeofences}
               pins={pins}
               pinsReady={pinsReady}
+              geofenceDiameter={geofenceDiameter}
               initialPin={initialPin.current}
               selected={
                 selected && hasJobCoordinates(selected) ? selected : undefined

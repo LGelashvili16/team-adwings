@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useMap } from '#/components/ui/map'
 import { jobGeofenceColor, jobGeofenceRing } from '../jobs.geofence'
-import type { JobMarker } from '../jobs.types'
+import type { JobGeofenceDiameter, JobMarker } from '../jobs.types'
 import type { FeatureCollection, Polygon } from 'geojson'
 import type { GeoJSONSource } from 'maplibre-gl'
 
@@ -14,10 +14,12 @@ export function JobsGeofenceLayer({
   pins,
   selectedId,
   visible,
+  diameter,
 }: {
   pins: Array<JobMarker>
   selectedId?: string
   visible: boolean
+  diameter: JobGeofenceDiameter
 }) {
   const { map, loaded } = useMap()
   const data = useMemo<FeatureCollection<Polygon>>(
@@ -27,11 +29,14 @@ export function JobsGeofenceLayer({
         ? pins.map((pin) => ({
             type: 'Feature',
             properties: { selected: pin.id === selectedId },
-            geometry: { type: 'Polygon', coordinates: [jobGeofenceRing(pin)] },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [jobGeofenceRing(pin, diameter)],
+            },
           }))
         : [],
     }),
-    [pins, selectedId, visible],
+    [pins, selectedId, visible, diameter],
   )
 
   useEffect(() => {
