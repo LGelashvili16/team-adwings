@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   IconArrowRight,
   IconBell,
+  IconBellRinging,
   IconChecks,
   IconInbox,
   IconTrash,
@@ -48,7 +49,11 @@ export function NotificationsPopover({ actorId }: { actorId: string }) {
           unseenCount > 0 ? 'შეტყობინებები, ახალი შეტყობინება' : 'შეტყობინებები'
         }
       >
-        <IconBell aria-hidden="true" />
+        {unseenCount > 0 ? (
+          <IconBellRinging aria-hidden="true" />
+        ) : (
+          <IconBell aria-hidden="true" />
+        )}
         {unseenCount > 0 ? (
           <span
             aria-hidden="true"

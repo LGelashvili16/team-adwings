@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 96. Last updated: 2026-11-26.
+Status: required project instructions. Version: 97. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -81,6 +81,7 @@ Place the page title outside and above a route-aware tabs wrapper when that wrap
 - Use `@tabler/icons-react`. Let shared controls determine icon size and follow their `data-icon` convention. Match stroke weight and scale in comparable contexts.
 - Hide decorative icons from assistive technology. Icon-only actions need concise Georgian accessible names and tooltips where their meaning is not obvious.
 - An unread dot is a status indicator, not a numeric badge. Preserve its accessible unread meaning. Notification row dots sit beside the corresponding bell icon, as established in the notification UI.
+- Bells accompanied by a red unread dot use the outline `IconBellRinging` in the sidebar, popup trigger and notification rows. Preserve the existing red dots, accessible unread labels and read-state icons.
 
 The personal schedule uses a sky-blue daylight-to-night palette. Its today panel has soft sunlight over a blue sky at the top, fading into twilight and a dark blue star-lit bottom. Keep atmospheric layers static, decorative, behind the text, and scoped through the schedule styles in `src/styles.css`. Use dark start-time text and light end-time text, stacked on mobile. Weekday work blocks follow the same light-to-dark direction, with a brighter sky treatment for today and quiet cool accents for days off. These calendar colors describe the schedule, not attendance completion or approval. Preserve explicit today/day-off labels and readable contrast in both themes.
 

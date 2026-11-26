@@ -27,6 +27,7 @@ export function EmployeeAccountsTable({
       <TableHeader>
         <TableRow>
           <TableHead className="pl-5">თანამშრომელი</TableHead>
+          <TableHead>თანამდებობა</TableHead>
           <TableHead className="hidden md:table-cell">როლები</TableHead>
           <TableHead>სტატუსი</TableHead>
           <TableHead className="w-12 pr-5">
@@ -70,6 +71,9 @@ export function EmployeeAccountsTable({
                     </span>
                   </div>
                 </div>
+              </TableCell>
+              <TableCell className="max-w-64 whitespace-normal wrap-anywhere text-muted-foreground">
+                {record.jobTitle || 'არ არის მითითებული'}
               </TableCell>
               <TableCell className="hidden text-muted-foreground md:table-cell">
                 {parseRoles(record.roles)

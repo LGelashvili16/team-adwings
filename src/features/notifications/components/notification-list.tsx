@@ -1,5 +1,5 @@
 import {
-  IconBell,
+  IconBellRinging,
   IconBellCheck,
   IconCheck,
   IconClock,
@@ -99,7 +99,7 @@ export function NotificationList({
               )}
             >
               {unseen ? (
-                <IconBell className="size-4" />
+                <IconBellRinging className="size-4" />
               ) : (
                 <IconBellCheck className="size-4" />
               )}

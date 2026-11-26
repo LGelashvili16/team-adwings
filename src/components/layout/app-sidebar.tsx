@@ -1,6 +1,10 @@
 import { APP_NAME } from '#/lib/app'
 import { Link, useLocation } from '@tanstack/react-router'
-import { IconChevronRight, IconSettings } from '@tabler/icons-react'
+import {
+  IconBellRinging,
+  IconChevronRight,
+  IconSettings,
+} from '@tabler/icons-react'
 import {
   Accordion,
   AccordionItem,
@@ -157,7 +161,12 @@ export function AppSidebar({
                             isActive: isNavigationItemActive(pathname, item.to),
                           })}
                     >
-                      <item.icon aria-hidden="true" />
+                      {item.to === '/notifications' &&
+                      hasUnreadNotifications ? (
+                        <IconBellRinging aria-hidden="true" />
+                      ) : (
+                        <item.icon aria-hidden="true" />
+                      )}
                       <span>{item.label}</span>
                       {item.to === '/jobs' && hasUnreadJobs ? (
                         <>
