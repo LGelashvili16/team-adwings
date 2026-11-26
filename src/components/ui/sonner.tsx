@@ -27,10 +27,8 @@ export function Toaster() {
     <Sonner
       position="top-right"
       richColors
-      closeButton
       style={toasterStyle}
       containerAriaLabel="შეტყობინებები"
-      toastOptions={{ closeButtonAriaLabel: 'შეტყობინების დახურვა' }}
     />
   )
 }

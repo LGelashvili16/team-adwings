@@ -1,8 +1,19 @@
 import { useState } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { IconAlertCircle, IconCalendar, IconWallet } from '@tabler/icons-react'
+import {
+  IconAlertCircle,
+  IconAlertTriangle,
+  IconCalendar,
+  IconWallet,
+} from '@tabler/icons-react'
 import { toast } from 'sonner'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '#/components/ui/accordion'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import {
@@ -107,11 +118,11 @@ export function MonthlyPaymentDialog({
     >
       <DialogContent
         showCloseButton={!mutation.isPending}
-        className="max-h-[calc(100dvh-2rem)] min-w-0 sm:max-w-lg"
+        className="max-h-[calc(100dvh-2rem)] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-lg"
       >
         <DialogHeader>
-          <DialogTitle>ხელფასის გაცემა</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="pr-8 text-lg">ხელფასის გაცემა</DialogTitle>
+          <DialogDescription className="leading-relaxed">
             {formatGeorgianMonth(month)}. დაადასტურეთ უკვე გადახდილი თანხები.
             ჩანაწერები თანამშრომლებს გამოუჩნდებათ.
           </DialogDescription>
@@ -161,8 +172,8 @@ export function MonthlyPaymentDialog({
             />
           ) : plan ? (
             <>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <IconCalendar className="size-4" aria-hidden="true" />
+              <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                <IconCalendar className="size-4 shrink-0" aria-hidden="true" />
                 <span>
                   {formatGeorgianDate(plan.start)} -{' '}
                   {formatGeorgianDate(plan.end)}
@@ -178,13 +189,13 @@ export function MonthlyPaymentDialog({
               ) : null}
               <section
                 aria-label="გასაცემი თანხები"
-                className="rounded-xl border bg-muted/25"
+                className="shrink-0 overflow-hidden rounded-xl border bg-card"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
-                  <h3 className="font-medium">
+                <div className="flex items-center justify-between gap-3 bg-muted/60 px-3 py-2.5">
+                  <h3 className="min-w-0 font-medium">
                     გასაცემია {plan.ready.length} თანამშრომლისთვის
                   </h3>
-                  <strong className="tabular-nums">
+                  <strong className="shrink-0 text-lg font-semibold tabular-nums">
                     {formatSalary({ amountMinor: total })}
                   </strong>
                 </div>
@@ -207,18 +218,41 @@ export function MonthlyPaymentDialog({
                 ) : null}
               </section>
               {plan.pending.length ? (
-                <details className="rounded-xl border p-3 text-sm">
-                  <summary className="cursor-pointer font-medium">
-                    გადასამოწმებელია {plan.pending.length} თანამშრომელი
-                  </summary>
-                  <ul className="mt-2 grid max-h-32 gap-2 overflow-y-auto text-muted-foreground">
-                    {plan.pending.map((line, index) => (
-                      <li key={index} className="wrap-anywhere">
-                        {line.name}. {line.message}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
+                <Accordion className="rounded-xl border border-badge-orange-foreground/25 bg-badge-orange/35">
+                  <AccordionItem value="pending-employees">
+                    <AccordionTrigger
+                      type="button"
+                      className="items-center px-3 py-3 hover:bg-badge-orange/60 hover:no-underline"
+                    >
+                      <span className="flex min-w-0 items-center gap-2 pr-3">
+                        <IconAlertTriangle
+                          className="size-4 shrink-0 text-badge-orange-foreground"
+                          aria-hidden="true"
+                        />
+                        გადასამოწმებელია {plan.pending.length} თანამშრომელი
+                      </span>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-3 pb-3">
+                      <ul
+                        aria-label="გადასამოწმებელი თანამშრომლები"
+                        tabIndex={0}
+                        className="grid gap-2 rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:max-h-56 sm:overflow-y-auto"
+                      >
+                        {plan.pending.map((line, index) => (
+                          <li
+                            key={index}
+                            className="grid gap-0.5 rounded-lg border bg-muted px-3 py-2 wrap-anywhere dark:bg-background"
+                          >
+                            <span className="font-medium">{line.name}</span>
+                            <span className="text-muted-foreground">
+                              {line.message}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               ) : null}
             </>
           ) : (
@@ -262,6 +296,7 @@ export function MonthlyPaymentDialog({
           <Button
             type="submit"
             form="payroll-payment-form"
+            aria-busy={mutation.isPending || undefined}
             disabled={
               preview.isFetching ||
               mutation.isPending ||

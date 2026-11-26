@@ -43,7 +43,7 @@ export function AppSelect({
         id={id}
         aria-invalid={invalid}
         aria-describedby={`${id}-error`}
-        className="w-full shadow-control-raised active:shadow-control-pressed"
+        className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
       >
         <SelectValue />
       </SelectTrigger>

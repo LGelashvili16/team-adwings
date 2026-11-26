@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 86. Last updated: 2026-11-26.
+Status: required project instructions. Version: 89. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -130,6 +130,7 @@ Choose feedback by purpose and lifetime. These components complement one another
 
 - Use `toast` from `sonner` and the single app-wide `Toaster` from `#/components/ui/sonner`. Do not mount another toaster or introduce the Base UI toast manager alongside it.
 - Emit one outcome toast per action. Avoid duplicates from hooks, components, retries, rerenders, and cache invalidation.
+- Omit the close button from app-wide Sonner toasts.
 - Show success only after the server confirms completion. Never simulate an unavailable workflow or imply that a local draft was saved remotely.
 - Say what happened and, for failures, what the user can do next. Reuse the existing green success and red error styling; do not create per-feature palettes.
 - Never expose SQL errors, stack traces, tokens, or unnecessary personal data. Preserve user input after failure and vacation controls recoverable.
@@ -215,7 +216,7 @@ Do not add route-changing tabs that duplicate destinations already shown as sepa
 
 The approved appearance is the existing attendance tab strip shown in the user's reference:
 
-- One compact rounded container with a muted surface, subtle border, and small inset around its triggers.
+- One compact rounded container with a white surface in light mode (`bg-white dark:bg-muted`), subtle border, and small inset around its triggers. Inputs, textareas, input groups, and select triggers also use a white background in light mode only, and select triggers omit the raised bottom shadow in light mode while keeping dark mode unchanged.
 - Match the inner trigger corners to the outer container, accounting for its border and inset; use the shared tab styles across pages.
 - Consistent trigger height and horizontal padding, muted inactive text, and clear hover/focus states.
 - A raised selected surface with a slight 3D edge/shadow, stronger text, and stable dimensions.
@@ -303,6 +304,8 @@ When the user changes a shared UI standard, update this file instead of creating
 Payroll tabs use compensation-specific Tabler icons and place settings last. Use the shared shadcn Calendar to choose a whole payroll month. Payroll filters use the compact, rounded Jobs toolbar styling and wrap within the available width. Give payroll alerts an icon that matches their severity. Show the month status in the toolbar after finalization. Use one tab and one entry sheet for bonuses, premiums and fines.
 
 Use an 8px gap between the payroll filters and table results.
+
+In the salary issuance dialog, show the selected payment window above the ready employees and total. Below that summary, group employees who need review in a collapsed shadcn Accordion with a right-aligned Tabler chevron. Show each employee's name and reason in a darker, rounded, bordered row. Use the shared expand and collapse transitions and respect reduced motion. Keep the confirmation actions visible while the dialog body scrolls on narrow screens.
 
 The monthly payroll table and its CSV use `ხელფასი(თვე)`, `ხელფასი(1/2)` and `ხელფასი(2/2)` for the selected view. The sheet edits the full earning month from every view and labels the monthly amount and the first-installment override with the corresponding names. Prefill the applicable fixed amount when the salary needs confirmation and explain why it needs review before saving. Keep paginated change history in a closed-by-default shadcn Accordion.
 

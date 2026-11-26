@@ -171,7 +171,7 @@ export function MonthlyFilters({
             >
               <SelectTrigger
                 id="monthly-sort"
-                className="w-full rounded-full px-3 shadow-control-raised active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
+                className="w-full rounded-full px-3 dark:shadow-control-raised dark:active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
               >
                 <SelectValue>
                   {field.state.value === 'name'

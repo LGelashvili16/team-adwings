@@ -7,13 +7,11 @@ afterEach(() => {
   toast.dismiss()
 })
 
-it('displays Sonner notifications with Georgian dismissal text', async () => {
+it('displays Sonner notifications without a close button', async () => {
   render(<Toaster />)
   act(() => {
     toast.success('განრიგი შენახულია.')
   })
   expect(await screen.findByText('განრიგი შენახულია.')).toBeVisible()
-  expect(
-    screen.getByRole('button', { name: 'შეტყობინების დახურვა' }),
-  ).toBeVisible()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })

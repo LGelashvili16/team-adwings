@@ -179,7 +179,7 @@ export function CompanyTimesheetFilters({
               >
                 <SelectTrigger
                   id="timesheet-status"
-                  className="w-full shadow-control-raised active:shadow-control-pressed"
+                  className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
                   aria-label="დღის სტატუსი"
                 >
                   <SelectValue />

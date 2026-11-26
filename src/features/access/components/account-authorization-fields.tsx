@@ -192,7 +192,7 @@ export function AccountPermissionFields({
                   >
                     <SelectTrigger
                       id={`permission-${permission}`}
-                      className="w-full shadow-control-raised active:shadow-control-pressed"
+                      className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
                       aria-invalid={invalid}
                       aria-describedby="admin-permissions-error"
                     >

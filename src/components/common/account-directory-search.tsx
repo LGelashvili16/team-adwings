@@ -168,7 +168,7 @@ export function AccountDirectorySearch({
               >
                 <SelectTrigger
                   id={`${id}-state`}
-                  className="w-full shadow-control-raised active:shadow-control-pressed"
+                  className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
                   aria-label="ანგარიშის სტატუსი"
                   aria-invalid={!field.state.meta.isValid}
                   aria-describedby={`${id}-state-error`}

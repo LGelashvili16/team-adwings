@@ -30,6 +30,8 @@ Monthly Payroll now displays assigned base salaries before draft preparation, wi
 - [x] Keep the filters and displayed results in place while an uncached period loads. Disable CSV export until the requested results arrive. Verified with a regression test and delayed responses in desktop and mobile Chrome previews.
 - [x] Refresh unpaid monthly payroll after a fixed salary correction. Require review for partial months and custom amounts and preserve issued installments. Verified in isolated PostgreSQL and with a Chrome preview of the corrected row and confirmation field.
 - [x] Show review, published-payment and neutral metadata badges in Monthly Payroll. Verified the whole-month and first-half states in Chrome with light and dark themes.
+- [x] Organize the monthly entry sheet into salary, adjustments and paginated history tabs. Keep one form across tabs and focus the first invalid field on save. Verified draft preservation and validation in tests, and pagination, keyboard navigation and mobile fit in Chrome.
+- [x] Show salary issuance warnings in a collapsed shadcn Accordion with a right-aligned Tabler chevron and darker bordered employee rows. Verified keyboard opening and closing, the existing confirmation workflow, and desktop and mobile layouts in both themes using sample data.
 
 ## Historical simplified delivery, 2026-11-25
 

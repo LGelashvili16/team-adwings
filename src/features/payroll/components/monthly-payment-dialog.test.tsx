@@ -57,8 +57,21 @@ it('confirms the exact preview for ready employees and explains who is pending',
     </QueryClientProvider>,
   )
   expect(await screen.findByText('ანა')).toBeVisible()
-  await user.click(screen.getByText('გადასამოწმებელია 1 თანამშრომელი'))
-  expect(screen.getByText('ბექა. დაადასტურეთ სამუშაო საათები.')).toBeVisible()
+  const warnings = screen.getByRole('button', {
+    name: 'გადასამოწმებელია 1 თანამშრომელი',
+  })
+  expect(warnings).toHaveAttribute('aria-expanded', 'false')
+  expect(
+    screen.queryByRole('list', { name: 'გადასამოწმებელი თანამშრომლები' }),
+  ).not.toBeInTheDocument()
+  warnings.focus()
+  await user.keyboard('{Enter}')
+  expect(warnings).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByText('ბექა')).toBeVisible()
+  expect(screen.getByText('დაადასტურეთ სამუშაო საათები.')).toBeVisible()
+  await user.keyboard(' ')
+  expect(warnings).toHaveAttribute('aria-expanded', 'false')
+  expect(setMonthlyPayments).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'გაცემის დადასტურება' }))
   await waitFor(() => expect(close).toHaveBeenCalledOnce())
   expect(setMonthlyPayments).toHaveBeenCalledWith({

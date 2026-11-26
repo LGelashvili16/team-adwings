@@ -53,8 +53,7 @@ export function PayrollMonthControl({
           <Button
             type="button"
             variant="outline"
-            depth="raised"
-            className="h-11 w-full rounded-full md:h-9 md:w-auto"
+            className="h-11 w-full rounded-full border-input bg-white px-3 font-normal dark:bg-input/30 dark:shadow-control-raised dark:active:shadow-control-pressed md:h-9 md:w-auto"
           />
         }
       >

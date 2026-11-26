@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -8,19 +8,17 @@ import {
   IconInfoCircle,
   IconDeviceFloppy,
   IconHistory,
+  IconWallet,
+  IconAdjustmentsHorizontal,
 } from '@tabler/icons-react'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '#/components/ui/accordion'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Badge } from '#/components/ui/badge'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Spinner } from '#/components/ui/spinner'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { Empty, EmptyHeader, EmptyTitle } from '#/components/ui/empty'
 import {
   SheetContent,
   SheetDescription,
@@ -29,7 +27,7 @@ import {
   SheetTitle,
 } from '#/components/ui/sheet'
 import { DraftSheet } from '#/components/common/draft-sheet'
-import { formatGeorgianDateTime, formatGeorgianMonth } from '#/lib/date-format'
+import { formatGeorgianMonth } from '#/lib/date-format'
 import { accountInitials } from '#/features/access/access.presentation'
 import { formatWorkedTime } from '#/features/attendance/attendance.rules'
 import { monthlyEmployeeQuery } from '../monthly.queries'
@@ -42,7 +40,18 @@ import {
 import { MonthlyEntryForm } from './monthly-entry-form'
 import { MonthlyRemoveDialog } from './monthly-remove-dialog'
 import { PaymentBreakdown } from './payment-breakdown'
-import { DataPagination } from '#/components/common/data-pagination'
+import { MonthlyEntryHistory } from './monthly-entry-history'
+
+const entryTabs = [
+  { value: 'salary', label: 'ხელფასი', icon: IconWallet },
+  {
+    value: 'adjustments',
+    label: 'ბონუსები და ჯარიმები',
+    icon: IconAdjustmentsHorizontal,
+  },
+  { value: 'history', label: 'ისტორია', icon: IconHistory },
+] as const
+type EntryTab = (typeof entryTabs)[number]['value']
 
 export function MonthlyEntrySheet({
   actorId,
@@ -64,12 +73,14 @@ export function MonthlyEntrySheet({
   finalFocus?: RefObject<HTMLButtonElement | null>
 }) {
   const [page, setPage] = useState(1),
+    [tab, setTab] = useState<EntryTab>('salary'),
     [pending, setPending] = useState(false),
     [removeOpen, setRemoveOpen] = useState(false),
     [removeTarget, setRemoveTarget] = useState<{
       userId: string
       version: number
     } | null>(null)
+  const body = useRef<HTMLDivElement>(null)
   const query = useQuery({
     ...monthlyEmployeeQuery(actorId, month, userId, page),
     enabled: open,
@@ -83,6 +94,43 @@ export function MonthlyEntrySheet({
     !legacySalary &&
     actorId !== userId &&
     view?.source
+  const changeTab = (value: EntryTab) => {
+    if (value === tab) return
+    setTab(value)
+    if (body.current) body.current.scrollTop = 0
+  }
+  const revision = view?.current
+  const salaryFooter = view ? (
+    <>
+      {view.payments.length ? (
+        <section className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+          <h3 className="text-sm font-medium">გაცემული თანხები</h3>
+          <PaymentBreakdown
+            payments={view.payments}
+            twice={view.firstPaymentEnabled}
+          />
+        </section>
+      ) : null}
+      {canEdit &&
+      !view.closed &&
+      !view.payments.length &&
+      actorId !== userId &&
+      revision?.status === 'draft' ? (
+        <Button
+          type="button"
+          variant="destructive"
+          disabled={pending}
+          className="self-start"
+          onClick={() => {
+            setRemoveTarget({ userId, version: revision.version })
+            setRemoveOpen(true)
+          }}
+        >
+          ჩანაწერის ამოღება
+        </Button>
+      ) : null}
+    </>
+  ) : null
   return (
     <DraftSheet
       open={open}
@@ -123,285 +171,235 @@ export function MonthlyEntrySheet({
             <IconX aria-hidden="true" />
           </Button>
         </SheetHeader>
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain p-4 sm:p-6">
-          {query.isPending ? (
-            <div
-              role="status"
-              aria-busy="true"
-              aria-label="თვის ჩანაწერი იტვირთება"
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            if (
+              value === 'salary' ||
+              value === 'adjustments' ||
+              value === 'history'
+            )
+              changeTab(value)
+          }}
+          className="min-h-0 flex-1 gap-0"
+        >
+          <div className="shrink-0 overflow-x-auto border-b px-4 py-3 sm:px-6">
+            <TabsList
+              aria-label="თვის ჩანაწერის განყოფილებები"
+              className="w-full min-w-max gap-0.5 group-data-horizontal/tabs:h-11 sm:group-data-horizontal/tabs:h-10"
+              activateOnFocus
             >
-              <Skeleton className="h-96" aria-hidden="true" />
-            </div>
-          ) : !view ? (
-            <Alert variant="destructive">
-              <IconAlertCircle aria-hidden="true" />
-              <AlertDescription>
-                {query.data && !query.data.ok
-                  ? query.data.message
-                  : 'ჩანაწერი ვერ ჩაიტვირთა. ხელახლა გახსენით ფანჯარა.'}
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <>
-              {view.payments.length ? (
-                <section className="flex flex-col gap-3 rounded-xl border bg-muted/30 p-4">
-                  <h3 className="text-sm font-medium">გაცემული თანხები</h3>
-                  <PaymentBreakdown
-                    payments={view.payments}
-                    twice={view.firstPaymentEnabled}
-                  />
-                </section>
-              ) : null}
-              {editable ? (
-                <MonthlyEntryForm
-                  actorId={actorId}
-                  month={month}
-                  userId={userId}
-                  source={editable}
-                  current={view.current}
-                  baseNeedsReview={view.baseNeedsReview}
-                  firstPaymentEnabled={view.firstPaymentEnabled}
-                  firstAlreadyPaid={view.payments.some(
-                    (payment) => payment.stage !== 'adjustments',
-                  )}
-                  defaultFineStage={view.defaultFineStage}
-                  paymentWindows={view.paymentWindows}
-                  payments={view.payments}
-                  onSaved={onClose}
-                  showSubmit={false}
-                  onPending={setPending}
-                />
-              ) : view.current ? (
-                <div className="flex flex-col gap-3">
-                  <Badge variant={view.closed ? 'green' : 'secondary'}>
-                    {view.closed ? 'დასრულებული' : 'მონახაზი'}
-                  </Badge>
-                  {view.current.salary ? (
-                    <>
-                      <p className="text-sm text-muted-foreground">
-                        {salaryBasisLabels[view.current.salary.amountBasis]}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {salaryKindLabels[view.current.salary.kind]}:{' '}
-                        {formatSalary(view.current.salary)}
-                        {view.current.salary.kind === 'hourly' ? (
-                          <>
-                            {' '}
-                            · დადასტურებული დრო:{' '}
-                            {formatWorkedTime(view.current.workedSeconds)}
-                          </>
-                        ) : null}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      თვის ხელფასი დასადასტურებელია.
-                    </p>
-                  )}
-                  <dl className="grid grid-cols-[1fr_auto] gap-3 text-sm">
-                    {view.current.salary ? (
-                      <>
-                        <dt>{monthlySalaryLabels.all}</dt>
-                        <dd className="tabular-nums">
-                          {formatSalary({
-                            amountMinor: view.current.baseMinor,
-                          })}
-                        </dd>
-                      </>
-                    ) : null}
-                    {view.current.adjustments.map((a, i) => (
-                      <div
-                        key={i}
-                        className="col-span-2 grid grid-cols-subgrid gap-3"
-                      >
-                        <dt>
-                          {monthlyAdjustmentLabels[a.kind]}
-                          {a.reason ? (
-                            <span className="block text-muted-foreground wrap-anywhere">
-                              {a.reason}
-                            </span>
-                          ) : null}
-                        </dt>
-                        <dd className="tabular-nums">
-                          {formatSalary({ amountMinor: a.amountMinor })}
-                        </dd>
-                      </div>
-                    ))}
-                    <dt className="font-semibold">
-                      {view.current.salary
-                        ? 'შეთანხმების ჯამი'
-                        : 'დამატებების ჯამი'}
-                    </dt>
-                    <dd className="font-semibold tabular-nums">
-                      {formatSalary({ amountMinor: view.current.totalMinor })}
-                    </dd>
-                  </dl>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  ამ თვის ჩანაწერი ჯერ არ არის.
-                </p>
-              )}
-              {canEdit &&
-              !view.closed &&
-              !view.payments.length &&
-              actorId !== userId &&
-              view.current?.status === 'draft' ? (
-                <Button
-                  variant="destructive"
-                  disabled={pending}
-                  onClick={() => {
-                    if (view.current) {
-                      setRemoveTarget({ userId, version: view.current.version })
-                      setRemoveOpen(true)
-                    }
-                  }}
+              {entryTabs.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="min-w-max px-1 text-xs sm:px-2 sm:text-sm"
                 >
-                  ჩანაწერის ამოღება
-                </Button>
-              ) : null}
-              {view.sourceMessage || legacySalary ? (
-                <Alert variant="info" role="status">
-                  <IconInfoCircle aria-hidden="true" />
-                  <AlertDescription className="flex flex-col items-start gap-2">
-                    {legacySalary
-                      ? 'გაცემამდე განსაზღვრეთ თანამშრომლისთვის ხელზე ასაღები თანხა.'
-                      : view.sourceMessage}
-                    {view.employmentNeedsReview ? (
-                      view.canOpenEmployeeProfile ? (
-                        <Link
-                          className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
-                          to="/manage/employees/$employeeId"
-                          params={{ employeeId: userId }}
-                          search={{
-                            employmentPage: 1,
-                            employmentHistoryPage: 1,
-                          }}
-                          hash="employment-periods"
-                        >
-                          თანამშრომლის დასაქმების პერიოდებზე გადასვლა
-                        </Link>
-                      ) : (
-                        <span>
-                          მიმართეთ თანამშრომლების მართვაზე უფლებამოსილ პირს.
-                        </span>
-                      )
-                    ) : view.salaryMissing || legacySalary ? (
-                      <Link
-                        className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
-                        to="/manage/payroll/$userId"
-                        params={{ userId }}
-                      >
-                        თანამშრომლის ხელფასზე გადასვლა
-                      </Link>
-                    ) : null}
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              {view.history.length ? (
-                <Accordion className="rounded-xl border bg-card px-4">
-                  <AccordionItem value="history">
-                    <AccordionTrigger className="items-center gap-3 py-3">
-                      <IconHistory
-                        className="size-4 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      ცვლილებების ისტორია
-                      <Badge variant="secondary">{view.total}</Badge>
-                    </AccordionTrigger>
-                    <AccordionContent className="flex flex-col gap-3 [&_p:not(:last-child)]:mb-0">
-                      {view.history.map((item) => (
-                        <div
-                          key={item.version}
-                          className="flex flex-col gap-2 rounded-xl border p-4 text-sm"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Badge
-                              variant={
-                                item.status === 'finalized'
-                                  ? 'green'
-                                  : 'secondary'
-                              }
-                            >
-                              {item.status === 'finalized'
-                                ? 'დასრულებული'
-                                : item.status === 'voided'
-                                  ? 'ამოღებული'
-                                  : 'მონახაზი'}{' '}
-                              · {item.version}
-                            </Badge>
-                            <span className="font-medium tabular-nums">
-                              {formatSalary({ amountMinor: item.totalMinor })}
-                            </span>
-                          </div>
-                          <p>
-                            {item.actorName} ·{' '}
-                            {formatGeorgianDateTime(
-                              item.recordedAt,
-                              view.timezone,
-                            )}
-                          </p>
-                          <p className="wrap-anywhere">{item.reason}</p>
-                          {item.salary ? (
-                            <p className="text-muted-foreground">
-                              {salaryKindLabels[item.salary.kind]}:{' '}
-                              {formatSalary(item.salary)}
-                              {item.salary.kind === 'hourly' ? (
-                                <>
-                                  {' '}
-                                  · დადასტურებული დრო:{' '}
-                                  {formatWorkedTime(item.workedSeconds)}
-                                </>
+                  <Icon className="hidden size-4 sm:block" aria-hidden="true" />
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
+          <div
+            ref={body}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6"
+          >
+            {query.isPending ? (
+              <div
+                role="status"
+                aria-busy="true"
+                aria-label="თვის ჩანაწერი იტვირთება"
+              >
+                <Skeleton className="h-96" aria-hidden="true" />
+              </div>
+            ) : !view ? (
+              <Alert variant="destructive">
+                <IconAlertCircle aria-hidden="true" />
+                <AlertDescription>
+                  {query.data && !query.data.ok
+                    ? query.data.message
+                    : 'ჩანაწერი ვერ ჩაიტვირთა. ხელახლა გახსენით ფანჯარა.'}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                {editable ? (
+                  <MonthlyEntryForm
+                    actorId={actorId}
+                    month={month}
+                    userId={userId}
+                    source={editable}
+                    current={view.current}
+                    baseNeedsReview={view.baseNeedsReview}
+                    firstPaymentEnabled={view.firstPaymentEnabled}
+                    firstAlreadyPaid={view.payments.some(
+                      (payment) => payment.stage !== 'adjustments',
+                    )}
+                    defaultFineStage={view.defaultFineStage}
+                    paymentWindows={view.paymentWindows}
+                    payments={view.payments}
+                    onSaved={onClose}
+                    showSubmit={false}
+                    onPending={setPending}
+                    tabs={{ onInvalid: changeTab, salaryFooter }}
+                  />
+                ) : (
+                  <>
+                    <TabsContent value="salary" className="flex flex-col gap-4">
+                      {view.sourceMessage || legacySalary ? (
+                        <Alert variant="info" role="status">
+                          <IconInfoCircle aria-hidden="true" />
+                          <AlertDescription className="flex flex-col items-start gap-2">
+                            {legacySalary
+                              ? 'გაცემამდე განსაზღვრეთ თანამშრომლისთვის ხელზე ასაღები თანხა.'
+                              : view.sourceMessage}
+                            {view.employmentNeedsReview ? (
+                              view.canOpenEmployeeProfile ? (
+                                <Link
+                                  className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
+                                  to="/manage/employees/$employeeId"
+                                  params={{ employeeId: userId }}
+                                  search={{
+                                    employmentPage: 1,
+                                    employmentHistoryPage: 1,
+                                  }}
+                                  hash="employment-periods"
+                                >
+                                  თანამშრომლის დასაქმების პერიოდებზე გადასვლა
+                                </Link>
+                              ) : (
+                                <span>
+                                  მიმართეთ თანამშრომლების მართვაზე უფლებამოსილ
+                                  პირს.
+                                </span>
+                              )
+                            ) : view.salaryMissing || legacySalary ? (
+                              <Link
+                                className="rounded-sm font-medium focus-visible:ring-2 focus-visible:ring-ring"
+                                to="/manage/payroll/$userId"
+                                params={{ userId }}
+                              >
+                                თანამშრომლის ხელფასზე გადასვლა
+                              </Link>
+                            ) : null}
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
+                      {revision ? (
+                        <section className="flex flex-col items-start gap-3 rounded-xl border bg-card p-4">
+                          <Badge variant={view.closed ? 'green' : 'secondary'}>
+                            {view.closed ? 'დასრულებული' : 'მონახაზი'}
+                          </Badge>
+                          {revision.salary ? (
+                            <>
+                              <p className="text-muted-foreground">
+                                {salaryKindLabels[revision.salary.kind]} ·{' '}
+                                {formatSalary(revision.salary)}
+                              </p>
+                              {revision.salary.kind === 'hourly' ? (
+                                <p>
+                                  დადასტურებული დრო ·{' '}
+                                  {formatWorkedTime(revision.workedSeconds)}
+                                </p>
                               ) : null}
-                            </p>
+                            </>
                           ) : (
                             <p className="text-muted-foreground">
                               თვის ხელფასი დასადასტურებელია.
                             </p>
                           )}
-                          <p className="text-muted-foreground">
-                            {item.salary
-                              ? `${monthlySalaryLabels.all} ${formatSalary({ amountMinor: item.baseMinor })}, `
-                              : null}
-                            ბონუსი:{' '}
-                            {formatSalary({ amountMinor: item.bonusMinor })},
-                            პრემია:{' '}
-                            {formatSalary({ amountMinor: item.premiumMinor })},
-                            ჯარიმა:{' '}
-                            {formatSalary({ amountMinor: item.fineMinor })}
-                          </p>
-                          {item.baseReason ? (
-                            <p className="wrap-anywhere">{item.baseReason}</p>
-                          ) : null}
-                          {item.adjustments.map((a, i) => (
-                            <p key={i} className="wrap-anywhere">
-                              {monthlyAdjustmentLabels[a.kind]}:{' '}
-                              {formatSalary({ amountMinor: a.amountMinor })}
-                              {a.reason ? `. ${a.reason}` : null}
-                            </p>
+                          <dl className="grid w-full grid-cols-[1fr_auto] gap-2 border-t pt-3">
+                            {revision.salary ? (
+                              <>
+                                <dt>{monthlySalaryLabels.all}</dt>
+                                <dd className="tabular-nums">
+                                  {formatSalary({
+                                    amountMinor: revision.baseMinor,
+                                  })}
+                                </dd>
+                                <dt className="text-muted-foreground">
+                                  თანხის ტიპი
+                                </dt>
+                                <dd>
+                                  {
+                                    salaryBasisLabels[
+                                      revision.salary.amountBasis
+                                    ]
+                                  }
+                                </dd>
+                              </>
+                            ) : null}
+                            <dt className="font-semibold">
+                              {revision.salary
+                                ? 'თვის ჯამი'
+                                : 'დამატებების ჯამი'}
+                            </dt>
+                            <dd className="font-semibold tabular-nums">
+                              {formatSalary({
+                                amountMinor: revision.totalMinor,
+                              })}
+                            </dd>
+                          </dl>
+                        </section>
+                      ) : (
+                        <Empty className="rounded-xl border border-dashed">
+                          <EmptyHeader>
+                            <EmptyTitle>
+                              ამ თვის ჩანაწერი ჯერ არ არის
+                            </EmptyTitle>
+                          </EmptyHeader>
+                        </Empty>
+                      )}
+                      {salaryFooter}
+                    </TabsContent>
+                    <TabsContent value="adjustments">
+                      {revision?.adjustments.length ? (
+                        <dl className="flex flex-col divide-y rounded-xl border bg-card">
+                          {revision.adjustments.map((item, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between gap-3 p-4"
+                            >
+                              <dt className="min-w-0 wrap-anywhere">
+                                {monthlyAdjustmentLabels[item.kind]}
+                                {item.reason ? (
+                                  <span className="block text-muted-foreground">
+                                    {item.reason}
+                                  </span>
+                                ) : null}
+                              </dt>
+                              <dd className="shrink-0 tabular-nums">
+                                {formatSalary(item)}
+                              </dd>
+                            </div>
                           ))}
-                        </div>
-                      ))}
-                      <DataPagination
-                        page={page}
-                        total={view.total}
-                        pageSize={view.pageSize}
-                        renderLink={(next) => (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={pending}
-                            onClick={() => setPage(next)}
-                          />
-                        )}
-                      />
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              ) : null}
-            </>
-          )}
-        </div>
+                        </dl>
+                      ) : (
+                        <Empty className="rounded-xl border border-dashed">
+                          <EmptyHeader>
+                            <EmptyTitle>
+                              დამატებითი ჩანაწერები არ არის
+                            </EmptyTitle>
+                          </EmptyHeader>
+                        </Empty>
+                      )}
+                    </TabsContent>
+                  </>
+                )}
+                <TabsContent value="history">
+                  <MonthlyEntryHistory
+                    view={view}
+                    page={page}
+                    onPageChange={setPage}
+                    busy={query.isPlaceholderData}
+                    disabled={pending || query.isPlaceholderData}
+                  />
+                </TabsContent>
+              </>
+            )}
+          </div>
+        </Tabs>
         {editable ? (
           <SheetFooter className="shrink-0 flex-row justify-end gap-2 border-t bg-card p-4 sm:px-6">
             <Button
