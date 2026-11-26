@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { MonthlyEntryForm } from './monthly-entry-form'
 import { setMonthlyEmployee } from '../monthly.functions'
-import type { MonthlySource } from '../monthly.types'
+import type { MonthlyEntry, MonthlySource } from '../monthly.types'
 
 vi.mock('../monthly.functions', () => ({ setMonthlyEmployee: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
@@ -28,7 +28,7 @@ beforeEach(() => {
     value: { saved: 1 },
   })
 })
-function mount(value = source) {
+function mount(value = source, current: MonthlyEntry | null = null) {
   const saved = vi.fn(),
     pending = vi.fn(),
     client = new QueryClient()
@@ -39,7 +39,8 @@ function mount(value = source) {
         month="2026-11"
         userId="worker"
         source={snapshot}
-        current={null}
+        current={current}
+        baseNeedsReview={Boolean(current)}
         onSaved={saved}
         onPending={pending}
       />
@@ -47,6 +48,54 @@ function mount(value = source) {
   )
   return { ...render(node(value)), saved, pending, node }
 }
+it('prefills the corrected agreement in an unpaid partial month', async () => {
+  const corrected: MonthlySource = {
+    ...source,
+    requiresBaseConfirmation: true,
+    salary: {
+      ...source.salary,
+      kind: 'monthly',
+      amountMinor: 70000,
+      version: 2,
+    },
+  }
+  const { saved } = mount(corrected, {
+    userId: 'worker',
+    employeeName: 'ანა',
+    status: 'draft',
+    version: 1,
+    salary: { ...corrected.salary, version: 1, amountMinor: 50000 },
+    manualBase: true,
+    baseMinor: 50000,
+    baseReason: '',
+    workedSeconds: 0,
+    firstPaymentMinor: null,
+    fineStage: null,
+    paymentDates: null,
+    adjustments: [],
+    bonusMinor: 0,
+    premiumMinor: 0,
+    fineMinor: 0,
+    totalMinor: 50000,
+    reason: '',
+    actorName: 'ბუღალტერი',
+    recordedAt: '2026-11-25T09:00:00Z',
+  })
+  expect(
+    screen.getByRole('textbox', { name: /^ხელფასი\(თვე\) ლარში/ }),
+  ).toHaveValue('700.00')
+  expect(screen.getByText(/გადაამოწმეთ და შეინახეთ თვის ხელფასი/)).toBeVisible()
+  await userEvent
+    .setup()
+    .click(screen.getByRole('button', { name: 'ჩანაწერის შენახვა' }))
+  await waitFor(() => expect(saved).toHaveBeenCalledOnce())
+  expect(setMonthlyEmployee).toHaveBeenCalledWith({
+    data: expect.objectContaining({
+      expectedVersion: 1,
+      baseOverrideMinor: 70000,
+    }),
+  })
+})
 it('saves without a general change reason', async () => {
   const user = userEvent.setup()
   const { saved } = mount()

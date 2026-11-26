@@ -259,6 +259,33 @@ async function source(
     }),
   }
 }
+function refreshedDraftBase(
+  draft: {
+    salary: MonthlyEntry['salary']
+    sourceToken: string | null
+    manualBase: boolean | null
+    baseMinor: number | null
+    firstPaymentMinor: number | null
+  },
+  prepared: MonthlySource,
+  firstPaidBase: number | null,
+): number | null | undefined {
+  // An undefined result keeps the draft. Null means the amount needs review.
+  if (prepared.sourceToken === draft.sourceToken) return undefined
+  const { salary } = prepared
+  if (
+    draft.salary?.kind === 'monthly' &&
+    salary.kind === 'monthly' &&
+    salary.version !== draft.salary.version &&
+    salary.amountBasis === 'net' &&
+    draft.salary.amountBasis === salary.amountBasis &&
+    !prepared.requiresBaseConfirmation &&
+    (!draft.manualBase || draft.baseMinor === draft.salary.amountMinor) &&
+    salary.amountMinor >= (firstPaidBase ?? draft.firstPaymentMinor ?? 0)
+  )
+    return salary.amountMinor
+  return null
+}
 async function replay(
   tx: PayrollTransaction,
   actorId: string,
@@ -342,21 +369,65 @@ export async function readMonthlyPayroll(
           'ექსპორტის ლიმიტი 1 000 თანამშრომელია. დააზუსტეთ ძიება.',
         )
       const { start, end } = monthlyBounds(month)
-      const unpreparedIds =
+      const salaryLookupIds =
         data.view === 'bonuses' || snapshot.closed
           ? []
           : result.records
-              .filter((row) => !row.salary)
+              .filter(
+                (row) =>
+                  !row.salary ||
+                  (row.status === 'draft' &&
+                    row.salary.kind === 'monthly' &&
+                    !row.salaryPaidOn),
+              )
               .map((row) => row.employeeId)
-      const terms = unpreparedIds.length
-        ? await repository.directorySalaryTerms(tx, unpreparedIds, start, end)
+      const terms = salaryLookupIds.length
+        ? await repository.directorySalaryTerms(tx, salaryLookupIds, start, end)
         : []
       const salaryByEmployee = new Map(
         terms.map((term) => [term.employeeId, term]),
       )
+      const revisedDrafts = new Map<
+        string,
+        { salary: MonthlySource['salary']; baseMinor: number | null }
+      >()
+      await Promise.all(
+        result.records.map(async (row) => {
+          const term = salaryByEmployee.get(row.employeeId)
+          if (
+            !term ||
+            row.status !== 'draft' ||
+            row.salary?.kind !== 'monthly' ||
+            (term.salary.version === row.salary.version &&
+              row.salary.effectiveFrom <= start)
+          )
+            return
+          try {
+            const prepared = await source(tx, row.userId, month)
+            const baseMinor = refreshedDraftBase(
+              row,
+              prepared,
+              row.firstPaidBase,
+            )
+            if (baseMinor !== undefined)
+              revisedDrafts.set(row.employeeId, {
+                salary: prepared.salary,
+                baseMinor,
+              })
+          } catch (error) {
+            if (!(error instanceof MonthlyPayrollError)) throw error
+            revisedDrafts.set(row.employeeId, {
+              salary: term.salary,
+              baseMinor: null,
+            })
+          }
+        }),
+      )
       const records = result.records.map(
         ({
           employeeId,
+          sourceToken: _sourceToken,
+          manualBase: _manualBase,
           fineStage: storedFineStage,
           paymentDates,
           firstPaidOn,
@@ -370,20 +441,23 @@ export async function readMonthlyPayroll(
           ...row
         }) => {
           const term = salaryByEmployee.get(employeeId)
-          const salary = row.salary ?? term?.salary ?? null
+          const revised = revisedDrafts.get(employeeId)
+          const salary = revised?.salary ?? row.salary ?? term?.salary ?? null
           const automatic =
             term?.fullEmployment &&
             term.salary.kind === 'monthly' &&
             term.salary.amountBasis === 'net' &&
             term.salary.effectiveFrom <= start
           // An adjustments-only revision stores zero without preparing a base.
-          const baseMinor = row.salary
-            ? row.baseMinor
-            : salaryPaidOn
-              ? salaryBaseMinor
-              : automatic
-                ? term.salary.amountMinor
-                : null
+          const baseMinor = salaryPaidOn
+            ? salaryBaseMinor
+            : revised
+              ? revised.baseMinor
+              : row.salary
+                ? row.baseMinor
+                : automatic
+                  ? term.salary.amountMinor
+                  : null
           const calculatedTotal =
             baseMinor === null
               ? null
@@ -468,11 +542,12 @@ export async function readMonthlyPayroll(
             ...row,
             salary,
             baseMinor,
-            totalMinor: row.salary
-              ? row.totalMinor
-              : calculatedTotal !== null && calculatedTotal >= 0
-                ? calculatedTotal
-                : null,
+            totalMinor:
+              row.salary && !revised && !salaryPaidOn
+                ? row.totalMinor
+                : calculatedTotal !== null && calculatedTotal >= 0
+                  ? calculatedTotal
+                  : null,
             baseNeedsConfirmation:
               baseMinor === null && salary !== null && !snapshot.closed,
             adjustmentDates,
@@ -599,9 +674,28 @@ export async function readMonthlyEmployee(
             monthlyBounds(data.month).end,
           ))
       }
+      const closed = (await state(tx, data.month)).closed
+      const payments = await repository.employeePayments(
+        tx,
+        target.id,
+        data.month,
+      )
+      const entry = latest.at(0)?.entry
       return {
         timezone: (await getCompanyWorkday(new Date(), tx)).timezone,
         source: currentSource,
+        baseNeedsReview:
+          !closed &&
+          entry?.status === 'draft' &&
+          !!entry.salary &&
+          !!currentSource &&
+          !payments.some((payment) => payment.stage === 'salary') &&
+          refreshedDraftBase(
+            entry,
+            currentSource,
+            payments.find((payment) => payment.stage === 'first')?.baseMinor ??
+              null,
+          ) === null,
         sourceMessage,
         salaryMissing,
         employmentNeedsReview,
@@ -610,8 +704,8 @@ export async function readMonthlyEmployee(
         history: rows.records.map(projection),
         total: rows.total,
         pageSize: repository.historyPageSize,
-        closed: (await state(tx, data.month)).closed,
-        payments: await repository.employeePayments(tx, target.id, data.month),
+        closed,
+        payments,
         firstPaymentEnabled: Boolean(policy?.schedule?.first),
         defaultFineStage: policy?.schedule?.fineStage ?? 'salary',
         paymentWindows: paymentWindows(data.month, policy?.schedule),
@@ -901,7 +995,11 @@ async function planPayment(
         )
       let baseMinor = 0
       if (stage !== 'adjustments') {
-        if (entry?.salary && prepared.sourceToken !== entry.sourceToken)
+        const first = payments.find((line) => line.stage === 'first')
+        const refreshed = entry?.salary
+          ? refreshedDraftBase(entry, prepared, first?.baseMinor ?? null)
+          : undefined
+        if (refreshed === null)
           throw new MonthlyPayrollError(
             'ხელფასი ან დასაქმების თარიღები შეიცვალა. ხელახლა შეინახეთ უწყისი.',
           )
@@ -913,10 +1011,9 @@ async function planPayment(
           throw new MonthlyPayrollError(
             'ჯერ დაადასტურეთ თვის ხელფასი ან სამუშაო საათები.',
           )
-        const base = entry?.salary
-          ? entry.baseMinor
-          : prepared.salary.amountMinor
-        const first = payments.find((line) => line.stage === 'first')
+        const base =
+          refreshed ??
+          (entry?.salary ? entry.baseMinor : prepared.salary.amountMinor)
         baseMinor =
           stage === 'first'
             ? prepared.salary.kind === 'monthly'

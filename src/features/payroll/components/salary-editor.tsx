@@ -127,6 +127,13 @@ export function SalaryEditor({
             : `${result.value.saved} თანამშრომლის ხელფასი შენახულია.`,
         )
         void client.invalidateQueries({ queryKey: salaryKey(actorId) })
+        // The monthly form snapshots its source when opened.
+        client.removeQueries({
+          queryKey: [...monthlyKey(actorId), 'employee'],
+          type: 'inactive',
+          predicate: ({ queryKey }) =>
+            targets.some(({ userId }) => userId === queryKey[4]),
+        })
         void client.invalidateQueries({ queryKey: monthlyKey(actorId) })
         onClose()
       } catch {

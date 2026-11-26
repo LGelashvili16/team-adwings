@@ -159,6 +159,7 @@ export function MonthlyEntrySheet({
                   userId={userId}
                   source={editable}
                   current={view.current}
+                  baseNeedsReview={view.baseNeedsReview}
                   firstPaymentEnabled={view.firstPaymentEnabled}
                   firstAlreadyPaid={view.payments.some(
                     (payment) => payment.stage !== 'adjustments',

@@ -6,8 +6,21 @@ export const monthlyKey = (actorId: string) =>
   ['payroll-monthly', actorId] as const
 export const monthlyPayrollQuery = (actorId: string, search: MonthlySearch) =>
   queryOptions({
-    queryKey: [...monthlyKey(actorId), 'directory', search],
+    queryKey: [...monthlyKey(actorId), 'directory', search] as const,
     queryFn: () => getMonthlyPayroll({ data: search }),
+    placeholderData: (previous, query) => {
+      const previousSearch = query?.queryKey[3]
+      return previous?.ok &&
+        query?.queryKey[1] === actorId &&
+        previousSearch &&
+        previousSearch.month === search.month &&
+        previousSearch.view === search.view &&
+        previousSearch.q === search.q &&
+        previousSearch.sort === search.sort &&
+        previousSearch.period !== search.period
+        ? previous
+        : undefined
+    },
     staleTime: 0,
     refetchInterval: ({ state }) => {
       const boundary = state.data?.ok

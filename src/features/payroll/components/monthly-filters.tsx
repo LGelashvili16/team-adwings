@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
+import { Spinner } from '#/components/ui/spinner'
 import { useIsMobile } from '#/hooks/use-mobile'
 import { formatGeorgianMonth } from '#/lib/date-format'
 import { monthlyPeriodSchema, monthlySearchSchema } from '../monthly.schemas'
@@ -56,6 +57,7 @@ export function MonthlyFilters({
   onChange,
   payrollMonth,
   payrollPeriod,
+  isPeriodLoading,
   onMonthChange,
   children,
   periodPanelId,
@@ -64,6 +66,7 @@ export function MonthlyFilters({
   onChange: (search: MonthlySearch) => void
   payrollMonth?: string
   payrollPeriod?: MonthlySearch['period']
+  isPeriodLoading: boolean
   onMonthChange: (month: string) => void
   children: ReactNode
   periodPanelId?: string
@@ -239,7 +242,7 @@ export function MonthlyFilters({
             return (
               <Tabs
                 className="w-full shrink-0 md:w-auto"
-                value={field.state.value ?? payrollPeriod ?? 'all'}
+                value={payrollPeriod ?? field.state.value ?? 'all'}
                 onValueChange={selectPeriod}
               >
                 <TabsList
@@ -259,9 +262,16 @@ export function MonthlyFilters({
                           : `${compactPeriods[value]} ${periods[value]}`
                       }
                       aria-controls={periodPanelId}
+                      onClick={
+                        isPeriodLoading && value === payrollPeriod
+                          ? () => selectPeriod(value)
+                          : undefined
+                      }
                       className="px-2 text-xs tabular-nums"
                     >
-                      {value === 'all' ? (
+                      {isPeriodLoading && value === search.period ? (
+                        <Spinner className="size-3.5" aria-hidden="true" />
+                      ) : value === 'all' ? (
                         <IconCalendarMonth
                           className="size-3.5"
                           aria-hidden="true"

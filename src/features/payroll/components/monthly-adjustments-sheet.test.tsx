@@ -30,6 +30,7 @@ it('saves a premium and fine together without any base-pay fields', async () => 
     value: {
       timezone: 'Asia/Tbilisi',
       source: null,
+      baseNeedsReview: false,
       sourceMessage: 'ხელფასი არ არის განსაზღვრული.',
       salaryMissing: true,
       employmentNeedsReview: false,

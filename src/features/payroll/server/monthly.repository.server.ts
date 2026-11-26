@@ -466,6 +466,8 @@ export async function directory(
       version: current.version,
       status: current.status,
       salary: current.salary,
+      sourceToken: current.sourceToken,
+      manualBase: current.manualBase,
       firstPaymentMinor: current.firstPaymentMinor,
       fineStage: current.fineStage,
       paymentDates: current.paymentDates,

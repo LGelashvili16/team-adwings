@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { SalaryEditor } from './salary-editor'
+import { monthlyEmployeeQuery } from '../monthly.queries'
 import { setSalaryTerms } from '../salary.functions'
 import type { SalaryEmployee } from '../salary.types'
 
@@ -34,10 +35,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(setSalaryTerms).mockResolvedValue({ ok: true, value: { saved: 2 } })
 })
-function mount() {
+function mount(client = new QueryClient()) {
   const onClose = vi.fn()
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={client}>
       <SalaryEditor
         actorId="accountant"
         targets={targets}
@@ -50,8 +51,16 @@ function mount() {
   return onClose
 }
 it('saves exact bulk terms without a change reason on the first valid click', async () => {
+  const client = new QueryClient()
+  const cachedDetail = monthlyEmployeeQuery(
+    'accountant',
+    '2026-11',
+    'worker',
+    1,
+  )
+  client.setQueryData(cachedDetail.queryKey, { ok: false, message: 'მონახაზი' })
   const user = userEvent.setup(),
-    onClose = mount()
+    onClose = mount(client)
   await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   expect(setSalaryTerms).not.toHaveBeenCalled()
   const amount = screen.getByRole('textbox', { name: /თანხა ლარში/ })
@@ -62,6 +71,7 @@ it('saves exact bulk terms without a change reason on the first valid click', as
   await user.type(amount, '2400,29')
   await user.click(await screen.findByRole('button', { name: 'შენახვა' }))
   await waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+  expect(client.getQueryData(cachedDetail.queryKey)).toBeUndefined()
   expect(setSalaryTerms).toHaveBeenCalledWith({
     data: {
       targets: [

@@ -400,6 +400,109 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
         salaryMissing: true,
       })
     })
+    it('refreshes an unpaid fixed salary after correcting the agreement in a partial month', async () => {
+      await sql().query(
+        `update employee_employment_period set start_date='2026-11-25' where employee_id=(select id from employee where user_id='monthly-worker')`,
+      )
+      await salary('monthly-worker', 2, '2026-11-25', 'monthly', 50000)
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({ baseOverrideMinor: 50000, baseReason: undefined }),
+      )
+      await salary('monthly-worker', 3, '2026-11-25', 'monthly', 70000)
+      const view = await service.readMonthlyPayroll(actor, {
+        month,
+        period: 'all',
+        q: 'monthly-worker',
+      })
+      expect(view.records).toMatchObject([
+        {
+          salary: { amountMinor: 70000 },
+          baseMinor: null,
+          baseNeedsConfirmation: true,
+          totalMinor: null,
+        },
+      ])
+      expect(await detail()).toMatchObject({
+        baseNeedsReview: true,
+        source: { salary: { amountMinor: 70000 } },
+        history: [{ baseMinor: 50000 }],
+      })
+      expect((await preview()).pending).toContainEqual({
+        name: 'ანა თანამშრომელი',
+        message: expect.stringContaining('შეიცვალა'),
+      })
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({
+          expectedVersion: 1,
+          baseOverrideMinor: 70000,
+          baseReason: undefined,
+        }),
+      )
+      expect(await detail()).toMatchObject({
+        baseNeedsReview: false,
+        current: { baseMinor: 70000 },
+      })
+    })
+    it('refreshes the full-month balance and preserves recorded installments', async () => {
+      const read = async (period: 'all' | 'first' | 'salary' = 'all') =>
+        (
+          await service.readMonthlyPayroll(actor, {
+            month,
+            period,
+            q: 'monthly-worker',
+          })
+        ).records.at(0)
+      await salary('monthly-worker', 2, '2026-11-01', 'monthly', 50000)
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({ baseOverrideMinor: 50000, baseReason: undefined }),
+      )
+      await salary('monthly-worker', 3, '2026-12-01', 'monthly', 100000)
+      expect((await read())?.baseMinor).toBe(50000)
+      expect(await publish()).toEqual({ saved: 1 })
+      await salary('monthly-worker', 4, '2026-11-01', 'monthly', 70000)
+      expect(await read()).toMatchObject({
+        salary: { amountMinor: 70000 },
+        baseMinor: 70000,
+        totalMinor: 70000,
+        baseNeedsConfirmation: false,
+      })
+      expect((await read('first'))?.baseMinor).toBe(25000)
+      expect((await read('salary'))?.baseMinor).toBe(45000)
+      expect((await detail()).baseNeedsReview).toBe(false)
+      setDate('2026-12-10')
+      expect((await preview('salary')).ready).toMatchObject([
+        { baseMinor: 45000 },
+      ])
+      expect(await publish('salary')).toEqual({ saved: 1 })
+      await salary('monthly-worker', 5, '2026-11-01', 'monthly', 90000)
+      expect((await read())?.baseMinor).toBe(70000)
+      expect((await read('salary'))?.baseMinor).toBe(45000)
+      expect((await detail()).payments).toMatchObject([
+        { stage: 'first', baseMinor: 25000 },
+        { stage: 'salary', baseMinor: 45000 },
+      ])
+    })
+    it('requires review for a custom amount after a full-month salary correction', async () => {
+      await service.saveMonthlyEmployee(
+        actor,
+        await input({ baseOverrideMinor: 50000, baseReason: undefined }),
+      )
+      await salary('monthly-worker', 2, '2026-01-01', 'monthly', 70000)
+      expect(await detail()).toMatchObject({
+        baseNeedsReview: true,
+        current: { baseMinor: 50000 },
+      })
+      expect((await preview()).pending).toMatchObject([
+        { name: 'ბექა თანამშრომელი' },
+        {
+          name: 'ანა თანამშრომელი',
+          message: expect.stringContaining('შეიცვალა'),
+        },
+      ])
+    })
     it('rejects missing employment and stale salary/employment sources at save or publication', async () => {
       const stale = await input()
       await salary('monthly-worker', 2, '2026-01-01', 'monthly', 120000)

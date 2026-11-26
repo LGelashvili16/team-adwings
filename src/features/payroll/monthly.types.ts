@@ -51,6 +51,7 @@ export type MonthlySource = {
 export type MonthlyDetail = {
   timezone: string
   source: MonthlySource | null
+  baseNeedsReview: boolean
   sourceMessage: string | null
   salaryMissing: boolean
   employmentNeedsReview: boolean

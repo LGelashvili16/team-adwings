@@ -208,6 +208,7 @@ export function MonthlyPayrollPage() {
           }}
           payrollMonth={view?.month ?? search.month}
           payrollPeriod={view?.period}
+          isPeriodLoading={query.isPlaceholderData}
           onMonthChange={(month) => {
             void navigate({
               search: { ...search, month, page: 1 },
@@ -226,7 +227,11 @@ export function MonthlyPayrollPage() {
               variant="outline"
               size="sm"
               className="h-11 w-full md:ml-auto md:h-9 md:w-auto"
-              disabled={!view?.total || exportPayroll.isPending}
+              disabled={
+                !view?.total ||
+                query.isPlaceholderData ||
+                exportPayroll.isPending
+              }
               onClick={() => exportPayroll.mutate()}
             >
               {exportPayroll.isPending ? (
@@ -255,6 +260,7 @@ export function MonthlyPayrollPage() {
         <div
           id={showPeriod ? resultsId : undefined}
           role={showPeriod ? 'tabpanel' : undefined}
+          aria-busy={query.isPlaceholderData || undefined}
           aria-labelledby={
             showPeriod
               ? `${resultsId}-${view?.period ?? search.period ?? 'all'}`

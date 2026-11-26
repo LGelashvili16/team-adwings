@@ -61,6 +61,7 @@ export function MonthlyEntryForm({
   userId,
   source: initialSource,
   current: initialCurrent,
+  baseNeedsReview = false,
   onSaved,
   onPending,
   showSubmit = true,
@@ -75,6 +76,7 @@ export function MonthlyEntryForm({
   userId: string
   source: MonthlySource | null
   current: MonthlyDetail['current']
+  baseNeedsReview?: boolean
   onSaved: () => void
   onPending: (value: boolean) => void
   showSubmit?: boolean
@@ -89,7 +91,12 @@ export function MonthlyEntryForm({
     current: initialCurrent,
   }))
   const adjustmentsOnly = !source
-  const salaryPaid = payments.some((payment) => payment.stage === 'salary')
+  const salaryPayment = payments.find((payment) => payment.stage === 'salary')
+  const salaryPaid = !!salaryPayment
+  const paidBase = salaryPayment
+    ? salaryPayment.baseMinor +
+      (payments.find((payment) => payment.stage === 'first')?.baseMinor ?? 0)
+    : null
   const formSchema = monthlyFormSchema.superRefine(
     ({ paymentDates }, context) => {
       for (const stage of ['salary', 'adjustments'] as const) {
@@ -168,12 +175,20 @@ export function MonthlyEntryForm({
     current && (!adjustmentsOnly || current.status !== 'voided')
       ? current.adjustments
       : []
+  const replacedAgreementAmount =
+    !salaryPaid &&
+    source?.salary.kind === 'monthly' &&
+    current?.salary?.kind === 'monthly' &&
+    source.salary.version !== current.salary.version &&
+    current.baseMinor === current.salary.amountMinor
   const savedBase =
     current?.salary &&
+    !replacedAgreementAmount &&
     (!source?.requiresBaseConfirmation || current.manualBase || salaryPaid)
       ? current.baseMinor
       : null
   const defaultBase =
+    paidBase ??
     savedBase ??
     (source?.salary.kind === 'monthly' ? source.salary.amountMinor : null)
   const form = useForm({
@@ -271,12 +286,13 @@ export function MonthlyEntryForm({
           </CardContent>
         </Card>
       ) : null}
-      {source?.requiresBaseConfirmation ? (
+      {source && (baseNeedsReview || source.requiresBaseConfirmation) ? (
         <Alert variant="warning" role="status">
           <IconAlertTriangle aria-hidden="true" />
           <AlertDescription>
-            დასაქმება ან ხელფასის შეთანხმება მთელ თვეს არ მოიცავს, ან თვეში
-            ტარიფი იცვლება. შენახვამდე გადაამოწმეთ თვის ხელფასი.
+            {baseNeedsReview
+              ? 'ხელფასის შეთანხმება ან დასაქმების თარიღები შეიცვალა. გადაამოწმეთ და შეინახეთ თვის ხელფასი.'
+              : 'დასაქმება ან ხელფასის შეთანხმება მთელ თვეს არ მოიცავს, ან თვეში ტარიფი იცვლება. შენახვამდე გადაამოწმეთ თვის ხელფასი.'}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -689,14 +705,16 @@ export function MonthlyEntryForm({
             {(values) => {
               const parsed = monthlyFormSchema.safeParse(values)
               if (!parsed.success) return null
-              const base = values.manualBase
-                ? salaryToMinor(values.base)
-                : source.salary.kind === 'monthly'
-                  ? source.salary.amountMinor
-                  : hourlyBase(
-                      source.salary.amountMinor,
-                      salaryToMinor(values.hours) * 36,
-                    )
+              const base =
+                paidBase ??
+                (values.manualBase
+                  ? salaryToMinor(values.base)
+                  : source.salary.kind === 'monthly'
+                    ? source.salary.amountMinor
+                    : hourlyBase(
+                        source.salary.amountMinor,
+                        salaryToMinor(values.hours) * 36,
+                      ))
               const total = monthlyTotals(
                 base,
                 values.adjustments.map((a) => ({

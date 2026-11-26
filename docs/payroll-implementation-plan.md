@@ -27,6 +27,8 @@ Monthly Payroll now displays assigned base salaries before draft preparation, wi
 - [x] Align CSV export with the right edge of the desktop payroll toolbar and keep it full width on mobile. Verified both widths in a Chrome preview.
 - [x] Highlight nonzero fines and the unset-salary summary count with semantic red. Verified the treatment in light and dark Chrome previews.
 - [x] Reduce the gap between payroll filters and table results to 8px. Verified rendered spacing in Chrome.
+- [x] Keep the filters and displayed results in place while an uncached period loads. Disable CSV export until the requested results arrive. Verified with a regression test and delayed responses in desktop and mobile Chrome previews.
+- [x] Refresh unpaid monthly payroll after a fixed salary correction. Require review for partial months and custom amounts and preserve issued installments. Verified in isolated PostgreSQL and with a Chrome preview of the corrected row and confirmation field.
 
 ## Historical simplified delivery, 2026-11-25
 
