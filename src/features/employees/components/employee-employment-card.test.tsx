@@ -8,6 +8,9 @@ import type { EmploymentView } from '../employment.types'
 import type { Actor } from '#/lib/authorization/actor'
 
 vi.mock('../employment.functions', () => ({ getEmployeeEmployment: vi.fn() }))
+vi.mock('#/features/access/access.functions', () => ({
+  endEmployeeEmployment: vi.fn(),
+}))
 vi.mock('./employment-editor', () => ({ EmploymentEditor: () => null }))
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
