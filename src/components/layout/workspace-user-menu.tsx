@@ -48,7 +48,11 @@ export function WorkspaceUserMenu({
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <SidebarMenuButton size="lg" aria-label="ანგარიშის მენიუ" />
+              <SidebarMenuButton
+                size="lg"
+                aria-label="ანგარიშის მენიუ"
+                className="rounded-lg border border-sidebar-border/80 bg-white/75 shadow-xs hover:bg-sidebar-accent dark:bg-card/80 dark:hover:bg-sidebar-accent"
+              />
             }
           >
             <Avatar>

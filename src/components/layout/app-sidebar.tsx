@@ -94,6 +94,7 @@ export function AppSidebar({
                 <Link to="/dashboard" onClick={() => setOpenMobile(false)} />
               }
               size="lg"
+              className="rounded-lg border border-sidebar-border/80 bg-white/75 shadow-xs hover:bg-sidebar-accent dark:bg-card/80 dark:hover:bg-sidebar-accent"
             >
               <img
                 src="/favicon.svg"

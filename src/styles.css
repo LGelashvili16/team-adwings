@@ -801,10 +801,48 @@ a {
   background-image: var(--app-background-gradient);
 }
 
+/* Light-mode surface harmony: keep dark mode untouched and easy to tune independently. */
+:root:not(.dark) [data-slot='sidebar-wrapper'],
+:root:not(.dark) [data-slot='sidebar-inner'],
+:root:not(.dark) [data-slot='sidebar'][data-mobile='true'] {
+  background-color: color-mix(in srgb, var(--primary) 3.5%, #f3f3f5);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 7%, #f3f3f5) 0%,
+    color-mix(in srgb, var(--primary) 3%, #f3f3f5) 45%,
+    color-mix(in srgb, var(--primary) 1.5%, #f3f3f5) 100%
+  );
+}
+
+:root:not(.dark) [data-slot='sidebar-inset'] {
+  border: 1px solid color-mix(in srgb, var(--primary) 10%, #e0e0e4);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 3%),
+    0 6px 20px rgb(0 0 0 / 3%);
+}
+
+[data-slot='sidebar-content']:not(:hover):not(:focus-within) {
+  scrollbar-color: transparent transparent;
+}
+
+@supports selector(::-webkit-scrollbar) {
+  [data-slot='sidebar-content']:not(:hover):not(
+      :focus-within
+    )::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+}
+
 @media (forced-colors: active) {
   :root,
   .dark {
     --app-background-gradient: none;
+  }
+
+  :root:not(.dark) [data-slot='sidebar-wrapper'],
+  :root:not(.dark) [data-slot='sidebar-inner'],
+  :root:not(.dark) [data-slot='sidebar'][data-mobile='true'] {
+    background-image: none;
   }
 
   .sidebar-brand-halo {
