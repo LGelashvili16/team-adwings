@@ -13,7 +13,11 @@ import {
   hasPermission,
 } from '#/lib/authorization/permissions'
 import { getEmployeeAccount } from '../access.functions'
-import { availableAccountActions, canManageAccount } from '../access.actions'
+import {
+  availableAccountActions,
+  canEditOwnEmployeeProfile,
+  canManageAccount,
+} from '../access.actions'
 import { AccountActionDialog } from './account-action-dialog'
 import { AccountCodeDialog } from './account-code-dialog'
 import { EmployeeDetailsSheet } from './employee-details-sheet'
@@ -98,7 +102,9 @@ export function UserDetail({
     )
 
   const { record, companyWeek } = detail
+  const isSelf = actor.id === record.userId
   const manageable = canManageAccount(record, actor)
+  const canEdit = manageable || (isSelf && canEditOwnEmployeeProfile(actor))
   const actions = manageable ? availableAccountActions(record) : []
   const canAssignAdmin = hasEveryPermission(actor, [
     'admin.access',
@@ -110,7 +116,7 @@ export function UserDetail({
       <BackLink />
       <UserProfileHeader
         record={record}
-        canEdit={manageable}
+        canEdit={canEdit}
         onEdit={() => setEditing(true)}
         actions={actions}
         onAction={setAction}
@@ -158,8 +164,9 @@ export function UserDetail({
       ) : null}
       {/* Keep the sheet root mounted so Base UI can run its opening and closing transitions. */}
       <EmployeeDetailsSheet
-        open={editing}
+        open={editing && canEdit}
         target={record}
+        editingSelf={isSelf}
         canAssignAdmin={canAssignAdmin}
         canConfigureSchedule={hasPermission(actor, 'attendance.configure')}
         onClose={() => setEditing(false)}

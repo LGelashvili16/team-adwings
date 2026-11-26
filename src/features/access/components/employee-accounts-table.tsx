@@ -2,7 +2,6 @@ import { Link } from '@tanstack/react-router'
 import { IconChevronRight } from '@tabler/icons-react'
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Badge } from '#/components/ui/badge'
-import { Button } from '#/components/ui/button'
 import {
   Table,
   TableBody,
@@ -41,7 +40,7 @@ export function EmployeeAccountsTable({
         {records.map((record) => {
           const status = accountStatus(record)
           return (
-            <TableRow key={record.userId}>
+            <TableRow key={record.userId} className="relative cursor-pointer">
               <TableCell className="pl-5">
                 <div className="flex items-center gap-3">
                   <Avatar aria-hidden="true">
@@ -54,7 +53,7 @@ export function EmployeeAccountsTable({
                       <Link
                         to="/manage/employees/$employeeId"
                         params={{ employeeId: record.userId }}
-                        className="break-words outline-none hover:underline focus-visible:underline"
+                        className="break-words text-foreground! hover:underline focus-visible:outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
                       >
                         {record.name}
                       </Link>
@@ -86,21 +85,10 @@ export function EmployeeAccountsTable({
                 <Badge variant={status.variant}>{status.label}</Badge>
               </TableCell>
               <TableCell className="pr-5">
-                <Button
-                  nativeButton={false}
-                  role="link"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`${record.name}: დეტალები`}
-                  render={
-                    <Link
-                      to="/manage/employees/$employeeId"
-                      params={{ employeeId: record.userId }}
-                    />
-                  }
-                >
-                  <IconChevronRight aria-hidden="true" />
-                </Button>
+                <IconChevronRight
+                  className="mx-auto size-4"
+                  aria-hidden="true"
+                />
               </TableCell>
             </TableRow>
           )

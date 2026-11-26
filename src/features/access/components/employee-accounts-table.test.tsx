@@ -53,7 +53,7 @@ describe('employee accounts table', () => {
     expect(within(rows[1]).getByText('გასააქტიურებელი')).toBeVisible()
     expect(within(rows[1]).getByText('თქვენ')).toBeVisible()
     expect(
-      within(rows[1]).getByRole('link', { name: 'გიორგი ბერიძე: დეტალები' }),
+      within(rows[1]).getByRole('link', { name: 'გიორგი ბერიძე' }),
     ).toHaveAttribute('href', '/manage/employees/u2')
   })
 })

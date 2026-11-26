@@ -3,6 +3,7 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { IconDeviceFloppy } from '@tabler/icons-react'
 import { toast } from 'sonner'
+import { ownScheduleOptions } from '#/features/scheduling/scheduling.queries'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
@@ -45,12 +46,14 @@ const detailFields = [
 export function EmployeeDetailsSheet({
   open,
   target,
+  editingSelf,
   canAssignAdmin = false,
   canConfigureSchedule,
   onClose,
 }: {
   open: boolean
   target: EmployeeAccountRecord
+  editingSelf: boolean
   /** Assigning privileged administrator/accountant roles requires admin.access, users.manage, and roles.manage. */
   canAssignAdmin?: boolean
   /** Editing the working week additionally requires the attendance.configure permission. */
@@ -71,6 +74,7 @@ export function EmployeeDetailsSheet({
     : employeeRoleSchema.options
   const parsedRoles = provisionableRolesSchema.safeParse(targetRoles)
   const editableRoles =
+    !editingSelf &&
     parsedRoles.success &&
     parsedRoles.data.every((role) =>
       availableRoles.some((item) => item === role),
@@ -92,10 +96,14 @@ export function EmployeeDetailsSheet({
   const form = useForm({
     defaultValues,
     validators: { onSubmit: employeeDetailsSchema },
-    onSubmit: async ({ value }) => {
+    onSubmit: async ({ value, formApi }) => {
       setError('')
       try {
-        const { roles, expectedRoles, ...details } = value
+        const { roles, expectedRoles, workingWeek, ...profile } = value
+        const scheduleChanged =
+          workingWeek !== undefined &&
+          formApi.getFieldMeta('workingWeek')?.isDefaultValue === false
+        const details = scheduleChanged ? { ...profile, workingWeek } : profile
         const originalRoles = parseRoles(expectedRoles ?? '')
         const rolesChanged =
           roles &&
@@ -110,6 +118,10 @@ export function EmployeeDetailsSheet({
           return
         }
         await client.invalidateQueries({ queryKey: ['employee-accounts'] })
+        if (scheduleChanged)
+          await client.invalidateQueries({
+            queryKey: ownScheduleOptions(target.userId).queryKey,
+          })
         toast.success('თანამშრომლის მონაცემები განახლებულია.')
         onClose()
       } catch {
@@ -155,8 +167,10 @@ export function EmployeeDetailsSheet({
           <FieldGroup className="gap-4">
             <SheetDescription>
               მომხმარებლის სახელის ან შესვლის ელფოსტის შეცვლა მაშინვე აისახება
-              ანგარიშზე. სისტემაში წვდომის შეცვლისას მიმდინარე სესიები
-              გაუქმდება.
+              ანგარიშზე.
+              {editingSelf
+                ? null
+                : ' სისტემაში წვდომის შეცვლისას მიმდინარე სესიები გაუქმდება.'}
             </SheetDescription>
             {detailFields.map(({ name, label, autoComplete }) => (
               <form.Field key={name} name={name}>
@@ -213,7 +227,7 @@ export function EmployeeDetailsSheet({
                   />
                 )}
               </form.Field>
-            ) : (
+            ) : editingSelf ? null : (
               <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
                 ამ ანგარიშის სისტემაში წვდომა წვდომის მართვის გვერდიდან
                 იმართება.

@@ -91,7 +91,7 @@ export const bootstrapOwnerSchema = z.object({
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
 })
-/** Administrative update of an existing employee's details, username, and roles. */
+/** Employee profile updates and authorized changes to roles and work schedule. */
 export const employeeDetailsSchema = z
   .object({
     userId: accountIdSchema,
@@ -117,7 +117,7 @@ export const employeeDetailsSchema = z
       message: 'განაახლეთ თანამშრომლის მონაცემები და სცადეთ ხელახლა.',
     },
   )
-/** The only field employees may change themselves; everything else is administrator-controlled. */
+/** Phone update from personal account settings. */
 export const ownPhoneSchema = z.object({ phone: phoneSchema })
 export const accountActionSchema = z
   .object({

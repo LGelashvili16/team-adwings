@@ -312,14 +312,14 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
           reason: 'აკრძალული მოქმედების შემოწმება.',
         }),
       ).rejects.toThrow()
-      await expect(
-        service.editEmployeeDetails(hr, {
-          userId,
-          name: 'დაუშვებელი ცვლილება',
-          contactEmail: '',
-        }),
-      ).rejects.toThrow()
     }
+    await expect(
+      service.editEmployeeDetails(hr, {
+        userId: owner.id,
+        name: 'დაუშვებელი ცვლილება',
+        contactEmail: '',
+      }),
+    ).rejects.toThrow()
     const hrSupervisor = await service.provisionEmployee(hr, {
       ...input,
       roles: ['supervisor'],
@@ -515,7 +515,6 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     expect((await identity('edit-plain')).email).toMatch(
       /@accounts\.teamwork\.invalid$/,
     )
-    await expect(edit(owner.id)).rejects.toThrow()
   })
 
   it('lets an active employee change only their own phone number', async () => {
@@ -755,6 +754,91 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       edit(saturdayShift.map((day) => ({ ...day, hours: null }))),
     ).rejects.toThrow()
   })
+
+  it.each(['owner', 'admin', 'hr_manager', 'employee'] as const)(
+    'enforces the self-edit policy for %s',
+    async (role) => {
+      let target = owner
+      if (role !== 'owner') {
+        const name = `პროფილის ტესტი ${role}`
+        const issued = await service.provisionEmployee(owner, {
+          name,
+          contactEmail: '',
+          roles: [role],
+        })
+        const record = await identityForCode(issued.code)
+        await service.completeEmployeeActivation(
+          {
+            code: issued.code,
+            username: `profile-${role}`,
+            newPassword: password,
+          },
+          hashPassword,
+        )
+        target = { ...owner, id: record.id, name, roles: [role] }
+      }
+
+      const details = {
+        userId: target.id,
+        name: target.name,
+        contactEmail: '',
+        jobTitle: 'განახლებული თანამდებობა',
+        phone: '',
+      }
+      const workingWeek = Array.from({ length: 7 }, (_, index) => ({
+        weekday: index + 1,
+        hours: index === 5 ? { start: '10:00', end: '14:00' } : null,
+      }))
+      if (role === 'employee') {
+        const staleActor: Actor = { ...target, roles: ['admin'] }
+        await expect(
+          service.editEmployeeDetails(staleActor, { ...details, workingWeek }),
+        ).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+        })
+        return
+      }
+
+      await expect(
+        service.editEmployeeDetails(target, {
+          ...details,
+          roles: ['employee'],
+          expectedRoles: role,
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+      await service.editEmployeeDetails(target, { ...details, workingWeek })
+      expect(
+        (await service.readEmployeeAccount(target, { userId: target.id }))
+          ?.record,
+      ).toMatchObject({
+        jobTitle: details.jobTitle,
+        roles: role,
+        workingWeek,
+      })
+
+      await service.editEmployeeDetails(target, {
+        ...details,
+        workingWeek: null,
+      })
+      expect(
+        (await service.readEmployeeAccount(target, { userId: target.id }))
+          ?.record.workingWeek,
+      ).toBeNull()
+
+      if (role === 'admin') {
+        await testDatabase()
+          .update(tables.user)
+          .set({
+            permissionOverrides: { allow: [], deny: ['attendance.configure'] },
+          })
+          .where(eq(tables.user.id, target.id))
+        await expect(
+          service.editEmployeeDetails(target, { ...details, workingWeek }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+        await service.editEmployeeDetails(target, details)
+      }
+    },
+  )
 
   it('allows only one concurrent consumption and authenticates through Better Auth username login', async () => {
     const issued = await provision('worker-active')

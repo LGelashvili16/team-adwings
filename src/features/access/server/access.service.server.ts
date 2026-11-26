@@ -18,6 +18,7 @@ import {
   replaceEmployeeWeek,
   ScheduleWorkflowError,
 } from '#/features/scheduling/server/scheduling.service.server'
+import { canEditOwnEmployeeProfile } from '../access.actions'
 import {
   accountActionSchema,
   accountListSchema,
@@ -274,11 +275,17 @@ export async function editEmployeeDetails(
   const input = employeeDetailsSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
+    const editingSelf = manager.id === input.userId
+    if (
+      editingSelf &&
+      (!canEditOwnEmployeeProfile(manager) || input.roles !== undefined)
+    )
+      throw new AuthorizationError()
     const target = await repository.lockedAccount(tx, input.userId)
     if (!target?.person)
       throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
     const targetRoles = parseRoles(target.identity.roles)
-    checkTarget(manager, input.userId, targetRoles)
+    if (!editingSelf) checkTarget(manager, input.userId, targetRoles)
     let roleChanged = false
     if (input.roles !== undefined) {
       if (!targetRoles.length || targetRoles.includes('owner'))

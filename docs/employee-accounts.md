@@ -107,11 +107,14 @@ Email is not marked verified by provisioning. Email delivery is not configured; 
 
 Who may change what:
 
-- **Employee managers** (`manage.access` and `employees.manage`) edit full name, email, job title and
-  phone from the account page `/manage/employees/$employeeId` (the lean list on `/manage/employees` links to it;
-  button "რედაქტირება"). No free-text reason is required. The server records a fixed
-  action description, the authenticated actor, target account and timestamp as `account.details_updated`. The username and role cannot be edited here, and the
-  usual target rules apply (not yourself, owner required for admin/owner accounts).
+- **Employee managers** (`manage.access` and `employees.manage`) use the `რედაქტირება` button on
+  `/manage/employees/$employeeId` to edit full name, username, email, job title and phone. On other
+  employees' accounts, changes to system access and the work schedule follow their own permission
+  rules. The server records the actor, target and timestamp as `account.details_updated`.
+- **Owners, administrators and HR managers** with employee-management access can use the same
+  button on their own employee page to edit those five profile fields. They can also set their own
+  working days and hours with `attendance.configure`. Self-edits to system access and account
+  status are blocked.
 - **Employees** edit only their own phone number on `/settings/profile`. The subject is always
   the signed-in account; no identifier is accepted from the browser.
 - **Email** changes require employee-management access because email is not verified yet. For accounts that

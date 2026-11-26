@@ -26,7 +26,10 @@ vi.mock('../access.functions', () => ({
   updateEmployeeDetails,
 }))
 vi.mock('#/features/scheduling/scheduling.functions', () => ({
-  getScheduleSettings: vi.fn().mockResolvedValue({ ok: false, message: '' }),
+  getScheduleSettings: vi.fn(async () => ({
+    ok: true,
+    value: { current: { days: companyWeek } },
+  })),
 }))
 vi.mock('@tanstack/react-router', () => ({
   Link: ({
@@ -86,13 +89,14 @@ function renderDetail(
   overrides: Partial<EmployeeAccountRecord> = {},
   currentActor = actor,
 ) {
+  const target = { ...record, ...overrides }
   getEmployeeAccount.mockResolvedValue({
     ok: true,
-    value: { record: { ...record, ...overrides }, companyWeek },
+    value: { record: target, companyWeek },
   })
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <UserDetail userId="employee" actor={currentActor} />
+      <UserDetail userId={target.userId} actor={currentActor} />
     </QueryClientProvider>,
   )
 }
@@ -251,15 +255,74 @@ describe('single account page', () => {
     ).toBeVisible()
   })
 
-  it('hides editing and actions for the administrator themselves', async () => {
-    renderDetail({ userId: 'administrator' })
-    await screen.findByRole('heading', { name: 'ანა მაისურაძე' })
-    expect(screen.queryByRole('button', { name: 'რედაქტირება' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'შეჩერება' })).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: 'აღდგენის კოდის გაცემა' }),
-    ).toBeNull()
+  it.each(['owner', 'admin', 'hr_manager'] as const)(
+    'lets %s edit their profile and working days',
+    async (role) => {
+      updateEmployeeDetails.mockClear().mockResolvedValue({ ok: true })
+      const user = userEvent.setup()
+      renderDetail(
+        { userId: actor.id, roles: role },
+        { ...actor, roles: [role] },
+      )
+      const edit = await screen.findByRole('button', { name: 'რედაქტირება' })
+      expect(screen.queryByRole('button', { name: 'შეჩერება' })).toBeNull()
+      expect(
+        screen.queryByRole('button', { name: 'აღდგენის კოდის გაცემა' }),
+      ).toBeNull()
+      await user.click(edit)
+      expect(screen.getAllByRole('textbox')).toHaveLength(5)
+      expect(
+        screen.queryByRole('button', { name: /სისტემაში წვდომა/ }),
+      ).toBeNull()
+      const inherit = screen.getByRole('switch', {
+        name: 'კომპანიის განრიგის გამოყენება',
+      })
+      expect(inherit).toBeChecked()
+      await user.click(inherit)
+      await user.click(
+        screen.getByRole('switch', { name: 'ორშაბათი: სამუშაო დღე' }),
+      )
+      const jobTitle = screen.getByRole('textbox', { name: 'თანამდებობა' })
+      await user.clear(jobTitle)
+      await user.type(jobTitle, 'გუნდის ხელმძღვანელი')
+      await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+      expect(updateEmployeeDetails).toHaveBeenCalledExactlyOnceWith({
+        data: {
+          userId: actor.id,
+          name: record.name,
+          code: record.code,
+          contactEmail: record.contactEmail,
+          jobTitle: 'გუნდის ხელმძღვანელი',
+          phone: record.phone,
+          workingWeek: [{ weekday: 1, hours: null }, ...companyWeek.slice(1)],
+        },
+      })
+    },
+  )
+
+  it('omits an untouched working week when saving personal details', async () => {
+    updateEmployeeDetails.mockClear().mockResolvedValue({ ok: true })
+    const user = userEvent.setup()
+    renderDetail({ userId: actor.id, roles: 'admin', workingWeek: companyWeek })
+    await user.click(await screen.findByRole('button', { name: 'რედაქტირება' }))
+    await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+    expect(updateEmployeeDetails).toHaveBeenCalledOnce()
+    expect(updateEmployeeDetails.mock.calls[0][0].data).not.toHaveProperty(
+      'workingWeek',
+    )
   })
+
+  it.each(['employee', 'accountant', 'supervisor'] as const)(
+    'hides the self-edit button for %s',
+    async (role) => {
+      renderDetail(
+        { userId: actor.id, roles: role },
+        { ...actor, roles: [role] },
+      )
+      await screen.findByRole('heading', { name: record.name })
+      expect(screen.queryByRole('button', { name: 'რედაქტირება' })).toBeNull()
+    },
+  )
 
   it('reports a missing account', async () => {
     getEmployeeAccount.mockResolvedValue({ ok: true, value: null })
