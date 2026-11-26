@@ -3,6 +3,7 @@ import { setResponseHeader } from '@tanstack/react-start/server'
 import { permissionsMiddleware } from '#/lib/auth/auth.middleware'
 import { enforcePolicy } from '#/lib/authorization/guards.server'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
+import { endEmploymentSchema } from '#/features/employees/employment.schemas'
 import {
   accountActionSchema,
   accountListSchema,
@@ -15,11 +16,15 @@ import {
   editEmployeeDetails,
   listEmployeeAccounts,
   manageEmployeeAccount,
+  offboardEmployee,
   provisionEmployee,
   readEmployeeAccount,
 } from './server/access.service.server'
 
-async function safeAccessAction<T>(action: () => Promise<T>) {
+async function safeAccessAction<T>(
+  action: () => Promise<T>,
+  failureMessage = 'მოქმედება ვერ შესრულდა. გადაამოწმეთ მომხმარებლის სახელისა და ელფოსტის უნიკალურობა და სცადეთ ხელახლა.',
+) {
   setResponseHeader('Cache-Control', 'private, no-store')
   try {
     return { ok: true as const, value: await enforcePolicy(action) }
@@ -28,9 +33,7 @@ async function safeAccessAction<T>(action: () => Promise<T>) {
     return {
       ok: false as const,
       message:
-        error instanceof AccountWorkflowError
-          ? error.message
-          : 'მოქმედება ვერ შესრულდა. გადაამოწმეთ მომხმარებლის სახელისა და ელფოსტის უნიკალურობა და სცადეთ ხელახლა.',
+        error instanceof AccountWorkflowError ? error.message : failureMessage,
     }
   }
 }
@@ -67,4 +70,20 @@ export const updateEmployeeDetails = createServerFn({ method: 'POST' })
   .validator(employeeDetailsSchema)
   .handler(({ data, context }) =>
     safeAccessAction(() => editEmployeeDetails(context.actor, data)),
+  )
+
+export const endEmployeeEmployment = createServerFn({ method: 'POST' })
+  .middleware([
+    permissionsMiddleware(
+      'manage.access',
+      'employees.manage',
+      'employees.employment.manage',
+    ),
+  ])
+  .validator(endEmploymentSchema)
+  .handler(({ data, context }) =>
+    safeAccessAction(
+      () => offboardEmployee(context.actor, data),
+      'დასაქმება ვერ დასრულდა. სცადეთ ხელახლა.',
+    ),
   )

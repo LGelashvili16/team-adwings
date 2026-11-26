@@ -2,6 +2,7 @@ import '@tanstack/react-start/server-only'
 import { assertPermissions } from '#/lib/authorization/access'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { currentAuthorization } from '#/lib/authorization/permissions'
+import { lockAccountManagement } from '#/lib/auth/account-management-lock.server'
 import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
 import type { Actor } from '#/lib/authorization/actor'
 import type { EmploymentPeriodFacts, EmploymentView } from '../employment.types'
@@ -12,6 +13,8 @@ import {
   employmentWriteSchema,
 } from '../employment.schemas'
 import * as repository from './employment.repository.server'
+import type { endEmploymentSchema } from '../employment.schemas'
+import type { z } from 'zod'
 
 export class EmploymentError extends Error {}
 async function authorize(
@@ -41,16 +44,22 @@ export async function readEmployeeEmployment(
       const workday = await getCompanyWorkday(new Date(), tx)
       const periodTotal = await repository.periodCount(tx, target.id)
       const historyTotal = await repository.historyCount(tx, target.id)
+      const periods = await repository.readPeriods(
+        tx,
+        target.id,
+        data.employmentPage,
+      )
       return {
         revision: target.revision,
         today: workday.date,
         timezone: workday.timezone,
         confirmed: periodTotal > 0,
-        periods: await repository.readPeriods(
-          tx,
-          target.id,
-          data.employmentPage,
-        ),
+        departureScheduled: target.departureScheduled,
+        latestPeriod:
+          data.employmentPage === 1
+            ? (periods[0] ?? null)
+            : await repository.latestPeriod(tx, target.id),
+        periods,
         periodTotal,
         history: (
           await repository.readHistory(
@@ -72,6 +81,7 @@ async function lockTarget(
   userId: string,
   expectedRevision: number,
 ) {
+  await lockAccountManagement(tx)
   const current = await authorize(tx, actor, true)
   if (current.id === userId) throw new AuthorizationError()
   const target = await repository.targetEmployee(tx, userId, true)
@@ -79,6 +89,10 @@ async function lockTarget(
   if (target.revision !== expectedRevision)
     throw new EmploymentError(
       'დასაქმების პერიოდები შეიცვალა. განაახლეთ გვერდი და გადაამოწმეთ მონაცემები.',
+    )
+  if (target.departureEffectiveAt)
+    throw new EmploymentError(
+      'დაგეგმილი ბოლო სამუშაო დღე შეცვალეთ დასაქმების დასრულების ფანჯრიდან.',
     )
   return { target, actorId: current.id }
 }
@@ -156,6 +170,48 @@ async function writeEmploymentPeriod(
       data.reason ??
       (before ? 'დასაქმების პერიოდი განახლდა.' : 'დასაქმების პერიოდი დაემატა.'),
   })
+}
+
+/** The account workflow owns the transaction and holds the target employee lock. */
+export async function closeEmploymentForDeparture(
+  tx: repository.EmploymentTransaction,
+  manager: Actor,
+  target: { id: string; employmentRevision: number },
+  data: z.infer<typeof endEmploymentSchema>,
+) {
+  assertPermissions(manager, ['employees.employment.manage'])
+  if (target.employmentRevision !== data.expectedRevision)
+    throw new EmploymentError(
+      'დასაქმების პერიოდები შეიცვალა. განაახლეთ გვერდი და გადაამოწმეთ მონაცემები.',
+    )
+  const { date: today, timezone } = await getCompanyWorkday(new Date(), tx)
+  const scheduled = data.endDate > today
+  const period = await repository.latestPeriod(tx, target.id)
+  const startDate = period?.startDate ?? data.startDate
+  if (!startDate || startDate > data.endDate)
+    throw new EmploymentError(
+      'გადაამოწმეთ დასაქმების დაწყების თარიღი და ბოლო სამუშაო დღე.',
+    )
+  if (
+    await repository.hasAttendanceBlockingDeparture(
+      tx,
+      target.id,
+      data.endDate,
+      !scheduled,
+    )
+  )
+    throw new EmploymentError(
+      'დახურეთ ღია დასწრება და გადაამოწმეთ ბოლო სამუშაო დღის შემდეგ ჩაწერილი დასწრებები.',
+    )
+  await writeEmploymentPeriod(tx, target.id, manager.id, {
+    periodId: period?.id ?? null,
+    startDate,
+    endDate: data.endDate,
+    reason: data.reason,
+  })
+  return scheduled
+    ? repository.departureCutoff(tx, data.endDate, timezone)
+    : null
 }
 
 export async function saveEmployeeEmployment(

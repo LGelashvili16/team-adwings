@@ -9,7 +9,11 @@ import {
   workLocationOverrideSchema,
 } from '#/features/scheduling/scheduling.schemas'
 import { dayOffDaysSchema } from '#/features/leave/day-off-allowance.schemas'
-import { employmentDateSchema } from '#/features/employees/employment.schemas'
+import {
+  employmentDateSchema,
+  employmentDirectoryStatusSchema,
+} from '#/features/employees/employment.schemas'
+import { accountDirectorySearchSchema } from '#/lib/account-directory.schemas'
 import {
   maxPasswordLength,
   minPasswordLength,
@@ -154,15 +158,16 @@ export const accountListSchema = z.object({
     .int('გვერდი არასწორია.')
     .min(1, 'გვერდი არასწორია.')
     .max(10000, 'გვერდი არასწორია.'),
+  q: accountDirectorySearchSchema.shape.q,
+  employment: employmentDirectoryStatusSchema.optional(),
 })
-export const accountSearchSchema = z.object({
-  page: z.coerce
-    .number()
-    .int('გვერდი არასწორია.')
-    .min(1, 'გვერდი არასწორია.')
-    .max(10000, 'გვერდი არასწორია.')
-    .default(1),
+export const accountSearchSchema = accountListSchema.extend({
+  page: z.preprocess(
+    (value) => (typeof value === 'string' ? Number(value) : value),
+    accountListSchema.shape.page.default(1),
+  ),
 })
+export type EmployeeAccountSearch = z.infer<typeof accountSearchSchema>
 export const accountPasswordSchema = z
   .string()
   .min(

@@ -125,7 +125,9 @@ export async function autoCloseSessions(
   )
   return (
     await tx.execute<Candidate>(sql`with due as (
-    select s.id,${cutoff} as cutoff from attendance_session s where s.ended_at is null
+    select s.id,${cutoff} as cutoff from attendance_session s join employee e on e.id=s.employee_id
+      where s.ended_at is null
+      and (e.departure_effective_at is null or e.departure_effective_at > ${instant}::timestamptz)
       and ${cutoff} <= ${instant}::timestamptz
     order by s.started_at,s.id limit ${limit} for update of s skip locked
   ), closed as (

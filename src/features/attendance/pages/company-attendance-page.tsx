@@ -11,6 +11,7 @@ import {
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { Skeleton } from '#/components/ui/skeleton'
+import { EmploymentDirectoryFilter } from '#/features/employees/components/employment-directory-filter'
 import { CompanyAttendanceSearch } from '../components/company-attendance-search'
 import { CompanyAttendanceUsersTable } from '../components/company-attendance-users-table'
 import { CompanyAttendancePagination } from '../components/company-attendance-pagination'
@@ -41,12 +42,20 @@ export function CompanyAttendancePage() {
         </Alert>
       ) : null}
       <div className="min-w-0 overflow-hidden rounded-xl border bg-card">
-        <div className="border-b p-4">
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row">
           <CompanyAttendanceSearch
             search={search}
             onChange={(value, replace) => {
               void navigate({ search: value, replace })
             }}
+          />
+          <EmploymentDirectoryFilter
+            value={search.employment}
+            onChange={(employment) =>
+              void navigate({
+                search: (previous) => ({ ...previous, employment, page: 1 }),
+              })
+            }
           />
         </div>
         <div aria-busy={query.isFetching}>
@@ -125,7 +134,9 @@ export function CompanyAttendancePage() {
                       ? 'ამ გვერდზე ჩანაწერები არ არის'
                       : filtered
                         ? 'შესაბამისი თანამშრომლები ვერ მოიძებნა'
-                        : 'თანამშრომლები ჯერ არ არის'}
+                        : search.employment === 'former'
+                          ? 'ყოფილი თანამშრომლები ჯერ არ არიან'
+                          : 'თანამშრომლები ჯერ არ არის'}
                   </h2>
                   {filtered ? (
                     <p className="max-w-sm text-sm leading-6 text-muted-foreground">

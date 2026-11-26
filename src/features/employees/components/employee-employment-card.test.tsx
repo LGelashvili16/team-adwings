@@ -39,6 +39,8 @@ const initial: EmploymentView = {
   today: '2026-11-25',
   timezone: 'Asia/Tbilisi',
   confirmed: false,
+  latestPeriod: null,
+  departureScheduled: false,
   periods: [],
   periodTotal: 0,
   history: [],

@@ -9,6 +9,7 @@ import {
 import { assertPermission } from '#/lib/authorization/access'
 import { hasPermission } from '#/lib/authorization/permissions'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
+import { effectiveEmploymentStatus } from '#/features/employees/server/employment-status.server'
 import type { Actor } from '#/lib/authorization/actor'
 import {
   getCompanyWorkday,
@@ -48,7 +49,7 @@ export async function createManualAttendance(
         .where(
           and(
             eq(employee.userId, data.userId),
-            eq(employee.status, 'active'),
+            eq(effectiveEmploymentStatus, 'active'),
             eq(user.accessState, 'active'),
           ),
         )

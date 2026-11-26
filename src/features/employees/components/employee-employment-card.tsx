@@ -4,11 +4,13 @@ import { Link } from '@tanstack/react-router'
 import {
   IconCalendarUser,
   IconChevronDown,
+  IconDoorExit,
   IconHistory,
   IconPlus,
 } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
+import { Badge } from '#/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import {
   Collapsible,
@@ -25,16 +27,17 @@ import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
 import { DataPagination } from '#/components/common/data-pagination'
 import { hasPermission } from '#/lib/authorization/permissions'
-import { formatGeorgianDateTime } from '#/lib/date-format'
+import { formatGeorgianDate, formatGeorgianDateTime } from '#/lib/date-format'
 import { employmentKey, employmentQuery } from '../employment.queries'
 import { EmploymentEditor } from './employment-editor'
+import { EndEmploymentSheet } from './end-employment-sheet'
 import {
   EmploymentDates,
   EmploymentPeriodsTable,
 } from './employment-periods-table'
 import type { EmploymentDraft } from './employment-editor'
 import type { Actor } from '#/lib/authorization/actor'
-import type { EmploymentPeriod } from '../employment.types'
+import type { EmploymentPeriod, EmploymentView } from '../employment.types'
 
 const actionLabels = {
   created: 'პერიოდი დამატებულია',
@@ -46,12 +49,16 @@ export function EmployeeEmploymentCard({
   actor,
   userId,
   name,
+  canEndEmployment = false,
+  onEmploymentEnded,
   employmentPage = 1,
   employmentHistoryPage = 1,
 }: {
   actor: Actor
   userId: string
   name: string
+  canEndEmployment?: boolean
+  onEmploymentEnded?: () => void
   employmentPage?: number
   employmentHistoryPage?: number
 }) {
@@ -61,9 +68,15 @@ export function EmployeeEmploymentCard({
   )
   const [draft, setDraft] = useState<EmploymentDraft | null>(null)
   const [open, setOpen] = useState(false)
+  const [departure, setDeparture] = useState<{
+    key: number
+    view: Pick<EmploymentView, 'revision' | 'latestPeriod' | 'today'>
+    open: boolean
+  } | null>(null)
   const view = query.data?.ok ? query.data.value : null
   const canEdit =
     actor.id !== userId && hasPermission(actor, 'employees.employment.manage')
+  const canEditPeriods = canEdit && !view?.departureScheduled
   const edit = (
     period: EmploymentPeriod | null,
     mode: EmploymentDraft['mode'],
@@ -110,14 +123,36 @@ export function EmployeeEmploymentCard({
           <h2>დასაქმების პერიოდები</h2>
         </CardTitle>
         {canEdit && view ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => edit(null, 'create')}
-          >
-            <IconPlus data-icon="inline-start" aria-hidden="true" />
-            დამატება
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {canEditPeriods ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => edit(null, 'create')}
+              >
+                <IconPlus data-icon="inline-start" aria-hidden="true" />
+                დამატება
+              </Button>
+            ) : null}
+            {canEndEmployment ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  setDeparture({
+                    key: (departure?.key ?? 0) + 1,
+                    view,
+                    open: true,
+                  })
+                }
+              >
+                <IconDoorExit data-icon="inline-start" aria-hidden="true" />
+                {view.departureScheduled
+                  ? 'ბოლო სამუშაო დღის შეცვლა'
+                  : 'დასაქმების დასრულება'}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4 px-4 sm:px-5">
@@ -157,6 +192,15 @@ export function EmployeeEmploymentCard({
           </Alert>
         ) : (
           <>
+            {view.departureScheduled && view.latestPeriod?.endDate ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <Badge variant="yellow">დასრულება დაგეგმილია</Badge>
+                <span className="text-muted-foreground">
+                  ბოლო სამუშაო დღე{' '}
+                  {formatGeorgianDate(view.latestPeriod.endDate)}
+                </span>
+              </div>
+            ) : null}
             {!view.confirmed ? (
               <Empty className="rounded-xl border border-dashed bg-muted/15 px-4 py-7 md:p-7">
                 <EmptyHeader>
@@ -176,7 +220,7 @@ export function EmployeeEmploymentCard({
                 <EmploymentPeriodsTable
                   periods={view.periods}
                   today={view.today}
-                  canEdit={canEdit}
+                  canEdit={canEditPeriods}
                   onEdit={edit}
                 />
               </div>
@@ -296,6 +340,24 @@ export function EmployeeEmploymentCard({
             void client.invalidateQueries({
               queryKey: employmentKey(actor.id, userId),
             })
+          }}
+        />
+      ) : null}
+      {departure ? (
+        <EndEmploymentSheet
+          key={departure.key}
+          open={departure.open}
+          userId={userId}
+          name={name}
+          today={departure.view.today}
+          revision={departure.view.revision}
+          period={departure.view.latestPeriod}
+          onClose={() => setDeparture({ ...departure, open: false })}
+          onSaved={() => {
+            void client.invalidateQueries({
+              queryKey: employmentKey(actor.id, userId),
+            })
+            onEmploymentEnded?.()
           }}
         />
       ) : null}

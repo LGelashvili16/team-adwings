@@ -1,8 +1,13 @@
 import '@tanstack/react-start/server-only'
-import { sql } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
+import { attendanceSession } from '#/db/schema/attendance/attendance.schema'
 import type { DeliverNotificationsInput } from '#/features/notifications/notifications.schemas'
 import { deliverNotificationBatch } from '#/features/notifications/server/notifications.service.server'
-import { transactAttendance } from './attendance.repository.server'
+import {
+  transactAttendance,
+  workdayAutomaticCutoffSql,
+} from './attendance.repository.server'
+import type { AttendanceTransaction } from './attendance.repository.server'
 import {
   autoCloseSessions,
   autoCloseWarnings,
@@ -11,6 +16,35 @@ import {
   openCandidates,
   saveDigestReceipts,
 } from './attendance-reminder.repository.server'
+
+/** A forgotten checkout on the final day remains provisional and reviewable. */
+export async function closeAttendanceAtDeparture(
+  tx: AttendanceTransaction,
+  employeeId: string,
+  cutoff: Date,
+) {
+  const automaticCutoff = workdayAutomaticCutoffSql(
+    sql`${attendanceSession.employeeId}`,
+    sql`${attendanceSession.workDate}`,
+    sql`${attendanceSession.startedAt}`,
+  )
+  const end = sql`greatest(${attendanceSession.startedAt}, least(${cutoff.toISOString()}::timestamptz, ${automaticCutoff}))`
+  await tx
+    .update(attendanceSession)
+    .set({
+      endedAt: end,
+      autoClosedAt: end,
+      revision: sql`${attendanceSession.revision} + 1`,
+      reviewState: 'pending',
+      approvedOutsideSeconds: 0,
+    })
+    .where(
+      and(
+        eq(attendanceSession.employeeId, employeeId),
+        isNull(attendanceSession.endedAt),
+      ),
+    )
+}
 
 /** Called only by the server clock. Serializable snapshots order eligibility against concurrent domain writes. */
 export function runAttendanceReminders(now = new Date()) {

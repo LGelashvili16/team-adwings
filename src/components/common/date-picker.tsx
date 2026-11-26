@@ -17,6 +17,7 @@ export function DatePicker({
   value,
   today,
   minimum,
+  maximum,
   disabled,
   invalid,
   required,
@@ -28,6 +29,7 @@ export function DatePicker({
   value: string
   today?: string
   minimum?: string
+  maximum?: string
   disabled?: boolean
   invalid: boolean
   required?: boolean
@@ -69,9 +71,10 @@ export function DatePicker({
             locale={ka}
             captionLayout="dropdown"
             selected={selected}
-            disabled={
-              minimum ? { before: new Date(`${minimum}T00:00:00`) } : undefined
-            }
+            disabled={[
+              ...(minimum ? [{ before: new Date(`${minimum}T00:00:00`) }] : []),
+              ...(maximum ? [{ after: new Date(`${maximum}T00:00:00`) }] : []),
+            ]}
             defaultMonth={
               selected ?? (today ? new Date(`${today}T12:00:00`) : undefined)
             }

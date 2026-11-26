@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  gt,
   gte,
   isNull,
   lte,
@@ -13,11 +14,13 @@ import {
 } from 'drizzle-orm'
 import { db } from '#/db'
 import {
+  attendanceSession,
   employee,
   employeeEmploymentAudit,
   employeeEmploymentPeriod,
   user,
 } from '#/db/schema'
+import { effectiveEmploymentStatus } from './employment-status.server'
 
 export const transactEmployment = db.transaction.bind(db)
 export type EmploymentTransaction = Parameters<
@@ -39,7 +42,7 @@ export async function currentAccount(tx: EmploymentTransaction, id: string) {
   ).at(0)
   const person = (
     await tx
-      .select({ status: employee.status })
+      .select({ status: effectiveEmploymentStatus })
       .from(employee)
       .where(eq(employee.userId, id))
       .for('share')
@@ -56,6 +59,8 @@ export async function targetEmployee(
       id: employee.id,
       userId: employee.userId,
       revision: employee.employmentRevision,
+      departureEffectiveAt: employee.departureEffectiveAt,
+      departureScheduled: sql<boolean>`coalesce(${employee.departureEffectiveAt} > statement_timestamp(), false)`,
     })
     .from(employee)
     .where(eq(employee.userId, userId))
@@ -104,6 +109,63 @@ export async function readPeriods(
     )
     .limit(pageSize)
     .offset((page - 1) * pageSize)
+}
+export async function latestPeriod(
+  tx: EmploymentTransaction,
+  employeeId: string,
+) {
+  return (
+    (
+      await tx
+        .select({
+          id: employeeEmploymentPeriod.id,
+          startDate: employeeEmploymentPeriod.startDate,
+          endDate: employeeEmploymentPeriod.endDate,
+        })
+        .from(employeeEmploymentPeriod)
+        .where(active(employeeId))
+        .orderBy(desc(employeeEmploymentPeriod.startDate))
+        .limit(1)
+    ).at(0) ?? null
+  )
+}
+
+export async function hasAttendanceBlockingDeparture(
+  tx: EmploymentTransaction,
+  employeeId: string,
+  endDate: string,
+  includeOpen: boolean,
+) {
+  const rows = await tx
+    .select({ id: attendanceSession.id })
+    .from(attendanceSession)
+    .where(
+      and(
+        eq(attendanceSession.employeeId, employeeId),
+        or(
+          includeOpen ? isNull(attendanceSession.endedAt) : undefined,
+          gt(attendanceSession.workDate, endDate),
+        ),
+      ),
+    )
+    .limit(1)
+  return rows.length > 0
+}
+
+export async function departureCutoff(
+  tx: EmploymentTransaction,
+  endDate: string,
+  timezone: string,
+) {
+  const [row] = await tx
+    .select({
+      cutoff:
+        sql`(${endDate}::date + 1)::timestamp at time zone ${timezone}`.mapWith(
+          employee.createdAt,
+        ),
+    })
+    .from(sql`(select 1) as singleton`)
+  return row.cutoff
 }
 export async function periodCount(
   tx: EmploymentTransaction,

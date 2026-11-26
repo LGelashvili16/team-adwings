@@ -21,6 +21,8 @@ export type EmploymentView = {
   today: string
   timezone: string
   confirmed: boolean
+  latestPeriod: EmploymentPeriod | null
+  departureScheduled: boolean
   periods: Array<EmploymentPeriod>
   periodTotal: number
   history: Array<EmploymentAuditEntry>

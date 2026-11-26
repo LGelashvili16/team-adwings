@@ -3,6 +3,7 @@ import { accountDirectorySearchSchema } from '#/lib/account-directory.schemas'
 import { recordIdSchema } from '#/lib/route-schemas'
 import { employeeTimesheetSearchSchema } from '#/features/timesheets/timesheets.schemas'
 import { scheduleDateSchema } from '#/features/scheduling/scheduling.schemas'
+import { employmentDirectoryStatusSchema } from '#/features/employees/employment.schemas'
 
 const page = z
   .number({ error: 'გვერდი არასწორია.' })
@@ -12,6 +13,7 @@ const page = z
 export const companyAttendanceSearchSchema =
   accountDirectorySearchSchema.extend({
     userId: recordIdSchema.optional(),
+    employment: employmentDirectoryStatusSchema.optional(),
   })
 export const companyAttendanceListSchema = companyAttendanceSearchSchema
   .omit({ userId: true })

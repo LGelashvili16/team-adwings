@@ -10,8 +10,15 @@ export const attendanceTaskConfig = {
         new URL('../src/server/tasks/attendance-reminders.ts', import.meta.url),
       ),
     },
+    'employees:departures': {
+      handler: fileURLToPath(
+        new URL('../src/server/tasks/employee-departures.ts', import.meta.url),
+      ),
+    },
   },
-  scheduledTasks: { '* * * * *': ['attendance:reminders'] },
+  scheduledTasks: {
+    '* * * * *': ['employees:departures', 'attendance:reminders'],
+  },
   modules: [
     (nitro) => {
       // The dev preset otherwise installs an unauthenticated HTTP task runner.

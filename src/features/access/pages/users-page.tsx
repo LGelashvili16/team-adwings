@@ -2,8 +2,15 @@ import { useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { EmployeeAccounts } from '../components/employee-accounts'
 import type { Actor } from '#/lib/authorization/actor'
+import type { EmployeeAccountSearch } from '../access.schemas'
 
-export function UsersPage({ page, actor }: { page: number; actor: Actor }) {
+export function UsersPage({
+  search,
+  actor,
+}: {
+  search: EmployeeAccountSearch
+  actor: Actor
+}) {
   // This private feature owns its cache; leaving the authenticated page discards it.
   const [client] = useState(
     () =>
@@ -16,7 +23,7 @@ export function UsersPage({ page, actor }: { page: number; actor: Actor }) {
   )
   return (
     <QueryClientProvider client={client}>
-      <EmployeeAccounts page={page} actor={actor} />
+      <EmployeeAccounts search={search} actor={actor} />
     </QueryClientProvider>
   )
 }

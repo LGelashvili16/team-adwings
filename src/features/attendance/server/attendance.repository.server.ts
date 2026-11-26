@@ -1,4 +1,5 @@
 import '@tanstack/react-start/server-only'
+import { effectiveEmploymentStatus } from '#/features/employees/server/employment-status.server'
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm'
 import { db } from '#/db'
 import { attendanceAudit, attendanceSession, employee, user } from '#/db/schema'
@@ -149,7 +150,7 @@ export async function employeeForActor(
       .for('share')
   ).at(0)
   const query = tx
-    .select({ id: employee.id, status: employee.status })
+    .select({ id: employee.id, status: effectiveEmploymentStatus })
     .from(employee)
     .where(eq(employee.userId, actorId))
   const person = (await query.for(write ? 'update' : 'share')).at(0)

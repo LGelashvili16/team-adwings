@@ -9,7 +9,7 @@ Replace month closing with published payments for ready employees. Scheduled pay
 - [x] Verify one or two salary payments, either bonus and premium payment month with the following month as default, and company and employee fine-stage settings.
 - [x] Verify publication for ready employees, fixed first-payment overrides, confirmed hourly calculations, independent retries and month-filtered employee payment history.
 - [x] Verify migration 0072 removes the retired calculation settings and preserves salary history.
-- [ ] Implement overtime and rest-day formulas after the user supplies calculation rules. Hourly work can fall on any calendar day.
+- [ ] Confirm and implement the [attendance-based payroll calculation instructions](payroll-attendance-calculation-instructions.md) for fixed rest-day bonuses, hourly pay bands and GPS job earnings, in that dependency order.
 
 Verification, 2026-11-26. All 73 payroll tests passed, including 37 checks against isolated PostgreSQL databases. Tests covered an upgrade with an existing configuration, two concurrent publishers, duplicate command retries, payment isolation, and archived and published statements. TypeScript, targeted ESLint and formatting, Drizzle validation and the production build passed. Chrome checks used synthetic data with the actual settings, entry and payment-history components at desktop and mobile widths. The real database was left for deployment of the verified migration.
 

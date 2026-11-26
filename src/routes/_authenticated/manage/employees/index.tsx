@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_authenticated/manage/employees/')({
 })
 
 function EmployeeManagementRoute() {
-  const { page } = Route.useSearch()
+  const search = Route.useSearch()
   const { actor } = Route.useRouteContext()
-  return <UsersPage page={page} actor={actor} />
+  return <UsersPage search={search} actor={actor} />
 }

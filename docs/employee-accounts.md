@@ -82,6 +82,39 @@ Privileged operations re-read and lock the acting account and target account.
 Changes and their audit rows commit together. Audit rows contain actor, target,
 action, reason, and timestamps; they contain neither codes nor passwords.
 
+### End employment
+
+On the employee profile, use **დასაქმების დასრულება** in the employment periods
+section. HR, administrators, and owners need the existing employment-management
+permission and authority over the target account. Enter an inclusive last
+working day and a reason. If there is no confirmed period, enter the actual
+start date.
+
+Choose a future last working day to schedule the departure. Login stays
+available through that day and stops at midnight at the start of the following
+day, in the company timezone used when scheduling. Before the cutoff, use
+**ბოლო სამუშაო დღის შეცვლა** on the profile to reschedule. While a departure is
+pending, update its date through that action. The scheduled date is saved to the
+employment period immediately for payroll calculations. A future date entered
+in the ordinary employment-period editor only updates payroll eligibility.
+
+Choose today or an earlier date to complete the departure immediately. First
+resolve any open attendance and verify sessions recorded after the proposed
+last day. Immediate login suspension also remains available separately.
+
+The internal minute task finalizes each due departure, marks the employee
+inactive, suspends login, revokes sessions and setup codes, and audits the
+change. If a session is still open, the task closes it provisionally at the
+earlier of the departure cutoff and the ordinary attendance limit for review.
+Authentication and both directories apply the cutoff even if the task runs
+late. Apply migration `0075_scheduled_employee_departure.sql` before running
+the updated application.
+
+The employee and attendance directories default to current staff. Select
+**ყოფილი თანამშრომლები** to find former employees. Their profiles, dated
+attendance, timesheets, leave, and payroll records remain available within the
+existing permissions.
+
 ## Employee workflow
 
 Use `/auth/register` to activate and `/auth/reset-password` to redeem a reset code.

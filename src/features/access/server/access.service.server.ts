@@ -10,8 +10,15 @@ import {
   hasEveryPermission,
 } from '#/lib/authorization/permissions'
 import { provisionIdentity } from '#/lib/auth/provisioning.server'
+import { lockAccountManagement } from '#/lib/auth/account-management-lock.server'
 import { initializeEmployeeDayOffBalance } from '#/features/leave/server/day-off-allowance.service.server'
-import { createInitialEmployeeEmployment } from '#/features/employees/server/employment.service.server'
+import {
+  closeEmploymentForDeparture,
+  createInitialEmployeeEmployment,
+  EmploymentError,
+} from '#/features/employees/server/employment.service.server'
+import { endEmploymentSchema } from '#/features/employees/employment.schemas'
+import { closeAttendanceAtDeparture } from '#/features/attendance/server/attendance-reminders.service.server'
 import {
   assignInitialEmployeeWeek,
   readCompanyWeek,
@@ -68,11 +75,13 @@ async function currentEmployeeManager(
   tx: repository.AccessTransaction,
   actor: Actor,
 ) {
+  // Match platform administration before locking any pair of accounts.
+  await lockAccountManagement(tx)
   const record = await repository.lockedAccount(tx, actor.id)
   if (
     !record ||
     record.identity.accessState !== 'active' ||
-    (record.person && record.person.status !== 'active')
+    (record.person && record.person.effectiveStatus !== 'active')
   )
     throw new AuthorizationError()
   const current = { ...actor, ...currentAuthorization(record.identity) }
@@ -211,8 +220,7 @@ export async function listEmployeeAccounts(
   untrusted: z.infer<typeof accountListSchema>,
 ) {
   assertPermissions(actor, ['manage.access', 'employees.manage'])
-  const { page } = accountListSchema.parse(untrusted)
-  return repository.queryAccounts(page)
+  return repository.queryAccounts(accountListSchema.parse(untrusted))
 }
 
 export async function readEmployeeAccount(
@@ -247,7 +255,7 @@ export async function manageEmployeeAccount(
       const expected = activation ? 'invited' : 'active'
       if (
         target.identity.accessState !== expected ||
-        target.person.status !== 'active'
+        target.person.effectiveStatus !== 'active'
       )
         throw new AccountWorkflowError(
           'ანგარიშის მიმდინარე სტატუსი ამ მოქმედებას არ უშვებს.',
@@ -265,7 +273,7 @@ export async function manageEmployeeAccount(
     } else {
       if (target.identity.accessState !== 'suspended')
         throw new AccountWorkflowError('ანგარიში შეჩერებული არ არის.')
-      if (target.person.status !== 'active')
+      if (target.person.effectiveStatus !== 'active')
         throw new AccountWorkflowError(
           'ანგარიშის აღდგენამდე საჭიროა დასაქმების სტატუსის აღდგენა.',
         )
@@ -283,6 +291,91 @@ export async function manageEmployeeAccount(
     })
     return challenge
   })
+}
+
+export async function offboardEmployee(
+  actor: Actor | null,
+  untrusted: unknown,
+) {
+  if (!actor) throw new AuthorizationError()
+  const input = endEmploymentSchema.parse(untrusted)
+  return repository.transactAccounts(async (tx) => {
+    const manager = await currentEmployeeManager(tx, actor)
+    assertPermissions(manager, ['employees.employment.manage'])
+    const target = await repository.lockedAccount(tx, input.userId)
+    if (!target?.person)
+      throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
+    checkTarget(manager, input.userId, parseRoles(target.identity.roles))
+    if (target.person.effectiveStatus !== 'active')
+      throw new AccountWorkflowError(
+        'თანამშრომლის დასაქმება უკვე დასრულებულია.',
+      )
+
+    let cutoff: Date | null
+    try {
+      cutoff = await closeEmploymentForDeparture(
+        tx,
+        manager,
+        target.person,
+        input,
+      )
+    } catch (error) {
+      if (error instanceof EmploymentError)
+        throw new AccountWorkflowError(error.message)
+      throw error
+    }
+
+    if (cutoff) await repository.scheduleDeparture(tx, input.userId, cutoff)
+    else await finalizeEmployeeDeparture(tx, input.userId)
+    await repository.auditAccess(tx, {
+      actorId: manager.id,
+      targetId: input.userId,
+      action: cutoff
+        ? 'account.employment_end_scheduled'
+        : 'account.employment_ended',
+      reason: input.reason,
+    })
+    return { endDate: input.endDate, scheduled: cutoff !== null }
+  })
+}
+
+async function finalizeEmployeeDeparture(
+  tx: repository.AccessTransaction,
+  userId: string,
+) {
+  await repository.setEmployment(tx, userId, 'inactive')
+  await repository.updateIdentity(tx, userId, 'suspended')
+  await repository.revokeAccess(tx, userId)
+}
+
+/** Only the internal task runs due departures. Recheck after locking to handle concurrent rescheduling. */
+export async function runScheduledDepartures(now = new Date()) {
+  let completed = 0
+  for (const { userId } of await repository.dueDepartures(now)) {
+    completed += await repository.transactAccounts(async (tx) => {
+      await tx.execute(sql`set local lock_timeout='2s'`)
+      await lockAccountManagement(tx)
+      const target = await repository.lockedAccount(tx, userId)
+      const cutoff = target?.person?.departureEffectiveAt
+      if (
+        !target?.person ||
+        target.person.status !== 'active' ||
+        !cutoff ||
+        cutoff > now
+      )
+        return 0
+      await closeAttendanceAtDeparture(tx, target.person.id, cutoff)
+      await finalizeEmployeeDeparture(tx, userId)
+      await repository.auditAccess(tx, {
+        actorId: null,
+        targetId: userId,
+        action: 'account.employment_ended',
+        reason: 'დასაქმება დასრულდა დაგეგმილ თარიღში.',
+      })
+      return 1
+    })
+  }
+  return completed
 }
 
 export async function editEmployeeDetails(
@@ -472,7 +565,7 @@ async function executeEmployeeSetup(
     const target = await repository.lockedAccount(tx, candidate.userId)
     if (
       !target?.person ||
-      target.person.status !== 'active' ||
+      target.person.effectiveStatus !== 'active' ||
       target.identity.accessState !==
         (purpose === 'activation' ? 'invited' : 'active')
     )

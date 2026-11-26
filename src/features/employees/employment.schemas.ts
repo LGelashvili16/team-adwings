@@ -21,12 +21,12 @@ export const employmentDateSchema = z.iso
         'თარიღი არ უნდა აღემატებოდეს 2100 წელს.',
       ),
   )
-const reason = z
+const changeReason = z
   .string({ error: 'მიუთითეთ ცვლილების მიზეზი.' })
   .trim()
   .min(5, 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.')
   .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
-  .optional()
+const reason = changeReason.optional()
 const revision = z
   .number({ error: 'განაახლეთ მონაცემები.' })
   .int('ვერსია არასწორია.')
@@ -36,6 +36,9 @@ const revision = z
 export const employmentSearchSchema = z.object({
   employmentPage: page,
   employmentHistoryPage: page,
+})
+export const employmentDirectoryStatusSchema = z.enum(['current', 'former'], {
+  error: 'აირჩიეთ დასაქმების სტატუსი.',
 })
 export const employmentReadSchema = z.object(
   { userId, ...employmentSearchSchema.shape },
@@ -71,6 +74,21 @@ export const employmentVoidSchema = z.strictObject(
   },
   { error: 'მოთხოვნა არასწორია.' },
 )
+export const endEmploymentFormSchema = z
+  .object({
+    startDate: z.union([employmentDateSchema, z.literal('')]),
+    endDate: employmentDateSchema,
+    reason: changeReason,
+  })
+  .refine((value) => !value.startDate || value.endDate >= value.startDate, {
+    path: ['endDate'],
+    message: 'ბოლო სამუშაო დღე დაწყების თარიღამდე ვერ იქნება.',
+  })
+
+export const endEmploymentSchema = endEmploymentFormSchema.safeExtend({
+  userId,
+  expectedRevision: revision,
+})
 export const employmentFormSchema = z
   .object({
     startDate: employmentDateSchema,

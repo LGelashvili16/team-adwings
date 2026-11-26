@@ -8,6 +8,7 @@ import {
   parseRoles,
 } from '#/lib/authorization/permissions'
 import { user } from '#/db/schema'
+import { lockAccountManagement } from '#/lib/auth/account-management-lock.server'
 import {
   adminAccountActionSchema,
   adminAccountListSchema,
@@ -19,12 +20,12 @@ import type { Actor } from '#/lib/authorization/actor'
 
 async function administrator(tx: repository.AccessTransaction, actor: Actor) {
   // Serialize access changes before taking actor/target locks to avoid cross-admin lock cycles.
-  await tx.execute(sql`select pg_advisory_xact_lock(812736, 1)`)
+  await lockAccountManagement(tx)
   const record = await repository.lockedAccount(tx, actor.id)
   if (
     !record ||
     record.identity.accessState !== 'active' ||
-    record.person?.status === 'inactive'
+    record.person?.effectiveStatus === 'inactive'
   )
     throw new AuthorizationError()
   const current = { ...actor, ...currentAuthorization(record.identity) }
@@ -95,7 +96,7 @@ export async function administerAccount(actor: Actor, input: unknown) {
     if (data.action === 'restore') {
       if (
         target.identity.accessState !== 'suspended' ||
-        target.person?.status === 'inactive'
+        target.person?.effectiveStatus === 'inactive'
       )
         throw new AccountWorkflowError(
           'ანგარიშის აღდგენა ამ სტატუსით შეუძლებელია.',

@@ -526,6 +526,13 @@
       "when": 1795727703400,
       "tag": "0074_employee_work_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1795735556457,
+      "tag": "0075_scheduled_employee_departure",
+      "breakpoints": true
     }
   ]
 }
