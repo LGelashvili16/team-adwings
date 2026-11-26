@@ -27,6 +27,8 @@ export function notificationDestination(input: unknown, actorId: string) {
       return { to: '/settings/security' } as const
     case 'attendance_clock':
       return { to: '/attendance' } as const
+    case 'payroll':
+      return { to: '/payroll', search: { month: value.month } } as const
     case 'attendance':
       return value.userId === actorId
         ? ({

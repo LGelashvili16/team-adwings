@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { getRouteApi, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { IconAlertCircle, IconX } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
@@ -19,24 +20,21 @@ export function MySalaryPage() {
   const navigate = route.useNavigate()
   const query = useQuery(mySalaryQuery(actor.id, search))
   const view = query.data?.ok ? query.data.value : null
-  const statements = view?.statements
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6">
+    <div className="flex w-full min-w-0 flex-col gap-5 sm:gap-6">
       <h1 className="text-2xl font-semibold tracking-tight text-foreground">
         ხელფასი
       </h1>
       {query.isPending ? (
         <div role="status" aria-busy="true" aria-label="ხელფასი იტვირთება">
           <div aria-hidden="true" className="flex flex-col gap-6">
-            <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-              <Skeleton className="h-52 rounded-2xl" />
-              <Skeleton className="h-52 rounded-2xl" />
-            </div>
+            <Skeleton className="h-52 rounded-2xl md:h-36" />
             <Skeleton className="h-60 rounded-2xl" />
           </div>
         </div>
-      ) : !view || !statements ? (
+      ) : !view ? (
         <Alert variant="destructive">
           <IconAlertCircle aria-hidden="true" />
           <AlertDescription>
@@ -47,9 +45,9 @@ export function MySalaryPage() {
         </Alert>
       ) : (
         <>
-          <SalarySummary employee={view.employee} highlightCurrent />
+          <SalarySummary employee={view.employee} personal />
           <SalaryStatements
-            records={statements.records}
+            records={view.statements.records}
             loading={query.isPlaceholderData}
             filtered={Boolean(search.month)}
             filter={
@@ -91,12 +89,12 @@ export function MySalaryPage() {
             }
             pagination={
               !query.isPlaceholderData &&
-              statements.total > statements.pageSize ? (
+              view.statements.total > view.statements.pageSize ? (
                 <DataPagination
                   label="თვის უწყისების გვერდები"
-                  page={statements.page}
-                  total={statements.total}
-                  pageSize={statements.pageSize}
+                  page={view.statements.page}
+                  total={view.statements.total}
+                  pageSize={view.statements.pageSize}
                   renderLink={(statementPage) => (
                     <Link
                       to="/payroll"
@@ -112,6 +110,7 @@ export function MySalaryPage() {
             heading="ხელფასის ცვლილებები"
             history={view.history}
             timezone={view.timezone}
+            disclosure={{ open: historyOpen, onOpenChange: setHistoryOpen }}
             pagination={
               view.total > view.pageSize || search.page > 1 ? (
                 <DataPagination

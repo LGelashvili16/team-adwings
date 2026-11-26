@@ -58,22 +58,34 @@ it('shows the employee exact old and new times, missing checkout, author, reason
     }),
   )
   mount()
+  const user = userEvent.setup()
+  const history = screen.getByRole('button', {
+    name: 'დროის შესწორებების ისტორია',
+  })
+  expect(history).toHaveAttribute('aria-expanded', 'false')
+  history.focus()
+  await user.keyboard('{Enter}')
   expect(await screen.findByText('მიზეზი: გასვლის დრო შესწორდა')).toBeVisible()
   expect(screen.getByText(/ნინო/)).toBeVisible()
   expect(screen.getByText(/10:05:13/)).toBeVisible()
   expect(screen.getByText(/10:00:00/)).toBeVisible()
   expect(screen.getByText(/19:00:00/)).toBeVisible()
   expect(screen.getByText(/არ იყო აღრიცხული/)).toBeVisible()
-  const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: 'შემდეგი გვერდი' }))
   expect(await screen.findByText('მიზეზი: ძველი შესწორება')).toBeVisible()
   expect(calls.read).toHaveBeenLastCalledWith({ data: { page: 1 } })
   expect(screen.getByRole('button', { name: 'შემდეგი გვერდი' })).toBeDisabled()
+  expect(history).toHaveAttribute('aria-expanded', 'true')
+  await user.click(history)
+  expect(history).toHaveAttribute('aria-expanded', 'false')
 })
 
 it('shows safe Georgian failure feedback without exposing audit data', async () => {
   calls.read.mockRejectedValue(new Error('private database detail'))
   mount()
+  await userEvent
+    .setup()
+    .click(screen.getByRole('button', { name: 'დროის შესწორებების ისტორია' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'შესწორებების ისტორია ვერ ჩაიტვირთა.',
   )

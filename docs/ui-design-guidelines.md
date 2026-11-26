@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 89. Last updated: 2026-11-26.
+Status: required project instructions. Version: 96. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -129,6 +129,7 @@ Choose feedback by purpose and lifetime. These components complement one another
 - A new non-modal live announcement shows one informational Sonner toast per open app tab at the bottom right for 6 seconds, with a Georgian ნახვა action. Reconnect snapshots do not replay old announcement toasts. Keep the announcement in its directory after the toast expires; toast dismissal never marks it read. Use an accessible unread dot in personal announcement navigation, without another header icon.
 
 - Use `toast` from `sonner` and the single app-wide `Toaster` from `#/components/ui/sonner`. Do not mount another toaster or introduce the Base UI toast manager alongside it.
+- Center general Sonner toasts at the top of the viewport.
 - Emit one outcome toast per action. Avoid duplicates from hooks, components, retries, rerenders, and cache invalidation.
 - Omit the close button from app-wide Sonner toasts.
 - Show success only after the server confirms completion. Never simulate an unavailable workflow or imply that a local draft was saved remotely.
@@ -307,6 +308,8 @@ Use an 8px gap between the payroll filters and table results.
 
 In the salary issuance dialog, show the selected payment window above the ready employees and total. Below that summary, group employees who need review in a collapsed shadcn Accordion with a right-aligned Tabler chevron. Show each employee's name and reason in a darker, rounded, bordered row. Use the shared expand and collapse transitions and respect reduced motion. Keep the confirmation actions visible while the dialog body scrolls on narrow screens.
 
+On the employee sheet's salary tab, show **ხელფასის გაცემა** to authorized editors when a salary stage remains. Ask users to save unsaved changes before opening the confirmation. Reuse the issuance dialog with the employee's name, unpaid salary stages and confirmed amount. Refresh the sheet after issuance and return focus to the action or salary tab.
+
 The monthly payroll table and its CSV use `ხელფასი(თვე)`, `ხელფასი(1/2)` and `ხელფასი(2/2)` for the selected view. The sheet edits the full earning month from every view and labels the monthly amount and the first-installment override with the corresponding names. Prefill the applicable fixed amount when the salary needs confirmation and explain why it needs review before saving. Keep paginated change history in a closed-by-default shadcn Accordion.
 
 Use the semantic red text token for nonzero fines in the management payroll tables. Keep zero fines neutral. Tint the employee salary directory’s `განსასაზღვრი ხელფასი` summary card when its count is above zero.
@@ -314,6 +317,8 @@ Use the semantic red text token for nonzero fines in the management payroll tabl
 Use the compact `თვე`, `1/2` and `2/2` tabs for split payroll periods. Select the current half of the company-local month by default and keep explicit tab choices in the URL. Keep the desktop toolbar on one row with a usable minimum width for search and place CSV export at the far right. Allow scrolling within the toolbar when the available width is smaller. On mobile, group employee search, the month picker and sorting in the collapsed `ფილტრები` Accordion, using the Jobs filter style. Show the selected month on the trigger. Give the salary payment action, period tab strip and CSV export button the full available width on mobile.
 
 The management salary detail uses the full available content width. Give the current agreement more emphasis than the scheduled change. Show salary history as a table on wider screens and as stacked entries on narrow screens so dates, amounts and audit details remain readable.
+
+Use the full available width on the employee's own salary page and lead with one current-pay card. Label the amount type **თანხის ტიპი**. Show the next salary change as a compact notice only when it is scheduled. Show payout totals without repeating **ხელზე ასაღები** in the desktop table and narrow statement cards. Mark each recently recorded payment with a subtle green tint and the **ახლახანს გაცემული** badge for 24 hours after recording. Keep the indicator static and let it expire while the page is open. Place salary change history in a closed-by-default shadcn Accordion and keep it open during history pagination.
 
 `/manage/payroll/settings` belongs to management navigation under `ხელფასების პარამეტრები`, guarded by `payroll.configure`. Administrators, accountants and owners can edit it without granting accountants platform-administration access. Use separate Cards for calculation rules, statutory withholding settings and the save reason, with a single Save action. Keep employee and employer pension rates separately labeled and explain that the employer share is an additional company expense. Disabled built-in calculation does not imply a statutory exemption. Retain the dated version indicator, honest unavailable-calculation notice, inline validation, required reason, pending Spinner and draft preservation after conflicts or background refetch failures. Date selection uses the Georgian shadcn Calendar. Never display estimated settings as an employee's salary or simulate deductions.
 
@@ -482,6 +487,10 @@ The employee detail attendance tab at `/manage/attendance/$userId` defaults to t
 HR and owners can correct other employees' attendance company-wide through an explicit correction permission. Supervisors retain assignment-based correction scope. Show correction and approval controls independently; company-wide correction rights do not imply approval rights. Admins and owners may correct their own attendance only with the explicit attendance.correct.self permission. Self-approval remains forbidden; retain optional reasons, corrected markers, pending review and atomic before/after audits. Employees see a read-only, paginated correction history on their own attendance page, with exact before/after check-in and checkout times including seconds, editor, reason and change timestamp. Preserve every edit, including repeated changes. Use shared Cards and pagination, Georgian labels, and the existing SSE connection to refresh the history.
 
 Do not show a separate correction requests tab while employee-submitted requests are unavailable. Keep correction history on the attendance page.
+
+On the personal attendance page, show Tabler icons in the work clock and recent attendance card titles. Put correction history in a closed-by-default shadcn Accordion with a history icon and a right-aligned chevron. Keep it open during history pagination.
+
+Display each personal attendance correction in a card with its work date and editor in the header. Group the exact before and after values by check-in and checkout. Give both after values the same inset surface and font weight. Keep the reason and edit timestamp in the footer.
 
 ## Attendance correction sheet
 

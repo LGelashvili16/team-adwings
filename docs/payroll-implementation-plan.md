@@ -30,8 +30,15 @@ Monthly Payroll now displays assigned base salaries before draft preparation, wi
 - [x] Keep the filters and displayed results in place while an uncached period loads. Disable CSV export until the requested results arrive. Verified with a regression test and delayed responses in desktop and mobile Chrome previews.
 - [x] Refresh unpaid monthly payroll after a fixed salary correction. Require review for partial months and custom amounts and preserve issued installments. Verified in isolated PostgreSQL and with a Chrome preview of the corrected row and confirmation field.
 - [x] Show review, published-payment and neutral metadata badges in Monthly Payroll. Verified the whole-month and first-half states in Chrome with light and dark themes.
+- [x] Place monthly payroll badges in a dedicated payout status column beside the employee name. Verified the whole-month and installment views in Chrome using sample records.
+- [x] Show fixed or hourly salary type beside the employee name and show unpaid installments separately from review warnings. Verified paid, unpaid, and skipped installments in tests and checked desktop and mobile badges in Chrome.
 - [x] Organize the monthly entry sheet into salary, adjustments and paginated history tabs. Keep one form across tabs and focus the first invalid field on save. Verified draft preservation and validation in tests, and pagination, keyboard navigation and mobile fit in Chrome.
 - [x] Show salary issuance warnings in a collapsed shadcn Accordion with a right-aligned Tabler chevron and darker bordered employee rows. Verified keyboard opening and closing, the existing confirmation workflow, and desktop and mobile layouts in both themes using sample data.
+- [x] Record one employee's unpaid salary stage from their monthly sheet. Verified employee scope, permissions, retries and compatibility with bulk payments in isolated PostgreSQL. Verified draft protection, confirmation and focus on desktop and mobile in both themes.
+- [x] Notify employees privately when an individual or bulk payroll stage is published. Verified earning-month links, recipient isolation, retry deduplication, transaction rollback and live personal payroll refresh.
+- [x] Refine the personal salary page, show planned changes only when scheduled, and highlight each payment for 24 hours after recording. Verified payment expiry in the component and PostgreSQL, and checked desktop, tablet and mobile layouts in Chrome with sample data.
+- [x] Use the full content width for the personal salary page, simplify payout labels, and collapse the salary change history by default. Verified the Georgian labels, keyboard controls and history pagination in desktop and mobile Chrome previews.
+- [x] Make the monthly draft removal reason optional and retain an audit note. Verified submitting an empty field in the dialog and retaining default and entered reasons in isolated PostgreSQL.
 
 ## Historical simplified delivery, 2026-11-25
 

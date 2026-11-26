@@ -1,5 +1,6 @@
 import '@tanstack/react-start/server-only'
 import { createHash } from 'node:crypto'
+import type { z } from 'zod'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { assertPermissions } from '#/lib/authorization/access'
 import {
@@ -9,6 +10,8 @@ import {
 import { readEmploymentEligibility } from '#/features/employees/server/employment.service.server'
 import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
 import { followingDate } from '#/features/scheduling/scheduling.rules'
+import { deliverNotificationBatch } from '#/features/notifications/server/notifications.service.server'
+import { formatGeorgianMonth } from '#/lib/date-format'
 import {
   paymentPreviewSchema,
   publishPaymentsSchema,
@@ -34,6 +37,7 @@ import {
 } from './payroll-settings.repository.server'
 import * as salaries from './salary.repository.server'
 import * as repository from './monthly.repository.server'
+import { payStageLabel } from '../payroll-settings.schemas'
 import type { Actor } from '#/lib/authorization/actor'
 import type { MonthlyPaymentDates } from '../monthly.schemas'
 import type { PayrollTransaction } from './payroll-settings.repository.server'
@@ -919,17 +923,40 @@ export async function saveMonthlyAdjustments(
 async function planPayment(
   tx: PayrollTransaction,
   actorId: string,
-  month: string,
-  stage: PayStage,
+  {
+    month,
+    stage,
+    userId: selectedUserId,
+  }: z.infer<typeof paymentPreviewSchema>,
   lock: boolean,
 ) {
   const { date: paidOn } = await getCompanyWorkday(new Date(), tx)
   if ((await state(tx, month)).closed)
     throw new MonthlyPayrollError('ეს თვე ძველი ფორმატით არის დასრულებული.')
-  const issued = await repository.monthPayments(tx, month)
-  const policy = issued.length
-    ? await scheduleForMonth(tx, month, issued[0].policyVersion)
-    : await latestPolicy(tx)
+  if (selectedUserId === actorId)
+    throw new MonthlyPayrollError(
+      'საკუთარი თანხა სხვა უფლებამოსილმა პირმა უნდა გასცეს.',
+    )
+  const candidates = await repository.paymentCandidates(
+    tx,
+    month,
+    monthlyBounds(month).end,
+    selectedUserId,
+  )
+  const target = selectedUserId === undefined ? undefined : candidates[0]
+  if (selectedUserId !== undefined && !target)
+    throw new MonthlyPayrollError('თანამშრომელი ვერ მოიძებნა.')
+  if (candidates.length > 1000)
+    throw new MonthlyPayrollError(
+      'ერთი თვის უწყისი მაქსიმუმ 1 000 თანამშრომელს მოიცავს.',
+    )
+  const issued = await repository.monthPayments(tx, month, target?.employeeId)
+  // The first payment for anyone in the month pins the schedule for everyone.
+  const policy = target
+    ? await scheduleForMonth(tx, month)
+    : issued.length
+      ? await scheduleForMonth(tx, month, issued[0].policyVersion)
+      : await latestPolicy(tx)
   const schedule = policy?.schedule
   if (!policy || !schedule)
     throw new MonthlyPayrollError('ჯერ შეინახეთ ხელფასის გაცემის გრაფიკი.')
@@ -937,22 +964,17 @@ async function planPayment(
   if (!window)
     throw new MonthlyPayrollError('გაცემის ეს ეტაპი გრაფიკში არ არის.')
   const dates = paymentWindow(month, window)
-  const candidates = await repository.paymentCandidates(
-    tx,
-    month,
-    monthlyBounds(month).end,
-  )
-  if (candidates.length > 1000)
-    throw new MonthlyPayrollError(
-      'ერთი თვის უწყისი მაქსიმუმ 1 000 თანამშრომელს მოიცავს.',
-    )
   const byEmployee = new Map<string, typeof issued>()
   for (const line of issued) {
     const employeeLines = byEmployee.get(line.employeeId) ?? []
     employeeLines.push(line)
     byEmployee.set(line.employeeId, employeeLines)
   }
-  const ready: (PaymentAmounts & { employeeId: string; name: string })[] = []
+  const ready: (PaymentAmounts & {
+    employeeId: string
+    userId: string
+    name: string
+  })[] = []
   const pending: { name: string; message: string }[] = []
   for (const person of candidates.sort((a, b) =>
     a.userId.localeCompare(b.userId),
@@ -1033,6 +1055,7 @@ async function planPayment(
       if (baseMinor || bonusMinor || premiumMinor || fineMinor)
         ready.push({
           employeeId,
+          userId,
           name,
           baseMinor,
           bonusMinor,
@@ -1048,13 +1071,15 @@ async function planPayment(
   const token = fingerprint({
     month,
     stage,
+    userId: selectedUserId,
     paidOn,
     policy: policy.version,
-    ready,
+    ready: ready.map(({ userId: _userId, ...line }) => line),
   })
   return {
     ...dates,
     policyVersion: policy.version,
+    firstPaymentEnabled: !!schedule.first,
     paidOn,
     available: paidOn >= dates.start,
     ready,
@@ -1067,14 +1092,20 @@ export async function previewMonthlyPayments(
   actor: Actor | null,
   input: unknown,
 ) {
-  const { month, stage } = paymentPreviewSchema.parse(input)
+  const data = paymentPreviewSchema.parse(input)
   return repository.transactMonthly(
     async (tx) => {
       const current = await authorize(tx, actor, true)
-      const plan = await planPayment(tx, current.id, month, stage, false)
+      const {
+        ready,
+        firstPaymentEnabled: _firstPaymentEnabled,
+        ...preview
+      } = await planPayment(tx, current.id, data, false)
       return {
-        ...plan,
-        ready: plan.ready.map(({ employeeId: _employeeId, ...line }) => line),
+        ...preview,
+        ready: ready.map(
+          ({ employeeId: _employeeId, userId: _userId, ...line }) => line,
+        ),
       }
     },
     { isolationLevel: 'repeatable read' },
@@ -1104,7 +1135,7 @@ export async function publishMonthlyPayments(
     }
     await repository.lockMonth(tx, data.month)
     await lockPolicy(tx)
-    const plan = await planPayment(tx, current.id, data.month, data.stage, true)
+    const plan = await planPayment(tx, current.id, data, true)
     if (!plan.available)
       throw new MonthlyPayrollError('გაცემის პერიოდი ჯერ არ დაწყებულა.')
     if (plan.token !== data.expectedToken)
@@ -1115,7 +1146,7 @@ export async function publishMonthlyPayments(
       throw new MonthlyPayrollError('გასაცემი ჩანაწერები ჯერ არ არის.')
     await repository.insertPayments(
       tx,
-      plan.ready.map(({ name: _name, ...line }) => ({
+      plan.ready.map(({ name: _name, userId: _userId, ...line }) => ({
         ...line,
         month: `${data.month}-01`,
         stage: data.stage,
@@ -1125,6 +1156,31 @@ export async function publishMonthlyPayments(
         requestId: data.requestId,
         commandHash,
       })),
+    )
+    const monthLabel = formatGeorgianMonth(data.month)
+    const componentList = new Intl.ListFormat('ka')
+    await deliverNotificationBatch(
+      tx,
+      plan.ready.map((line) => {
+        const components = [
+          ...(line.baseMinor
+            ? [payStageLabel(data.stage, plan.firstPaymentEnabled)]
+            : []),
+          ...(line.bonusMinor ? ['ბონუსი'] : []),
+          ...(line.premiumMinor ? ['პრემია'] : []),
+          ...(line.fineMinor ? ['ჯარიმის დაქვითვა'] : []),
+        ]
+        return {
+          eventKey: `payroll:published:${data.month}:${data.stage}`,
+          recipientIds: [line.userId],
+          title:
+            data.stage === 'adjustments'
+              ? 'სახელფასო დამატებების განახლება'
+              : 'ხელფასის გაცემა აისახა',
+          body: `${monthLabel}. ${componentList.format(components)} აისახა თქვენს სახელფასო ჩანაწერში.`,
+          destination: { kind: 'payroll', month: data.month },
+        }
+      }),
     )
     return { saved: plan.ready.length }
   })
@@ -1165,7 +1221,7 @@ export async function removeMonthlyEmployee(
       version: previous.version + 1,
       status: 'voided',
       actorId: current.id,
-      reason: data.reason,
+      reason: data.reason || 'თვის ჩანაწერი ამოღებულია.',
       requestId: data.requestId,
       commandHash: hash,
     })

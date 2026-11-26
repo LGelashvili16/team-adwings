@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -50,17 +50,25 @@ export function MonthlyPaymentDialog({
   actorId,
   month,
   windows,
+  employee,
+  firstPaymentEnabled = windows.some((window) => window.stage === 'first'),
+  returnFocus,
   open,
   onClose,
 }: {
   actorId: string
   month: string
   windows: [PayStageWindow, ...PayStageWindow[]]
+  employee?: { userId: string; name: string }
+  firstPaymentEnabled?: boolean
+  returnFocus?: (issued: boolean) => HTMLElement | null
   open: boolean
   onClose: () => void
 }) {
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
   const [error, setError] = useState('')
+  const formId = useId()
+  const stageId = useId()
   const client = useQueryClient()
   const form = useForm({
     defaultValues: { stage: windows[0].stage },
@@ -77,9 +85,20 @@ export function MonthlyPaymentDialog({
     },
   })
   const stage = useStore(form.store, (state) => state.values.stage)
+  const selection = {
+    month,
+    stage,
+    ...(employee && { userId: employee.userId }),
+  }
   const preview = useQuery({
-    queryKey: [...monthlyKey(actorId), 'payment-preview', month, stage],
-    queryFn: () => getMonthlyPaymentPreview({ data: { month, stage } }),
+    queryKey: [
+      ...monthlyKey(actorId),
+      'payment-preview',
+      month,
+      stage,
+      employee?.userId,
+    ],
+    queryFn: () => getMonthlyPaymentPreview({ data: selection }),
     enabled: open,
     retry: false,
     staleTime: 0,
@@ -87,7 +106,7 @@ export function MonthlyPaymentDialog({
   const plan = preview.data?.ok ? preview.data.value : null
   const mutation = useMutation({
     mutationFn: (expectedToken: string) =>
-      setMonthlyPayments({ data: { month, stage, requestId, expectedToken } }),
+      setMonthlyPayments({ data: { ...selection, requestId, expectedToken } }),
     onSuccess: (result) => {
       if (!result.ok) {
         setError(result.message)
@@ -95,7 +114,9 @@ export function MonthlyPaymentDialog({
         return
       }
       toast.success(
-        `გაცემა დადასტურებულია ${result.value.saved} თანამშრომლისთვის.`,
+        employee
+          ? 'თანამშრომლის თანხის გაცემა დადასტურებულია.'
+          : `გაცემა დადასტურებულია ${result.value.saved} თანამშრომლისთვის.`,
       )
       void client.invalidateQueries({ queryKey: monthlyKey(actorId) })
       void client.invalidateQueries({ queryKey: salaryKey(actorId) })
@@ -108,7 +129,6 @@ export function MonthlyPaymentDialog({
     },
   })
   const total = plan?.ready.reduce((sum, line) => sum + line.totalMinor, 0) ?? 0
-  const twice = windows.some((window) => window.stage === 'first')
   return (
     <Dialog
       open={open}
@@ -118,17 +138,33 @@ export function MonthlyPaymentDialog({
     >
       <DialogContent
         showCloseButton={!mutation.isPending}
+        forceBackdrop={Boolean(employee)}
+        finalFocus={
+          returnFocus
+            ? () => returnFocus(mutation.data?.ok === true)
+            : undefined
+        }
         className="max-h-[calc(100dvh-2rem)] min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-lg"
       >
         <DialogHeader>
           <DialogTitle className="pr-8 text-lg">ხელფასის გაცემა</DialogTitle>
           <DialogDescription className="leading-relaxed">
-            {formatGeorgianMonth(month)}. დაადასტურეთ უკვე გადახდილი თანხები.
-            ჩანაწერები თანამშრომლებს გამოუჩნდებათ.
+            {employee ? (
+              <>
+                <strong className="font-medium text-foreground">
+                  {employee.name}
+                </strong>
+                {' · '}
+              </>
+            ) : null}
+            {formatGeorgianMonth(month)}.{' '}
+            {employee
+              ? 'დაადასტურეთ ამ თანამშრომლისთვის უკვე გადახდილი თანხა. ჩანაწერი თანამშრომელს გამოუჩნდება.'
+              : 'დაადასტურეთ უკვე გადახდილი თანხები. ჩანაწერები თანამშრომლებს გამოუჩნდებათ.'}
           </DialogDescription>
         </DialogHeader>
         <form
-          id="payroll-payment-form"
+          id={formId}
           className="flex min-h-0 flex-col gap-4 overflow-y-auto p-1"
           onSubmit={(event) => {
             event.preventDefault()
@@ -138,7 +174,7 @@ export function MonthlyPaymentDialog({
           <form.Field name="stage">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor="payment-stage">გაცემის ეტაპი</FieldLabel>
+                <FieldLabel htmlFor={stageId}>გაცემის ეტაპი</FieldLabel>
                 <Select
                   disabled={mutation.isPending}
                   value={field.state.value}
@@ -151,13 +187,15 @@ export function MonthlyPaymentDialog({
                     setError('')
                   }}
                 >
-                  <SelectTrigger id="payment-stage" className="w-full">
-                    <SelectValue>{payStageLabel(stage, twice)}</SelectValue>
+                  <SelectTrigger id={stageId} className="w-full">
+                    <SelectValue>
+                      {payStageLabel(stage, firstPaymentEnabled)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {windows.map((window) => (
                       <SelectItem key={window.stage} value={window.stage}>
-                        {payStageLabel(window.stage, twice)}
+                        {payStageLabel(window.stage, firstPaymentEnabled)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -193,13 +231,15 @@ export function MonthlyPaymentDialog({
               >
                 <div className="flex items-center justify-between gap-3 bg-muted/60 px-3 py-2.5">
                   <h3 className="min-w-0 font-medium">
-                    გასაცემია {plan.ready.length} თანამშრომლისთვის
+                    {employee
+                      ? 'გასაცემი თანხა'
+                      : `გასაცემია ${plan.ready.length} თანამშრომლისთვის`}
                   </h3>
                   <strong className="shrink-0 text-lg font-semibold tabular-nums">
                     {formatSalary({ amountMinor: total })}
                   </strong>
                 </div>
-                {plan.ready.length ? (
+                {!employee && plan.ready.length ? (
                   <ul className="max-h-44 divide-y overflow-y-auto border-t">
                     {plan.ready.map((line, index) => (
                       <li
@@ -217,6 +257,17 @@ export function MonthlyPaymentDialog({
                   </ul>
                 ) : null}
               </section>
+              {employee &&
+              plan.available &&
+              !plan.ready.length &&
+              !plan.pending.length ? (
+                <Alert variant="info" role="status">
+                  <IconAlertCircle aria-hidden="true" />
+                  <AlertDescription>
+                    ამ ეტაპზე გასაცემი თანხა არ არის.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
               {plan.pending.length ? (
                 <Accordion className="rounded-xl border border-badge-orange-foreground/25 bg-badge-orange/35">
                   <AccordionItem value="pending-employees">
@@ -295,7 +346,7 @@ export function MonthlyPaymentDialog({
           </Button>
           <Button
             type="submit"
-            form="payroll-payment-form"
+            form={formId}
             aria-busy={mutation.isPending || undefined}
             disabled={
               preview.isFetching ||

@@ -14,14 +14,14 @@ const tabs = [
   {
     value: 'monthly',
     to: '/manage/payroll/monthly',
-    label: 'თვის ხელფასები',
+    label: 'ხელფასის გაცემა',
     icon: IconCalendarDollar,
     permission: 'payroll.read.all',
   },
   {
     value: 'employees',
     to: '/manage/payroll',
-    label: 'თანამშრომლები',
+    label: 'ანაზღაურება',
     icon: IconUserDollar,
     permission: 'payroll.read.all',
   },

@@ -136,7 +136,11 @@ export async function employeeStatements(
     .limit(historyPageSize)
     .offset((currentPage - 1) * historyPageSize)
   const payments = await tx
-    .select({ month: payment.month, ...paymentAmounts })
+    .select({
+      month: payment.month,
+      recordedAt: payment.createdAt,
+      ...paymentAmounts,
+    })
     .from(payment)
     .where(
       and(
@@ -148,6 +152,7 @@ export async function employeeStatements(
       ),
     )
     .orderBy(payment.paidOn, payment.createdAt, payment.id)
+  const now = Date.now()
   return {
     records: records.map((record) => {
       const published = payments.filter((line) => line.month === record.month)
@@ -155,7 +160,17 @@ export async function employeeStatements(
         ...record,
         month: record.month.slice(0, 7),
         ...(published.length
-          ? { payments: published.map(({ month: _month, ...line }) => line) }
+          ? {
+              payments: published.map(
+                ({ month: _month, recordedAt, ...line }) => {
+                  const publishedAt = recordedAt.getTime()
+                  const recentUntil = publishedAt + 24 * 60 * 60 * 1000
+                  return publishedAt <= now && recentUntil > now
+                    ? { ...line, recentUntil }
+                    : line
+                },
+              ),
+            }
           : {}),
       }
     }),
@@ -186,7 +201,11 @@ export function employeePayments(
     )
     .orderBy(payment.paidOn, payment.createdAt, payment.id)
 }
-export function monthPayments(tx: PayrollTransaction, month: string) {
+export function monthPayments(
+  tx: PayrollTransaction,
+  month: string,
+  employeeId?: string,
+) {
   return tx
     .select({
       employeeId: payment.employeeId,
@@ -194,7 +213,14 @@ export function monthPayments(tx: PayrollTransaction, month: string) {
       ...paymentAmounts,
     })
     .from(payment)
-    .where(eq(payment.month, `${month}-01`))
+    .where(
+      and(
+        eq(payment.month, `${month}-01`),
+        employeeId === undefined
+          ? undefined
+          : eq(payment.employeeId, employeeId),
+      ),
+    )
 }
 export async function monthPaymentPolicy(
   tx: PayrollTransaction,
@@ -259,6 +285,7 @@ export function paymentCandidates(
   tx: PayrollTransaction,
   month: string,
   end: string,
+  userId?: string,
 ) {
   const current = latest(tx, month)
   return tx
@@ -272,20 +299,22 @@ export function paymentCandidates(
     .leftJoin(current, eq(current.employeeId, employee.id))
     .leftJoin(entry, eq(entry.id, current.id))
     .where(
-      or(
-        isNotNull(current.id),
-        exists(
-          tx
-            .select({ id: employeeSalaryTerm.id })
-            .from(employeeSalaryTerm)
-            .where(
-              and(
-                eq(employeeSalaryTerm.employeeId, employee.id),
-                lte(employeeSalaryTerm.effectiveFrom, end),
-              ),
+      userId === undefined
+        ? or(
+            isNotNull(current.id),
+            exists(
+              tx
+                .select({ id: employeeSalaryTerm.id })
+                .from(employeeSalaryTerm)
+                .where(
+                  and(
+                    eq(employeeSalaryTerm.employeeId, employee.id),
+                    lte(employeeSalaryTerm.effectiveFrom, end),
+                  ),
+                ),
             ),
-        ),
-      ),
+          )
+        : eq(employee.userId, userId),
     )
     .orderBy(employee.userId)
     .limit(1001)

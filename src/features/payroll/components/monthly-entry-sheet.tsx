@@ -10,6 +10,7 @@ import {
   IconHistory,
   IconWallet,
   IconAdjustmentsHorizontal,
+  IconTrash,
 } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
@@ -32,6 +33,7 @@ import { accountInitials } from '#/features/access/access.presentation'
 import { formatWorkedTime } from '#/features/attendance/attendance.rules'
 import { monthlyEmployeeQuery } from '../monthly.queries'
 import { monthlyAdjustmentLabels, monthlySalaryLabels } from '../monthly.rules'
+import type { PayStageWindow } from '../monthly.types'
 import {
   formatSalary,
   salaryBasisLabels,
@@ -41,6 +43,7 @@ import { MonthlyEntryForm } from './monthly-entry-form'
 import { MonthlyRemoveDialog } from './monthly-remove-dialog'
 import { PaymentBreakdown } from './payment-breakdown'
 import { MonthlyEntryHistory } from './monthly-entry-history'
+import { MonthlyPaymentDialog } from './monthly-payment-dialog'
 
 const entryTabs = [
   { value: 'salary', label: 'ხელფასი', icon: IconWallet },
@@ -81,6 +84,14 @@ export function MonthlyEntrySheet({
       version: number
     } | null>(null)
   const body = useRef<HTMLDivElement>(null)
+  const paymentButton = useRef<HTMLButtonElement>(null)
+  const salaryTab = useRef<HTMLButtonElement>(null)
+  const [paymentDialog, setPaymentDialog] = useState<{
+    key: number
+    open: boolean
+    windows: [PayStageWindow, ...PayStageWindow[]]
+    firstPaymentEnabled: boolean
+  } | null>(null)
   const query = useQuery({
     ...monthlyEmployeeQuery(actorId, month, userId, page),
     enabled: open,
@@ -94,48 +105,56 @@ export function MonthlyEntrySheet({
     !legacySalary &&
     actorId !== userId &&
     view?.source
+  const paidStages = new Set(view?.payments.map(({ stage }) => stage))
+  const unpaidWindows =
+    view?.paymentWindows.filter(
+      ({ stage }) =>
+        stage !== 'adjustments' &&
+        !paidStages.has(stage) &&
+        !(stage === 'first' && paidStages.has('salary')),
+    ) ?? []
+  const firstUnpaidWindow = unpaidWindows.at(0)
   const changeTab = (value: EntryTab) => {
     if (value === tab) return
     setTab(value)
     if (body.current) body.current.scrollTop = 0
   }
   const revision = view?.current
-  const salaryFooter = view ? (
-    <>
-      {view.payments.length ? (
-        <section className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-          <h3 className="text-sm font-medium">გაცემული თანხები</h3>
-          <PaymentBreakdown
-            payments={view.payments}
-            twice={view.firstPaymentEnabled}
-          />
-        </section>
-      ) : null}
-      {canEdit &&
-      !view.closed &&
-      !view.payments.length &&
-      actorId !== userId &&
-      revision?.status === 'draft' ? (
-        <Button
-          type="button"
-          variant="destructive"
-          disabled={pending}
-          className="self-start"
-          onClick={() => {
-            setRemoveTarget({ userId, version: revision.version })
-            setRemoveOpen(true)
-          }}
-        >
-          ჩანაწერის ამოღება
-        </Button>
-      ) : null}
-    </>
+  const salaryFooter = view?.payments.length ? (
+    <section className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <h3 className="text-sm font-medium">გაცემული თანხები</h3>
+      <PaymentBreakdown
+        payments={view.payments}
+        twice={view.firstPaymentEnabled}
+      />
+    </section>
   ) : null
+  const removeAction =
+    view &&
+    canEdit &&
+    !view.closed &&
+    !view.payments.length &&
+    actorId !== userId &&
+    revision?.status === 'draft' ? (
+      <Button
+        type="button"
+        variant="destructive"
+        disabled={pending}
+        className="self-start"
+        onClick={() => {
+          setRemoveTarget({ userId, version: revision.version })
+          setRemoveOpen(true)
+        }}
+      >
+        <IconTrash data-icon="inline-start" aria-hidden="true" />
+        ჩანაწერის ამოღება
+      </Button>
+    ) : null
   return (
     <DraftSheet
       open={open}
       onOpenChange={(next) => {
-        if (!next && !pending) onClose()
+        if (!next && !pending && !paymentDialog?.open) onClose()
       }}
     >
       <SheetContent
@@ -193,6 +212,7 @@ export function MonthlyEntrySheet({
                 <TabsTrigger
                   key={value}
                   value={value}
+                  ref={value === 'salary' ? salaryTab : undefined}
                   className="min-w-max px-1 text-xs sm:px-2 sm:text-sm"
                 >
                   <Icon className="hidden size-4 sm:block" aria-hidden="true" />
@@ -242,7 +262,52 @@ export function MonthlyEntrySheet({
                     onSaved={onClose}
                     showSubmit={false}
                     onPending={setPending}
-                    tabs={{ onInvalid: changeTab, salaryFooter }}
+                    tabs={{
+                      onInvalid: changeTab,
+                      salaryAction:
+                        firstUnpaidWindow || removeAction
+                          ? (hasUnsavedChanges) => (
+                              <div className="flex flex-col items-start gap-2">
+                                <div className="flex w-full flex-wrap items-center gap-2">
+                                  {firstUnpaidWindow ? (
+                                    <Button
+                                      ref={paymentButton}
+                                      type="button"
+                                      variant="outline"
+                                      className="max-sm:only:w-full"
+                                      disabled={pending || hasUnsavedChanges}
+                                      onClick={() =>
+                                        setPaymentDialog((previous) => ({
+                                          key: (previous?.key ?? 0) + 1,
+                                          open: true,
+                                          windows: [
+                                            firstUnpaidWindow,
+                                            ...unpaidWindows.slice(1),
+                                          ],
+                                          firstPaymentEnabled:
+                                            view.firstPaymentEnabled,
+                                        }))
+                                      }
+                                    >
+                                      <IconWallet
+                                        aria-hidden="true"
+                                        data-icon="inline-start"
+                                      />
+                                      ხელფასის გაცემა
+                                    </Button>
+                                  ) : null}
+                                  {removeAction}
+                                </div>
+                                {firstUnpaidWindow && hasUnsavedChanges ? (
+                                  <p className="text-sm text-muted-foreground">
+                                    ხელფასის გაცემამდე შეინახეთ ცვლილებები.
+                                  </p>
+                                ) : null}
+                              </div>
+                            )
+                          : undefined,
+                      salaryFooter,
+                    }}
                   />
                 ) : (
                   <>
@@ -352,6 +417,7 @@ export function MonthlyEntrySheet({
                         </Empty>
                       )}
                       {salaryFooter}
+                      {removeAction}
                     </TabsContent>
                     <TabsContent value="adjustments">
                       {revision?.adjustments.length ? (
@@ -436,6 +502,23 @@ export function MonthlyEntrySheet({
           onClose={() => setRemoveOpen(false)}
           employee={removeTarget}
           onRemoved={onClose}
+        />
+      ) : null}
+      {paymentDialog ? (
+        <MonthlyPaymentDialog
+          key={paymentDialog.key}
+          actorId={actorId}
+          month={month}
+          employee={{ userId, name: employeeName }}
+          windows={paymentDialog.windows}
+          firstPaymentEnabled={paymentDialog.firstPaymentEnabled}
+          returnFocus={(issued) =>
+            issued
+              ? salaryTab.current
+              : (paymentButton.current ?? salaryTab.current)
+          }
+          open={paymentDialog.open}
+          onClose={() => setPaymentDialog({ ...paymentDialog, open: false })}
         />
       ) : null}
     </DraftSheet>

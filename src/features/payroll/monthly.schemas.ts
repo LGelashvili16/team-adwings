@@ -30,11 +30,12 @@ export const monthlyDetailSchema = z.strictObject(
   },
   { error: 'თანამშრომლის უწყისის მოთხოვნა არასწორია.' },
 )
-const reason = z
+const reasonText = z
   .string({ error: 'მიუთითეთ მიზეზი.' })
   .trim()
-  .min(5, 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.')
   .max(500, 'მიზეზი არ უნდა აღემატებოდეს 500 სიმბოლოს.')
+const shortReason = 'მიზეზი უნდა შეიცავდეს მინიმუმ 5 სიმბოლოს.'
+const reason = reasonText.min(5, shortReason)
 const money = z
   .number({ error: 'მიუთითეთ სწორი თანხა.' })
   .int('თანხა მიუთითეთ თეთრებში.')
@@ -126,6 +127,7 @@ export const monthlySaveSchema = z
 export const paymentPreviewSchema = z.strictObject({
   month: payrollMonthSchema,
   stage: payStageSchema,
+  userId: salaryDetailSchema.shape.userId.optional(),
 })
 export const publishPaymentsSchema = paymentPreviewSchema.extend({
   expectedToken: z
@@ -206,16 +208,17 @@ export const monthlyFormSchema = z
     path: ['base'],
     message: 'მიუთითეთ თვის ხელფასი.',
   })
-export const monthlyRemoveFormSchema = z.object(
-  { reason },
-  { error: 'მიუთითეთ ჩანაწერის ამოღების მიზეზი.' },
+const removalReason = reasonText.refine(
+  (value) => !value || value.length >= 5,
+  shortReason,
 )
+export const monthlyRemoveFormSchema = z.object({ reason: removalReason })
 export const monthlyRemoveSchema = z.strictObject(
   {
     month: payrollMonthSchema,
     userId: salaryDetailSchema.shape.userId,
     expectedVersion: monthlySaveSchema.shape.expectedVersion,
-    reason,
+    reason: removalReason.default(''),
     requestId,
   },
   { error: 'ჩანაწერის მონაცემები არასწორია.' },

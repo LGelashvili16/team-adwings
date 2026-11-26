@@ -113,12 +113,9 @@ export function MonthlyRemoveDialog({
           <form.Field name="reason">
             {(field) => (
               <Field data-invalid={!field.state.meta.isValid}>
-                <FieldLabel htmlFor="monthly-remove-reason">
-                  მიზეზი <span aria-hidden="true">*</span>
-                </FieldLabel>
+                <FieldLabel htmlFor="monthly-remove-reason">მიზეზი</FieldLabel>
                 <Textarea
                   id="monthly-remove-reason"
-                  required
                   disabled={mutation.isPending}
                   value={field.state.value}
                   onBlur={field.handleBlur}

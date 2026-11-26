@@ -5,7 +5,6 @@ import {
   IconUsers,
   IconClock,
   IconAlertCircle,
-  IconInfoCircle,
 } from '@tabler/icons-react'
 import { Card, CardContent } from '#/components/ui/card'
 import { Alert, AlertDescription } from '#/components/ui/alert'
@@ -133,14 +132,6 @@ function SalaryDirectoryResults({
           </Card>
         ))}
       </div>
-      <Alert variant="info" role="status">
-        <IconInfoCircle aria-hidden="true" />
-        <AlertDescription>
-          ხელფასის ან საათობრივი ტარიფის განსაზღვრისთვის გახსენით თანამშრომლის
-          ჩანაწერი. თვის თანხები, ბონუსები, პრემიები და ჯარიმები შეიტანეთ
-          განყოფილებაში „თვის ხელფასები“.
-        </AlertDescription>
-      </Alert>
       <div className="flex min-w-0 flex-col gap-2">
         {filters}
         {view.records.length ? (

@@ -3,6 +3,7 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table'
+import { useEffect, useMemo, useState } from 'react'
 import { IconCalendarDollar, IconReceipt } from '@tabler/icons-react'
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
@@ -47,8 +48,8 @@ function StatementAmount({
     <span
       className={
         field === 'fineMinor' && amount > 0
-          ? 'text-destructive tabular-nums'
-          : 'tabular-nums'
+          ? 'whitespace-nowrap text-destructive tabular-nums'
+          : 'whitespace-nowrap tabular-nums'
       }
     >
       {field === 'fineMinor' && amount > 0 ? '−' : ''}
@@ -60,51 +61,57 @@ function StatementAmount({
 function StatementTotal({ statement }: { statement: SalaryStatement }) {
   return (
     <div className="flex flex-col gap-1">
-      <strong className="text-base font-semibold tracking-tight tabular-nums">
+      <strong className="text-base font-semibold tracking-tight whitespace-nowrap tabular-nums">
         {formatSalary({ amountMinor: statement.totalMinor })}
       </strong>
-      <span className="text-xs text-muted-foreground">
-        {salaryBasisLabels[statement.amountBasis]}
-      </span>
+      {statement.amountBasis === 'gross' ? (
+        <span className="text-xs text-muted-foreground">
+          {salaryBasisLabels.gross}
+        </span>
+      ) : null}
     </div>
   )
 }
 
 const features = tableFeatures({})
 const column = createColumnHelper<typeof features, SalaryStatement>()
-const columns = column.columns([
-  column.accessor('month', {
-    header: 'თვე',
-    cell: ({ getValue }) => (
-      <time className="font-medium" dateTime={getValue()}>
-        {formatGeorgianMonth(getValue())}
-      </time>
-    ),
-  }),
-  ...components.map(({ key, label }) =>
-    column.accessor(key, {
-      header: label,
+const statementColumns = (recentAfter: number) =>
+  column.columns([
+    column.accessor('month', {
+      header: 'თვე',
       cell: ({ getValue }) => (
-        <StatementAmount field={key} amount={getValue()} />
+        <time className="font-medium" dateTime={getValue()}>
+          {formatGeorgianMonth(getValue())}
+        </time>
       ),
     }),
-  ),
-  column.display({
-    id: 'total',
-    header: 'ჯამი',
-    cell: ({ row }) => <StatementTotal statement={row.original} />,
-  }),
-  column.display({
-    id: 'payments',
-    header: 'გადახდები',
-    cell: ({ row }) =>
-      row.original.payments?.length ? (
-        <PaymentBreakdown payments={row.original.payments} />
-      ) : (
-        <Badge variant="secondary">არქივი</Badge>
-      ),
-  }),
-])
+    ...components.map(({ key, label }) =>
+      column.accessor(key, {
+        header: label,
+        cell: ({ getValue }) => (
+          <StatementAmount field={key} amount={getValue()} />
+        ),
+      }),
+    ),
+    column.display({
+      id: 'total',
+      header: 'ჯამი',
+      cell: ({ row }) => <StatementTotal statement={row.original} />,
+    }),
+    column.display({
+      id: 'payments',
+      header: 'გადახდები',
+      cell: ({ row }) =>
+        row.original.payments?.length ? (
+          <PaymentBreakdown
+            payments={row.original.payments}
+            recentAfter={recentAfter}
+          />
+        ) : (
+          <Badge variant="secondary">არქივი</Badge>
+        ),
+    }),
+  ])
 const getRowId = (record: SalaryStatement) => record.month
 
 export function SalaryStatements({
@@ -120,9 +127,27 @@ export function SalaryStatements({
   loading: boolean
   filtered: boolean
 }) {
+  const [recentAfter, setRecentAfter] = useState(0)
+  let nextExpiry = Infinity
+  for (const record of records) {
+    for (const payment of record.payments ?? []) {
+      const expires = payment.recentUntil ?? 0
+      if (expires > recentAfter) nextExpiry = Math.min(nextExpiry, expires)
+    }
+  }
+  useEffect(() => {
+    if (!Number.isFinite(nextExpiry)) return
+    // Expire server-provided indicators even when the page stays open offline.
+    const timer = window.setTimeout(
+      () => setRecentAfter(Math.max(nextExpiry, Date.now())),
+      Math.max(0, nextExpiry - Date.now()),
+    )
+    return () => window.clearTimeout(timer)
+  }, [nextExpiry])
+  const columns = useMemo(() => statementColumns(recentAfter), [recentAfter])
   const table = useTable({ features, columns, data: records, getRowId })
   return (
-    <Card className="gap-0 rounded-2xl pb-0 sm:[--card-spacing:--spacing(5)]">
+    <Card className="@container gap-0 rounded-2xl pb-0 sm:[--card-spacing:--spacing(5)]">
       <CardHeader className="gap-4 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-3">
@@ -146,7 +171,7 @@ export function SalaryStatements({
           </div>
         ) : records.length ? (
           <>
-            <ul className="divide-y border-t md:hidden">
+            <ul className="divide-y border-t @3xl:hidden">
               {records.map((record) => (
                 <li
                   key={record.month}
@@ -173,18 +198,21 @@ export function SalaryStatements({
                     ))}
                     <div className="col-span-2 flex flex-wrap items-start justify-between gap-2 rounded-xl bg-muted/45 p-3">
                       <dt className="font-medium">ჯამი</dt>
-                      <dd>
+                      <dd className="text-right">
                         <StatementTotal statement={record} />
                       </dd>
                     </div>
                   </dl>
                   {record.payments?.length ? (
-                    <PaymentBreakdown payments={record.payments} />
+                    <PaymentBreakdown
+                      payments={record.payments}
+                      recentAfter={recentAfter}
+                    />
                   ) : null}
                 </li>
               ))}
             </ul>
-            <div className="hidden md:block">
+            <div className="hidden @3xl:block">
               <Table>
                 <TableCaption className="sr-only">
                   სახელფასო გადახდების ისტორია
@@ -196,7 +224,7 @@ export function SalaryStatements({
                         <TableHead
                           key={header.id}
                           scope="col"
-                          className="px-4 whitespace-normal"
+                          className="px-3 whitespace-normal sm:px-4"
                         >
                           <table.FlexRender header={header} />
                         </TableHead>
@@ -210,7 +238,7 @@ export function SalaryStatements({
                       {row.getAllCells().map((cell) => (
                         <TableCell
                           key={cell.id}
-                          className="px-4 py-4 align-top last:bg-muted/20"
+                          className="px-3 py-4 align-top whitespace-normal sm:px-4"
                         >
                           <table.FlexRender cell={cell} />
                         </TableCell>

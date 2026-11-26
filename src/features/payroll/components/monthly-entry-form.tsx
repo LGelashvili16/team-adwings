@@ -91,6 +91,7 @@ export function MonthlyEntryForm({
   payments?: MonthlyDetail['payments']
   tabs?: {
     onInvalid: (section: 'salary' | 'adjustments') => void
+    salaryAction?: (hasUnsavedChanges: boolean) => ReactNode
     salaryFooter?: ReactNode
   }
 }) {
@@ -286,6 +287,7 @@ export function MonthlyEntryForm({
     ) : (
       content
     )
+  const salaryAction = tabs?.salaryAction
   return (
     <form
       id="monthly-entry-form"
@@ -310,6 +312,11 @@ export function MonthlyEntryForm({
         {panel(
           'salary',
           <>
+            {salaryAction ? (
+              <form.Subscribe selector={(state) => !state.isDefaultValue}>
+                {(hasUnsavedChanges) => salaryAction(hasUnsavedChanges)}
+              </form.Subscribe>
+            ) : null}
             {source ? (
               <Card className="bg-muted/30">
                 <CardContent className="flex min-w-0 items-start gap-3">
@@ -343,7 +350,7 @@ export function MonthlyEntryForm({
                 <AlertDescription>
                   {baseNeedsReview
                     ? 'ხელფასის შეთანხმება ან დასაქმების თარიღები შეიცვალა. გადაამოწმეთ და შეინახეთ თვის ხელფასი.'
-                    : 'დასაქმება ან ხელფასის შეთანხმება მთელ თვეს არ მოიცავს, ან თვეში ტარიფი იცვლება. შენახვამდე გადაამოწმეთ თვის ხელფასი.'}
+                    : 'მიუთითეთ ამ თვის გასაცემი ხელფასი ველში „ხელფასი(თვე) ლარში“ და შეინახეთ ჩანაწერი. ეს საჭიროა, თუ თანამშრომელი თვის მხოლოდ ნაწილში იყო დასაქმებული, ხელფასი თვის დაწყების შემდეგ ამოქმედდა ან ტარიფი თვის განმავლობაში შეიცვალა.'}
                 </AlertDescription>
               </Alert>
             ) : null}

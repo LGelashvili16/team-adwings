@@ -25,7 +25,7 @@ const toasterStyle: CSSProperties & Record<`--${string}`, string> = {
 export function Toaster() {
   return (
     <Sonner
-      position="top-right"
+      position="top-center"
       richColors
       style={toasterStyle}
       containerAriaLabel="შეტყობინებები"

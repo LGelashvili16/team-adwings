@@ -58,46 +58,75 @@ export function MonthlyTable({
         helper.display({
           id: 'employee',
           header: 'თანამშრომელი',
-          cell: ({ row: { original: r } }) => {
-            const needsConfirmation =
-              r.baseNeedsConfirmation || (!r.salary && r.status === 'draft')
-            return (
-              <div className="flex min-w-48 flex-col items-start gap-1 whitespace-normal">
-                <Button
-                  variant="link"
-                  className="h-auto justify-start p-0 whitespace-normal text-left"
-                  aria-haspopup="dialog"
-                  onClick={(event) => onOpen(r, event.currentTarget)}
-                >
-                  {r.employeeName}
-                </Button>
-                {r.status === 'finalized' ? (
-                  <Badge variant="green">დასრულებული</Badge>
-                ) : !adjustmentsOnly ? (
-                  <div className="flex flex-wrap gap-1">
-                    {r.paidMinor !== null ? (
-                      <Badge variant="green" className="tabular-nums">
-                        გაცემულია {formatSalary({ amountMinor: r.paidMinor })}
-                      </Badge>
-                    ) : null}
-                    {needsConfirmation &&
-                    (r.paidMinor === null || period === 'all') ? (
-                      <Badge variant="yellow">
-                        თვის ხელფასი დასადასტურებელია
-                      </Badge>
-                    ) : r.paidMinor === null ? (
-                      <Badge variant="secondary">
-                        {r.salary
-                          ? salaryKindLabels[r.salary.kind]
-                          : 'ჩანაწერი ჯერ არ არის'}
-                      </Badge>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            )
-          },
+          cell: ({ row: { original: r } }) => (
+            <div className="flex min-w-48 flex-wrap items-center gap-x-2 gap-y-1 whitespace-normal">
+              <Button
+                variant="link"
+                className="h-auto justify-start p-0 whitespace-normal text-left"
+                aria-haspopup="dialog"
+                onClick={(event) => onOpen(r, event.currentTarget)}
+              >
+                {r.employeeName}
+              </Button>
+              {!adjustmentsOnly && r.salary ? (
+                <Badge variant="outline">
+                  {r.salary.kind === 'monthly'
+                    ? 'ყოველთვიური'
+                    : salaryKindLabels[r.salary.kind]}
+                </Badge>
+              ) : null}
+              {adjustmentsOnly && r.status === 'finalized' ? (
+                <Badge variant="green">დასრულებული</Badge>
+              ) : null}
+            </div>
+          ),
         }),
+        ...(!adjustmentsOnly
+          ? [
+              helper.display({
+                id: 'paymentStatus',
+                header: 'გაცემის სტატუსი',
+                cell: ({ row: { original: r } }) => {
+                  if (r.status === 'finalized')
+                    return <Badge variant="green">დასრულებული</Badge>
+                  const needsConfirmation =
+                    r.baseNeedsConfirmation ||
+                    (!r.salary && r.status === 'draft')
+                  const firstCoveredByFinal =
+                    period === 'first' && Boolean(r.payoutDates.salary?.paidOn)
+                  const noAmountDue =
+                    r.baseMinor === 0 &&
+                    !r.bonusMinor &&
+                    !r.premiumMinor &&
+                    !r.fineMinor
+                  const unpaidLabel = firstCoveredByFinal
+                    ? 'ცალკე გაცემა არ არის'
+                    : noAmountDue
+                      ? 'გასაცემი თანხა არ არის'
+                      : 'არ არის გაცემული'
+                  return (
+                    <div className="flex flex-wrap gap-1">
+                      {r.paidMinor !== null ? (
+                        <Badge variant="green" className="tabular-nums">
+                          გაცემულია {formatSalary({ amountMinor: r.paidMinor })}
+                        </Badge>
+                      ) : r.salary ? (
+                        <Badge variant="secondary">{unpaidLabel}</Badge>
+                      ) : !needsConfirmation ? (
+                        <Badge variant="secondary">ჩანაწერი ჯერ არ არის</Badge>
+                      ) : null}
+                      {needsConfirmation &&
+                      (r.paidMinor === null || period === 'all') ? (
+                        <Badge variant="yellow">
+                          თვის ხელფასი დასადასტურებელია
+                        </Badge>
+                      ) : null}
+                    </div>
+                  )
+                },
+              }),
+            ]
+          : []),
         ...(adjustmentsOnly
           ? monthlyAdjustmentColumns
           : monthlyPayrollColumns(period)
@@ -116,9 +145,11 @@ export function MonthlyTable({
                 return (
                   <div className="flex flex-col gap-1">
                     <span className="tabular-nums">{formatSalary(salary)}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {salary.kind === 'hourly' ? 'საათში' : 'შეთანხმებული'}
-                    </span>
+                    {salary.kind === 'hourly' ? (
+                      <span className="text-xs text-muted-foreground">
+                        საათში
+                      </span>
+                    ) : null}
                   </div>
                 )
               }

@@ -4,6 +4,7 @@ import { notificationRealtimeSchema } from '#/features/notifications/notificatio
 import { leaveKey } from '#/features/leave/leave.queries'
 import { ownScheduleOptions } from '#/features/scheduling/scheduling.queries'
 import { attendanceKey } from '#/features/attendance/attendance.queries'
+import { salaryKey } from '#/features/payroll/salary.queries'
 
 /** Application composition refreshes open business screens without coupling shared transport to features. */
 export function useBusinessNotificationRefresh(actorId: string) {
@@ -15,6 +16,10 @@ export function useBusinessNotificationRefresh(actorId: string) {
     const kind = notification?.destination?.kind
     // A reconnect snapshot reconciles changes missed while this tab was offline.
     const snapshot = !changed
+    if (snapshot || kind === 'payroll')
+      void client.invalidateQueries({
+        queryKey: [...salaryKey(actorId), 'mine'],
+      })
     if (snapshot || kind === 'attendance') {
       void client.invalidateQueries({
         queryKey: ['my-attendance-sessions', actorId],

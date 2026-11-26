@@ -88,12 +88,7 @@ export function AttendanceClock({
     >
       <CardHeader className="flex flex-wrap items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-2">
-          <span
-            className={cn(
-              'flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground',
-              workLog && 'hidden',
-            )}
-          >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <IconClock className="size-5" aria-hidden="true" />
           </span>
           {oldSession

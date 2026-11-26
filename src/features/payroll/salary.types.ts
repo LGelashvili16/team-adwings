@@ -30,6 +30,7 @@ export type SalaryDetail = {
   total: number
   pageSize: number
 }
+export type SalaryStatementPayment = PublishedPayment & { recentUntil?: number }
 export type SalaryStatement = {
   month: string
   amountBasis: SalaryTerm['amountBasis']
@@ -38,7 +39,7 @@ export type SalaryStatement = {
   premiumMinor: number
   fineMinor: number
   totalMinor: number
-  payments?: PublishedPayment[]
+  payments?: SalaryStatementPayment[]
 }
 export type MySalaryDetail = SalaryDetail & {
   statements: {
