@@ -21,7 +21,9 @@ The settings options, Zod allowlist, startup allowlist and CSS are derived from 
 
 The selector sorts once at module initialization: neutral first, then a hue progression from blues through purples, wine, oranges, gold, olive and greens. New colors enter their hue position automatically, wherever their entry appears in the source array. DOM and keyboard navigation follow the same order.
 
-The helper pairs the light primary and selected tabs with white text, and the dark primary with `#171717` text. Highlight text uses the corresponding primary. Choose colors that meet 4.5:1 for normal text and 3:1 for focus indicators. Preserve the existing status, schedule and map color meanings.
+The helper pairs the light primary and selected tabs with white text, and the dark primary with `#171717` text. Highlight text uses the corresponding primary, darkened automatically in light mode when needed so accent and sidebar active/hover surfaces maintain at least 5:1 text contrast. Light accent surfaces stay visibly deeper than `#f0f0f0` while preserving 4.5:1 contrast for `#666666` muted copy; light sidebar active/hover surfaces use an even richer tint derived from the primary. Choose colors that meet 4.5:1 for normal text and 3:1 for focus indicators. Preserve the existing status, schedule and map color meanings.
+
+The highest-level application background (`body` and `[data-slot='sidebar-inset']`, with a transparent top bar) renders a subtle 135-degree diagonal gradient from top left to bottom right using `--primary` mixed into `--background`, disabled in `forced-colors` mode.
 
 The registry keeps all chosen base hex values unchanged. Dark mode uses a reviewed lighter shade for primary buttons, links, checked switches, checkboxes, radio buttons and focus rings. Selected tabs retain the deeper base shade with white labels. Button hover shades are computed once at module load, slightly darker in light mode and lighter in dark mode. The tests check both default and hover text contrast.
 

@@ -97,7 +97,7 @@ export function AppearanceSettings() {
                       className={cn(
                         'relative flex items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
                         selected
-                          ? 'border-primary bg-accent/60 ring-1 ring-primary/30'
+                          ? 'border-primary bg-accent ring-1 ring-primary/30'
                           : 'border-border/70 bg-muted/20 hover:border-border hover:bg-muted/45',
                       )}
                     >

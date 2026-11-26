@@ -96,6 +96,12 @@
   --sidebar-accent-foreground: #262626;
   --sidebar-border: #dedede;
   --sidebar-ring: #303030;
+  --app-background-gradient: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 7%, var(--background)) 0%,
+    color-mix(in srgb, var(--primary) 2.5%, var(--background)) 45%,
+    var(--background) 100%
+  );
 }
 
 :root[data-theme='dark'] {
@@ -158,8 +164,9 @@ body {
   margin: 0;
   color: var(--sea-ink);
   font-family: var(--font-sans);
-  background-color: var(--bg-base);
-  background: var(--background);
+  background-color: var(--background);
+  background-image: var(--app-background-gradient);
+  background-attachment: fixed;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -738,6 +745,12 @@ a {
   --sidebar-accent-foreground: #f0f0f0;
   --sidebar-border: #333333;
   --sidebar-ring: #d4d4d4;
+  --app-background-gradient: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--primary) 10%, var(--background)) 0%,
+    color-mix(in srgb, var(--primary) 3.5%, var(--background)) 45%,
+    var(--background) 100%
+  );
 }
 
 @layer base {
@@ -783,14 +796,25 @@ a {
   opacity: 0.45;
 }
 
+[data-slot='sidebar-inset'] {
+  background-color: var(--background);
+  background-image: var(--app-background-gradient);
+}
+
 @media (forced-colors: active) {
+  :root,
+  .dark {
+    --app-background-gradient: none;
+  }
+
   .sidebar-brand-halo {
     display: none;
   }
 }
 
 .dark body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: var(--app-background-gradient);
 }
 
 .dark body::before,

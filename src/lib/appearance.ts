@@ -4,6 +4,8 @@ type PaletteTokens = {
   primaryHover: string
   accent: string
   accentForeground: string
+  sidebarAccent: string
+  sidebarAccentForeground: string
   ring: string
 }
 
@@ -15,6 +17,33 @@ type AccentPalette = {
   dark?: PaletteTokens
 }
 
+function luminance(hex: string) {
+  const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  return rgb
+    .map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0)
+}
+
+function contrastRatio(a: string, b: string) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+function ensureDarkContrast(foreground: string, background: string, min: number) {
+  if (contrastRatio(foreground, background) >= min) return foreground
+  let lo = 0
+  let hi = 0.6
+  for (let step = 0; step < 12; step++) {
+    const mid = (lo + hi) / 2
+    if (contrastRatio(mix(foreground, '#000000', mid), background) >= min) {
+      hi = mid
+    } else {
+      lo = mid
+    }
+  }
+  return mix(foreground, '#000000', hi)
+}
+
 function palette(
   id: string,
   label: string,
@@ -23,6 +52,8 @@ function palette(
   lightAccent: string,
   darkAccent: string,
 ) {
+  // Sidebar sits on a #f0f0f0 surface in light mode, so active/hover items need a deeper tint than --accent.
+  const lightSidebarAccent = mix(lightAccent, primary, 0.09)
   return {
     id,
     label,
@@ -30,9 +61,15 @@ function palette(
     light: {
       primary,
       primaryForeground: '#ffffff',
-      primaryHover: mix(primary, '#000000', 0.08),
+      primaryHover: mix(primary, '#000000', 0.14),
       accent: lightAccent,
-      accentForeground: primary,
+      accentForeground: ensureDarkContrast(primary, lightAccent, 5),
+      sidebarAccent: lightSidebarAccent,
+      sidebarAccentForeground: ensureDarkContrast(
+        primary,
+        lightSidebarAccent,
+        5,
+      ),
       ring: primary,
     },
     dark: {
@@ -41,6 +78,8 @@ function palette(
       primaryHover: mix(darkPrimary, '#ffffff', 0.08),
       accent: darkAccent,
       accentForeground: darkPrimary,
+      sidebarAccent: darkAccent,
+      sidebarAccentForeground: darkPrimary,
       ring: darkPrimary,
     },
   }
@@ -86,7 +125,7 @@ const palettes: AccentPalette[] = [
     'საფირონის ლურჯი',
     '#234E83',
     '#9dbce5',
-    '#edf2f8',
+    '#dfe6ed',
     '#202e40',
   ),
   palette(
@@ -94,7 +133,7 @@ const palettes: AccentPalette[] = [
     'ძველი ოქროსფერი',
     '#82702F',
     '#d9c783',
-    '#fbf9f0',
+    '#e9e6da',
     '#353020',
   ),
   palette(
@@ -102,16 +141,16 @@ const palettes: AccentPalette[] = [
     'სპილენძისფერი',
     '#965D35',
     '#e5b28b',
-    '#f8efe8',
+    '#ede3dd',
     '#3c2b20',
   ),
-  palette('iris', 'ზამბახისფერი', '#5C6096', '#b9bce5', '#f0f0f8', '#2b2c40'),
+  palette('iris', 'ზამბახისფერი', '#5C6096', '#b9bce5', '#e4e5ee', '#2b2c40'),
   palette(
     'jade',
     'ნეფრიტის მწვანე',
     '#28705F',
     '#96d5c0',
-    '#f0f8f4',
+    '#dce7e5',
     '#20362e',
   ),
   palette(
@@ -119,19 +158,19 @@ const palettes: AccentPalette[] = [
     'ევკალიპტის მწვანე',
     '#4B6658',
     '#b0cebd',
-    '#f1f6f3',
+    '#e2e6e4',
     '#28372f',
   ),
-  palette('forest', 'ტყის მწვანე', '#166534', '#91d6a9', '#f0f8f2', '#1e3427'),
-  palette('wine', 'ღვინისფერი', '#743C51', '#e2afc0', '#faf2f5', '#3b2630'),
-  palette('navy', 'მუქი ლურჯი', '#263F66', '#a5bee4', '#f0f4fa', '#232e40'),
-  palette('indigo', 'ინდიგო', '#4338CA', '#bab5fb', '#f3f2fd', '#2c2848'),
+  palette('forest', 'ტყის მწვანე', '#166534', '#91d6a9', '#dce8e1', '#1e3427'),
+  palette('wine', 'ღვინისფერი', '#743C51', '#e2afc0', '#ebe3e6', '#3b2630'),
+  palette('navy', 'მუქი ლურჯი', '#263F66', '#a5bee4', '#e2e5eb', '#232e40'),
+  palette('indigo', 'ინდიგო', '#4338CA', '#bab5fb', '#e5e4f8', '#2c2848'),
   palette(
     'cobalt',
     'კობალტის ლურჯი',
     '#2563EB',
     '#a5c4ff',
-    '#f4f8ff',
+    '#dbe6fc',
     '#22334d',
   ),
   palette(
@@ -139,7 +178,7 @@ const palettes: AccentPalette[] = [
     'მუქი ნარინჯისფერი',
     '#C2410C',
     '#ffba92',
-    '#fff6f0',
+    '#f6e1d9',
     '#402a20',
   ),
   palette(
@@ -147,7 +186,7 @@ const palettes: AccentPalette[] = [
     'ზეთისხილისფერი',
     '#4D5B26',
     '#c5d59b',
-    '#f5f7ed',
+    '#e4e6df',
     '#303521',
   ),
 ]
@@ -167,7 +206,7 @@ export const DEFAULT_ACCENT = 'neutral'
 export const accentIds = accentPalettes.map(({ id }) => id)
 
 function declarations(tokens: PaletteTokens) {
-  return `--primary:${tokens.primary};--primary-foreground:${tokens.primaryForeground};--primary-hover:${tokens.primaryHover};--switch-checked:${tokens.primary};--switch-checked-foreground:${tokens.primaryForeground};--accent:${tokens.accent};--accent-foreground:${tokens.accentForeground};--calendar-range-background:${tokens.accent};--ring:${tokens.ring};--sidebar-primary:${tokens.primary};--sidebar-primary-foreground:${tokens.primaryForeground};--sidebar-accent:${tokens.accent};--sidebar-accent-foreground:${tokens.accentForeground};--sidebar-ring:${tokens.ring};`
+  return `--primary:${tokens.primary};--primary-foreground:${tokens.primaryForeground};--primary-hover:${tokens.primaryHover};--switch-checked:${tokens.primary};--switch-checked-foreground:${tokens.primaryForeground};--accent:${tokens.accent};--accent-foreground:${tokens.accentForeground};--calendar-range-background:${tokens.accent};--ring:${tokens.ring};--sidebar-primary:${tokens.primary};--sidebar-primary-foreground:${tokens.primaryForeground};--sidebar-accent:${tokens.sidebarAccent};--sidebar-accent-foreground:${tokens.sidebarAccentForeground};--sidebar-ring:${tokens.ring};`
 }
 
 // Prepared once per module load, never during selection or component rendering.

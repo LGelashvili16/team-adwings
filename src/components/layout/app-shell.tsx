@@ -110,7 +110,7 @@ function WorkspaceShell({ actor }: { actor: Actor }) {
           }
         />
         <SidebarInset className="m-2 min-h-0 min-w-0 overflow-hidden rounded-xl">
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b bg-transparent px-4">
             <SidebarTrigger aria-label="მენიუს გახსნა ან დახურვა" />
             <Separator
               orientation="vertical"

@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 85. Last updated: 2026-11-25.
+Status: required project instructions. Version: 86. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -72,7 +72,7 @@ Place the page title outside and above a route-aware tabs wrapper when that wrap
 - Keep neutral first in the accent selector and group neighboring hues together. Sort new palette entries automatically through the shared registry, preserving the same DOM and keyboard order. Extend subtle accent treatment to selected select options and checked menu choices. Reserve broad content surfaces, headings, separators and semantic status colors for their established purposes.
 
 - Personal accent colors are selected in გარეგნობა on `/settings/profile`, independently of light/dark/system mode. Keep the existing neutral option as the default alongside საფირონის ლურჯი, ძველი ოქროსფერი, სპილენძისფერი and ზამბახისფერი. Define new palettes only in `src/lib/appearance.ts`; see [adding appearance colors](appearance-colors.md). Use the generated semantic tokens for primary actions, links, focus and selected navigation. Preserve status, schedule and map color meanings.
-- The accent registry also includes ნეფრიტის მწვანე, ევკალიპტის მწვანე, ტყის მწვანე, ღვინისფერი, მუქი ლურჯი, ინდიგო, კობალტის ლურჯი, მუქი ნარინჯისფერი and ზეთისხილისფერი. Use each palette's reviewed light/dark primary and foreground pairs for checked switches, checkboxes and radio buttons. Tint current pagination, selected table rows, calendar ranges and text selection subtly. Preserve neutral's existing appearance. Verify button hover contrast as well as resting states; never recolor business-status badges to match the personal accent.
+- The accent registry also includes ნეფრიტის მწვანე, ევკალიპტის მწვანე, ტყის მწვანე, ღვინისფერი, მუქი ლურჯი, ინდიგო, კობალტის ლურჯი, მუქი ნარინჯისფერი and ზეთისხილისფერი. Use each palette's reviewed light/dark primary and foreground pairs for checked switches, checkboxes and radio buttons. Tint current pagination, selected table rows, calendar ranges and text selection subtly. In light mode, keep active and hover accent surfaces visibly separated from `#f7f7f7` and `#f0f0f0` surfaces (with a deeper `--sidebar-accent` tint and auto-darkened foregrounds when needed) while maintaining readable muted-text contrast. Apply a subtle top-left-to-bottom-right diagonal background gradient derived from `--primary` on the highest-level application background (`body` and `[data-slot='sidebar-inset']`, disabled in forced-colors mode). Preserve neutral's existing appearance. Verify button hover contrast as well as resting states; never recolor business-status badges to match the personal accent.
 
 - Use semantic tokens such as `background`, `foreground`, `muted`, `muted-foreground`, `border`, `primary`, and `destructive`, plus existing badge variants. Keep foundations in `src/styles.css` and variants in shared primitives.
 - Keep primary emphasis restrained. Use status colors for their established meaning rather than decorating arbitrary rows or headings.
