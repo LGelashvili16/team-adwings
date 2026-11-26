@@ -6,6 +6,7 @@ import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { formatMonthlyPayrollCsv } from './monthly.rules'
 import {
   monthlySearchSchema,
+  monthlyExportSchema,
   monthlyDetailSchema,
   monthlySaveSchema,
   monthlyAdjustmentsSaveSchema,
@@ -54,7 +55,7 @@ export const getMonthlyPayroll = createServerFn({ method: 'GET' })
   )
 export const getMonthlyPayrollCsv = createServerFn({ method: 'GET' })
   .middleware([reader])
-  .validator(monthlySearchSchema.omit({ view: true }))
+  .validator(monthlyExportSchema)
   .handler(({ context, data }) =>
     safely(async () =>
       formatMonthlyPayrollCsv(

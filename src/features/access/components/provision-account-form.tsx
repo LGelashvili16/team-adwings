@@ -11,6 +11,7 @@ import { Input } from '#/components/ui/input'
 import { Spinner } from '#/components/ui/spinner'
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -44,16 +45,16 @@ const textFields = [
     autoComplete: 'name',
   },
   {
-    name: 'contactEmail',
-    label: 'ელფოსტა',
-    required: false,
-    autoComplete: 'email',
-  },
-  {
     name: 'jobTitle',
     label: 'თანამდებობა',
     required: false,
     autoComplete: 'organization-title',
+  },
+  {
+    name: 'contactEmail',
+    label: 'ელფოსტა',
+    required: false,
+    autoComplete: 'email',
   },
   {
     name: 'phone',
@@ -168,8 +169,9 @@ export function ProvisionAccountForm({
         <form.Field name="roles">
           {(field) => (
             <AccountRoleFields
+              collapsible
               options={availableRoles}
-              value={field.state.value}
+              value={field.state.value ?? ['employee']}
               onChange={field.handleChange}
               disabled={mutation.isPending}
               invalid={!field.state.meta.isValid}
@@ -216,54 +218,73 @@ export function ProvisionAccountForm({
         ) : null}
         <form.Field name="dayOffAllowance">
           {(field) => (
-            <Field data-invalid={!field.state.meta.isValid}>
-              <FieldLabel htmlFor="inherit-day-offs">
-                კომპანიის დასვენების დღეების ლიმიტის გამოყენება
-              </FieldLabel>
-              <Switch
-                id="inherit-day-offs"
-                checked={field.state.value == null}
-                onCheckedChange={(checked) =>
-                  field.handleChange(
-                    checked ? null : (settings.data?.defaultDays ?? 4),
-                  )
-                }
-                disabled={mutation.isPending}
-              />
-              {field.state.value == null ? (
-                <p className="text-sm text-muted-foreground">
-                  {settings.data
-                    ? `საწყისი ბალანსი: ${settings.data.defaultDays} დღე`
-                    : 'შექმნისას გამოიყენება კომპანიის მოქმედი ლიმიტი.'}
-                </p>
-              ) : (
-                <>
-                  <FieldLabel htmlFor="initial-day-offs">
-                    დასვენების დღეების საწყისი ბალანსი
-                  </FieldLabel>
-                  <Input
-                    id="initial-day-offs"
-                    type="number"
-                    min={0}
-                    max={366}
-                    value={
-                      Number.isNaN(field.state.value) ? '' : field.state.value
+            <Card
+              size="sm"
+              className="border bg-transparent shadow-none ring-0"
+            >
+              <CardContent className="flex flex-col gap-4">
+                <Field orientation="horizontal">
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <FieldLabel htmlFor="inherit-day-offs">
+                      კომპანიის დასვენების დღეების ლიმიტის გამოყენება
+                    </FieldLabel>
+                    {field.state.value == null ? (
+                      <FieldDescription id="inherit-day-offs-description">
+                        {settings.data
+                          ? `საწყისი ბალანსი: ${settings.data.defaultDays} დღე`
+                          : 'შექმნისას გამოიყენება კომპანიის მოქმედი ლიმიტი.'}
+                      </FieldDescription>
+                    ) : null}
+                  </div>
+                  <Switch
+                    id="inherit-day-offs"
+                    checked={field.state.value == null}
+                    aria-describedby={
+                      field.state.value == null
+                        ? 'inherit-day-offs-description'
+                        : undefined
                     }
-                    disabled={mutation.isPending}
-                    onBlur={field.handleBlur}
-                    onChange={(event) =>
+                    onCheckedChange={(checked) =>
                       field.handleChange(
-                        event.target.value === ''
-                          ? Number.NaN
-                          : Number(event.target.value),
+                        checked ? null : (settings.data?.defaultDays ?? 4),
                       )
                     }
-                    aria-invalid={!field.state.meta.isValid}
+                    disabled={mutation.isPending}
                   />
-                </>
-              )}
-              <FieldError errors={field.state.meta.errors} />
-            </Field>
+                </Field>
+                {field.state.value != null ? (
+                  <Field data-invalid={!field.state.meta.isValid}>
+                    <FieldLabel htmlFor="initial-day-offs">
+                      დასვენების დღეების საწყისი ბალანსი
+                    </FieldLabel>
+                    <Input
+                      id="initial-day-offs"
+                      type="number"
+                      min={0}
+                      max={366}
+                      value={
+                        Number.isNaN(field.state.value) ? '' : field.state.value
+                      }
+                      disabled={mutation.isPending}
+                      onBlur={field.handleBlur}
+                      onChange={(event) =>
+                        field.handleChange(
+                          event.target.value === ''
+                            ? Number.NaN
+                            : Number(event.target.value),
+                        )
+                      }
+                      aria-invalid={!field.state.meta.isValid}
+                      aria-describedby="initial-day-offs-error"
+                    />
+                    <FieldError
+                      id="initial-day-offs-error"
+                      errors={field.state.meta.errors}
+                    />
+                  </Field>
+                ) : null}
+              </CardContent>
+            </Card>
           )}
         </form.Field>
         {error ? (

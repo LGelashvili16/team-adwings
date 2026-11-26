@@ -22,6 +22,8 @@ export const monthlySearchSchema = z.object(
   },
   { error: 'უწყისის ფილტრები არასწორია.' },
 )
+export const monthlyExportSchema = monthlySearchSchema.omit({ view: true })
+
 export const monthlyDetailSchema = z.strictObject(
   {
     month: payrollMonthSchema,

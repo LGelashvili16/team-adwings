@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 97. Last updated: 2026-11-26.
+Status: required project instructions. Version: 99. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -27,6 +27,12 @@ Deliver an ultra-modern, visually polished interface from the first implementati
 | Iconography            | Consistent Tabler icons reinforce meaning with predictable size and placement.                                        | Mixed icon families, decorative icons everywhere, unexplained icon-only actions.                     |
 | Consistency and polish | Matching controls look and behave alike across employee, management, and admin pages.                                 | Local substitutes for shared primitives, one-off shadows, mismatched tabs or pagination.             |
 | Clarity                | Concise Georgian copy, explicit actions, precise information, and honest loading/empty/error states.                  | Unnecessary descriptions, vague labels, fake success, unexplained empty screens.                     |
+
+## Employee position and system access
+
+Keep `თანამდებობა` as employee profile data, separate from permission-bearing account roles. Creation defaults to ordinary employee access. Put `სისტემაში წვდომა` in a closed-by-default Accordion in creation and employee editing, with selected presets visible in its summary. Explain the distinction inside and expand on validation errors. Explicit access administration remains expanded. Position edits never infer or change access.
+
+During account activation, keep the username's typed case and replace spaces with hyphens as they are entered. Show a compact orange warning Alert below the field when a replacement occurs. Save and look up usernames in lowercase.
 
 ## Typography, hierarchy, and page structure
 
@@ -315,7 +321,7 @@ The monthly payroll table and its CSV use `ხელფასი(თვე)`, `�
 
 Use the semantic red text token for nonzero fines in the management payroll tables. Keep zero fines neutral. Tint the employee salary directory’s `განსასაზღვრი ხელფასი` summary card when its count is above zero.
 
-Use the compact `თვე`, `1/2` and `2/2` tabs for split payroll periods. Select the current half of the company-local month by default and keep explicit tab choices in the URL. Keep the desktop toolbar on one row with a usable minimum width for search and place CSV export at the far right. Allow scrolling within the toolbar when the available width is smaller. On mobile, group employee search, the month picker and sorting in the collapsed `ფილტრები` Accordion, using the Jobs filter style. Show the selected month on the trigger. Give the salary payment action, period tab strip and CSV export button the full available width on mobile.
+Use the compact `თვე`, `1/2` and `2/2` tabs for split payroll periods. Select the current half of the company-local month by default and keep explicit tab choices in the URL. Keep the desktop toolbar on one row with a usable minimum width for search and place the `ექსპორტი` menu at the far right. The menu offers CSV and PDF downloads for the loaded results. Allow scrolling within the toolbar when the available width is smaller. On mobile, group employee search, the month picker and sorting in the collapsed `ფილტრები` Accordion, using the Jobs filter style. Show the selected month on the trigger. Give the salary payment action, period tab strip and export trigger the full available width on mobile.
 
 The management salary detail uses the full available content width. Give the current agreement more emphasis than the scheduled change. Show salary history as a table on wider screens and as stacked entries on narrow screens so dates, amounts and audit details remain readable.
 

@@ -66,7 +66,7 @@ describe('login interactions', () => {
     render(<LoginPage />)
     await user.type(
       screen.getByLabelText('მომხმარებლის სახელი ან ელფოსტა'),
-      'WORKER_01',
+      ' WORKER_01 ',
     )
     await user.type(
       screen.getByLabelText('პაროლი', { exact: true }),

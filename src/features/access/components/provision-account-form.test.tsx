@@ -33,6 +33,29 @@ beforeEach(() => {
 })
 
 describe('administrative account provisioning', () => {
+  it('keeps ordinary access when an HR job title is entered without opening access settings', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProvisionAccountForm onCode={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(
+      screen.getByRole('button', { name: /სისტემაში წვდომა/ }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    await user.type(
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
+      'ანა მაისურაძე',
+    )
+    await user.type(screen.getByRole('textbox', { name: 'თანამდებობა' }), 'HR')
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ jobTitle: 'HR', roles: ['employee'] }),
+      }),
+    )
+  })
   it('submits the selected employment start date', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
@@ -73,6 +96,8 @@ describe('administrative account provisioning', () => {
     expect(
       screen.queryByRole('textbox', { name: 'მომხმარებლის სახელი' }),
     ).not.toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
     expect(screen.getAllByRole('checkbox')).toHaveLength(5)
     for (const name of [
       'თანამშრომელი',
@@ -98,6 +123,7 @@ describe('administrative account provisioning', () => {
         <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin />
       </QueryClientProvider>,
     )
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
     expect(
       screen.getByRole('checkbox', { name: 'ადმინისტრატორი' }),
     ).toBeEnabled()

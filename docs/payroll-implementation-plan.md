@@ -1,6 +1,6 @@
 # Payroll implementation instructions and progress
 
-Updated: 2026-11-26. This is the execution checklist for Team Adwings payroll. [Payroll architecture and rules](payroll.md), `AGENTS.md` and the [UI standard](ui-design-guidelines.md) remain applicable.
+Updated: 2026-11-27. This is the execution checklist for Team Adwings payroll. [Payroll architecture and rules](payroll.md), `AGENTS.md` and the [UI standard](ui-design-guidelines.md) remain applicable.
 
 ## Current delivery scope, updated 2026-11-26
 
@@ -28,6 +28,7 @@ Monthly Payroll now displays assigned base salaries before draft preparation, wi
 - [x] Highlight nonzero fines and the unset-salary summary count with semantic red. Verified the treatment in light and dark Chrome previews.
 - [x] Reduce the gap between payroll filters and table results to 8px. Verified rendered spacing in Chrome.
 - [x] Keep the filters and displayed results in place while an uncached period loads. Disable CSV export until the requested results arrive. Verified with a regression test and delayed responses in desktop and mobile Chrome previews.
+- [x] Offer CSV and PDF from the Monthly Payroll export menu. Verified with 90 payroll tests, including isolated PostgreSQL coverage, and with actual Chrome downloads at desktop and mobile widths. Inspected Georgian text and payment dates in the generated PDF and verified that it includes results across all matching pages. The production browser build contains neither PDFKit nor the report font.
 - [x] Refresh unpaid monthly payroll after a fixed salary correction. Require review for partial months and custom amounts and preserve issued installments. Verified in isolated PostgreSQL and with a Chrome preview of the corrected row and confirmation field.
 - [x] Show review, published-payment and neutral metadata badges in Monthly Payroll. Verified the whole-month and first-half states in Chrome with light and dark themes.
 - [x] Place monthly payroll badges in a dedicated payout status column beside the employee name. Verified the whole-month and installment views in Chrome using sample records.

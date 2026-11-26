@@ -55,6 +55,7 @@ import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_aut
 import { Route as AuthenticatedTimesheetsIndexRouteImport } from './routes/_authenticated/timesheets/index'
 import { Route as AuthenticatedTimesheetsTimesheetIdRouteImport } from './routes/_authenticated/timesheets/$timesheetId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiPayrollMonthlyPdfRouteImport } from './routes/api/payroll/monthly-pdf'
 import { Route as AuthenticatedAdminSettingsApprovalsRouteImport } from './routes/_authenticated/admin/settings/approvals'
 import { Route as AuthenticatedAdminSettingsCompanyRouteImport } from './routes/_authenticated/admin/settings/company'
 import { Route as AuthenticatedAdminSettingsLeaveRouteImport } from './routes/_authenticated/admin/settings/leave'
@@ -327,6 +328,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPayrollMonthlyPdfRoute = ApiPayrollMonthlyPdfRouteImport.update({
+  id: '/api/payroll/monthly-pdf',
+  path: '/api/payroll/monthly-pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminSettingsApprovalsRoute =
   AuthenticatedAdminSettingsApprovalsRouteImport.update({
     id: '/settings/approvals',
@@ -472,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/jobs/': typeof AuthenticatedJobsIndexRoute
@@ -534,6 +541,7 @@ export interface FileRoutesByTo {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/attendance': typeof AuthenticatedAttendanceIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/jobs': typeof AuthenticatedJobsIndexRoute
@@ -600,6 +608,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/_authenticated/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/_authenticated/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/jobs/': typeof AuthenticatedJobsIndexRoute
@@ -666,6 +675,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/attendance/'
     | '/dashboard/'
     | '/jobs/'
@@ -728,6 +738,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/attendance'
     | '/dashboard'
     | '/jobs'
@@ -793,6 +804,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/security'
     | '/_authenticated/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/_authenticated/attendance/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/jobs/'
@@ -823,6 +835,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiPayrollMonthlyPdfRoute: typeof ApiPayrollMonthlyPdfRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1147,6 +1160,13 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/$'
       fullPath: '/api/auth/$'
       preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/payroll/monthly-pdf': {
+      id: '/api/payroll/monthly-pdf'
+      path: '/api/payroll/monthly-pdf'
+      fullPath: '/api/payroll/monthly-pdf'
+      preLoaderRoute: typeof ApiPayrollMonthlyPdfRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/settings/approvals': {
@@ -1478,6 +1498,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiPayrollMonthlyPdfRoute: ApiPayrollMonthlyPdfRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

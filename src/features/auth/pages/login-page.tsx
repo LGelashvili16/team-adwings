@@ -34,13 +34,14 @@ export function LoginPage() {
     onSubmit: async ({ value }) => {
       setError('')
       try {
-        const result = value.identifier.includes('@')
+        const identifier = value.identifier.trim()
+        const result = identifier.includes('@')
           ? await authClient.signIn.email({
-              email: value.identifier,
+              email: identifier,
               password: value.password,
             })
           : await authClient.signIn.username({
-              username: value.identifier.toLowerCase(),
+              username: identifier.toLowerCase(),
               password: value.password,
             })
         if (result.error) {
@@ -110,6 +111,7 @@ export function LoginPage() {
                     placeholder="მომხმარებლის სახელი"
                     autoComplete="username"
                     autoCapitalize="none"
+                    autoCorrect="off"
                     spellCheck={false}
                     value={field.state.value}
                     onBlur={field.handleBlur}

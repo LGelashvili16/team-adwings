@@ -1,13 +1,21 @@
 import { useState } from 'react'
 import { useForm } from '@tanstack/react-form'
 import { Link } from '@tanstack/react-router'
-import { IconArrowRight, IconCheck } from '@tabler/icons-react'
+import {
+  IconAlertTriangle,
+  IconArrowRight,
+  IconCheck,
+} from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { authClient } from '#/lib/auth/auth-client'
 import {
   accountSetupFormSchema,
+  activateAccountSchema,
   activateAccountFormSchema,
+  completeAccountSchema,
 } from '#/features/access/access.schemas'
+import { replaceUsernameWhitespace } from '#/features/access/access.rules'
+import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Spinner } from '#/components/ui/spinner'
 import { Input } from '#/components/ui/input'
@@ -50,9 +58,12 @@ export function AccountSetupForm({
   const hydrated = useHydrated()
   const [error, setError] = useState('')
   const [complete, setComplete] = useState(false)
+  const [usernameSpaceReplaced, setUsernameSpaceReplaced] = useState(false)
   const isActivation = purpose === 'activation'
   const fields = isActivation ? activationFields : resetFields
-  const content = isActivation ? authContent.register : authContent.resetPassword
+  const content = isActivation
+    ? authContent.register
+    : authContent.resetPassword
   const form = useForm({
     defaultValues: {
       code: '',
@@ -84,12 +95,8 @@ export function AccountSetupForm({
           {
             method: 'POST',
             body: isActivation
-              ? {
-                  code: value.code.trim(),
-                  username: value.username.trim().toLowerCase(),
-                  newPassword: value.newPassword,
-                }
-              : { code: value.code.trim(), newPassword: value.newPassword },
+              ? activateAccountSchema.parse(value)
+              : completeAccountSchema.parse(value),
           },
         )
         if (result.error || !result.data.status) {
@@ -178,6 +185,8 @@ export function AccountSetupForm({
                 {(field) => {
                   const id = `setup-${name}`
                   const invalid = !field.state.meta.isValid
+                  const showSpaceNotice =
+                    name === 'username' && usernameSpaceReplaced
                   return (
                     <Field data-invalid={invalid}>
                       <FieldLabel htmlFor={id}>
@@ -209,18 +218,44 @@ export function AccountSetupForm({
                           id={id}
                           name={name}
                           required
+                          type="text"
                           autoComplete="username"
+                          autoCorrect="off"
                           spellCheck={false}
                           autoCapitalize="none"
                           value={field.state.value}
                           onBlur={field.handleBlur}
-                          onChange={(event) =>
-                            field.handleChange(event.target.value)
-                          }
+                          onChange={(event) => {
+                            const input = event.currentTarget
+                            const raw = input.value
+                            const next = replaceUsernameWhitespace(raw)
+                            if (next !== raw) {
+                              const start = input.selectionStart ?? raw.length
+                              const end = input.selectionEnd ?? start
+                              input.value = next
+                              input.setSelectionRange(
+                                replaceUsernameWhitespace(raw.slice(0, start))
+                                  .length,
+                                replaceUsernameWhitespace(raw.slice(0, end))
+                                  .length,
+                              )
+                              setUsernameSpaceReplaced(true)
+                            } else if (!next.includes('-')) {
+                              setUsernameSpaceReplaced(false)
+                            }
+                            field.handleChange(next)
+                          }}
                           aria-invalid={invalid}
-                          aria-describedby={`${id}-error`}
+                          aria-describedby={
+                            [
+                              showSpaceNotice && `${id}-space-notice`,
+                              invalid && `${id}-error`,
+                            ]
+                              .filter(Boolean)
+                              .join(' ') || undefined
+                          }
                           className="h-10"
-                          placeholder="მაგ: giorgi.beridze"
+                          placeholder="მაგ: giorgi-beridze"
                         />
                       ) : (
                         <PasswordInput
@@ -237,6 +272,18 @@ export function AccountSetupForm({
                         id={`${id}-error`}
                         errors={field.state.meta.errors}
                       />
+                      {showSpaceNotice ? (
+                        <Alert
+                          id={`${id}-space-notice`}
+                          variant="warning"
+                          role="status"
+                        >
+                          <IconAlertTriangle aria-hidden="true" />
+                          <AlertDescription>
+                            გამოტოვებული ადგილები დეფისებით (-) შეიცვალა.
+                          </AlertDescription>
+                        </Alert>
+                      ) : null}
                     </Field>
                   )
                 }}

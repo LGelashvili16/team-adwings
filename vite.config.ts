@@ -32,7 +32,8 @@ const config = defineConfig({
     nitro({
       ...attendanceTaskConfig,
       // Preserve the passkey library's module initialization order in production.
-      traceDeps: ['@simplewebauthn/server*'],
+      // PDFKit and Fontkit load font data relative to their installed modules.
+      traceDeps: ['@simplewebauthn/server*', 'pdfkit', 'fontkit'],
       rollupConfig: { external: [/^@sentry\//] },
       routeRules: {
         '/service-worker.js': { headers: { 'Cache-Control': 'no-cache' } },

@@ -57,9 +57,11 @@ describe('employee account activation', () => {
     const user = userEvent.setup()
     render(<RegisterPage />)
     await user.type(screen.getByLabelText(/ერთჯერადი კოდი/), 'A'.repeat(12))
-    await user.type(
-      screen.getByLabelText(/მომხმარებლის სახელი/),
-      'Giorgi.Beridze',
+    const username = screen.getByLabelText(/მომხმარებლის სახელი/)
+    await user.type(username, 'Giorgi Beridze')
+    expect(username).toHaveValue('Giorgi-Beridze')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'გამოტოვებული ადგილები დეფისებით (-) შეიცვალა.',
     )
     await user.type(
       screen.getByLabelText(/ახალი პაროლი/, { selector: 'input' }),
@@ -76,7 +78,7 @@ describe('employee account activation', () => {
       method: 'POST',
       body: {
         code: 'A'.repeat(12),
-        username: 'giorgi.beridze',
+        username: 'giorgi-beridze',
         newPassword: 'example-password-123',
       },
     })
@@ -89,6 +91,24 @@ describe('employee account activation', () => {
       '/auth/login',
     )
     expect(screen.queryByLabelText(/ერთჯერადი კოდი/)).not.toBeInTheDocument()
+  })
+
+  it('replaces pasted whitespace and keeps the cursor at an edited separator', async () => {
+    const user = userEvent.setup()
+    render(<RegisterPage />)
+    const username =
+      screen.getByLabelText<HTMLInputElement>(/მომხმარებლის სახელი/)
+    await user.click(username)
+    await user.paste('Giorgi  Beridze')
+    expect(username).toHaveValue('Giorgi-Beridze')
+    await user.type(username, ' ', {
+      initialSelectionStart: 6,
+      initialSelectionEnd: 7,
+    })
+    expect(username).toHaveValue('Giorgi-Beridze')
+    expect(username.selectionStart).toBe(7)
+    await user.clear(username)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 
   it('prevents repeat submission while pending and maps invalid codes and duplicate usernames to Georgian', async () => {

@@ -155,7 +155,8 @@ export function EmployeeDetailsSheet({
           <FieldGroup className="gap-4">
             <SheetDescription>
               მომხმარებლის სახელის ან შესვლის ელფოსტის შეცვლა მაშინვე აისახება
-              ანგარიშზე. როლების შეცვლისას მიმდინარე სესიები გაუქმდება.
+              ანგარიშზე. სისტემაში წვდომის შეცვლისას მიმდინარე სესიები
+              გაუქმდება.
             </SheetDescription>
             {detailFields.map(({ name, label, autoComplete }) => (
               <form.Field key={name} name={name}>
@@ -202,6 +203,7 @@ export function EmployeeDetailsSheet({
               <form.Field name="roles">
                 {(field) => (
                   <AccountRoleFields
+                    collapsible
                     options={availableRoles}
                     value={field.state.value ?? editableRoles}
                     onChange={field.handleChange}
@@ -213,7 +215,8 @@ export function EmployeeDetailsSheet({
               </form.Field>
             ) : (
               <p className="rounded-lg border border-border/60 bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
-                ამ ანგარიშის როლები წვდომის მართვის გვერდიდან იმართება.
+                ამ ანგარიშის სისტემაში წვდომა წვდომის მართვის გვერდიდან
+                იმართება.
                 {targetRoles.length > 0 ? (
                   <>
                     {' '}

@@ -138,6 +138,7 @@ describe('single account page', () => {
     })
     await user.clear(username)
     await user.type(username, 'worker-updated')
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
     expect(screen.getByRole('checkbox', { name: 'HR' })).toBeChecked()
     await user.click(screen.getByRole('checkbox', { name: 'თანამშრომელი' }))
     await user.click(screen.getByRole('checkbox', { name: 'ბუღალტერი' }))
@@ -163,6 +164,7 @@ describe('single account page', () => {
     ).toHaveAttribute('href', '/manage/employees?page=1')
     await user.click(await screen.findByRole('button', { name: 'რედაქტირება' }))
     expect(await screen.findByRole('dialog')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
     expect(screen.getAllByRole('checkbox')).toHaveLength(5)
     expect(screen.getByRole('checkbox', { name: 'HR' })).toBeEnabled()
     expect(

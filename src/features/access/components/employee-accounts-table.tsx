@@ -28,7 +28,9 @@ export function EmployeeAccountsTable({
         <TableRow>
           <TableHead className="pl-5">თანამშრომელი</TableHead>
           <TableHead>თანამდებობა</TableHead>
-          <TableHead className="hidden md:table-cell">როლები</TableHead>
+          <TableHead className="hidden md:table-cell">
+            სისტემაში წვდომა
+          </TableHead>
           <TableHead>სტატუსი</TableHead>
           <TableHead className="w-12 pr-5">
             <span className="sr-only">დეტალები</span>

@@ -5,12 +5,22 @@ import { toast } from 'sonner'
 import {
   IconWallet,
   IconDownload,
+  IconChevronDown,
+  IconFileTypeCsv,
+  IconFileTypePdf,
   IconPlus,
   IconInfoCircle,
   IconAlertCircle,
 } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { Badge } from '#/components/ui/badge'
 import {
   Empty,
@@ -52,27 +62,59 @@ export function MonthlyPayrollPage() {
     (view?.paymentWindows.some((window) => window.stage === 'first') ??
       Boolean(search.period))
   const exportPayroll = useMutation({
-    mutationFn: () =>
-      getMonthlyPayrollCsv({
-        data: {
-          page: 1,
-          month: view?.month,
-          period: view?.period,
-          q: search.q,
-          sort: search.sort,
-        },
-      }),
+    mutationFn: async (format: 'csv' | 'pdf') => {
+      if (!view) throw new Error()
+      const data = {
+        month: view.month,
+        period: view.period,
+        q: search.q,
+        sort: search.sort,
+      }
+      if (format === 'csv') {
+        const result = await getMonthlyPayrollCsv({
+          data: { ...data, page: 1 },
+        })
+        if (!result.ok) return result
+        return {
+          ok: true as const,
+          filename: result.value.filename,
+          file: new Blob([result.value.csv], {
+            type: 'text/csv;charset=utf-8',
+          }),
+        }
+      }
+
+      const params = new URLSearchParams(data)
+      const response = await fetch(`/api/payroll/monthly-pdf?${params}`)
+      if (response.status === 422) {
+        return { ok: false as const, message: await response.text() }
+      }
+      if (
+        !response.ok ||
+        response.headers.get('Content-Type') !== 'application/pdf'
+      ) {
+        throw new Error()
+      }
+      const filename = response.headers
+        .get('Content-Disposition')
+        ?.match(
+          /filename="(payroll-\d{4}-\d{2}-(?:all|first|salary)\.pdf)"/,
+        )?.[1]
+      return {
+        ok: true as const,
+        filename: filename ?? `payroll-${data.month}-${data.period}.pdf`,
+        file: await response.blob(),
+      }
+    },
     onSuccess: (result) => {
       if (!result.ok) {
         toast.error(result.message)
         return
       }
-      const url = URL.createObjectURL(
-        new Blob([result.value.csv], { type: 'text/csv;charset=utf-8' }),
-      )
+      const url = URL.createObjectURL(result.file)
       const link = document.createElement('a')
       link.href = url
-      link.download = result.value.filename
+      link.download = result.filename
       link.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     },
@@ -222,25 +264,47 @@ export function MonthlyPayrollPage() {
             </Badge>
           ) : null}
           {!adjustmentsOnly ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-11 w-full md:ml-auto md:h-9 md:w-auto"
-              disabled={
-                !view?.total ||
-                query.isPlaceholderData ||
-                exportPayroll.isPending
-              }
-              onClick={() => exportPayroll.mutate()}
-            >
-              {exportPayroll.isPending ? (
-                <Spinner data-icon="inline-start" aria-hidden="true" />
-              ) : (
-                <IconDownload data-icon="inline-start" aria-hidden="true" />
-              )}
-              CSV ექსპორტი
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                type="button"
+                render={<Button variant="outline" size="sm" />}
+                className="h-11 w-full shrink-0 md:ml-auto md:h-9 md:w-auto"
+                disabled={!view?.total || query.isPlaceholderData}
+                aria-busy={exportPayroll.isPending}
+              >
+                {exportPayroll.isPending ? (
+                  <Spinner data-icon="inline-start" aria-hidden="true" />
+                ) : (
+                  <IconDownload data-icon="inline-start" aria-hidden="true" />
+                )}
+                ექსპორტი
+                <IconChevronDown data-icon="inline-end" aria-hidden="true" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                aria-label="ექსპორტის ფორმატი"
+                className="min-w-44"
+              >
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    className="min-h-11 md:min-h-8"
+                    disabled={exportPayroll.isPending}
+                    onClick={() => exportPayroll.mutate('csv')}
+                  >
+                    <IconFileTypeCsv aria-hidden="true" />
+                    CSV ჩამოტვირთვა
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="min-h-11 md:min-h-8"
+                    disabled={exportPayroll.isPending}
+                    onClick={() => exportPayroll.mutate('pdf')}
+                  >
+                    <IconFileTypePdf aria-hidden="true" />
+                    PDF ჩამოტვირთვა
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
         </MonthlyFilters>
         {!adjustmentsOnly && view && !view.closed && canEdit && !firstWindow ? (

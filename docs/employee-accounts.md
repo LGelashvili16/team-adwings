@@ -38,8 +38,14 @@ Employee creation and account management live under the management sidebar group
 
 Open `/manage/employees`. The route and every server function independently require
 `manage.access` and `employees.manage`. Enter the full name, optional email, job
-title and phone number, and select at least one role. The employee sets their
-username during activation. Authorized profile editors can change the assigned roles.
+title and phone number. Ordinary employee access is selected by default. Additional
+access presets are available in the collapsed `სისტემაში წვდომა` section, whose
+summary shows the selected presets. This section explains the difference between
+the position and system permissions and opens automatically for validation errors.
+At least one access preset is required. The employee sets their
+username during activation. Authorized profile editors can change the assigned access in the same collapsed
+section. A position change never infers permissions. The `employee.job_title` and
+`user.roles` columns are both required; this form change needs no database migration.
 The server checks the current role set before saving, records an audit event and
 revokes active sessions when the roles change.
 

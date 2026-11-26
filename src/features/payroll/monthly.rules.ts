@@ -83,6 +83,26 @@ export function monthlyPayrollColumns(period: MonthlyDirectory['period']) {
   ] as const
 }
 
+export function monthlyPayrollExportStages({
+  period,
+  paymentWindows,
+}: Pick<MonthlyDirectory, 'period' | 'paymentWindows'>) {
+  const split = paymentWindows.some((window) => window.stage === 'first')
+  const stageLabels = {
+    first: monthlySalaryLabels.first,
+    salary:
+      split || period === 'salary'
+        ? monthlySalaryLabels.salary
+        : monthlySalaryLabels.all,
+    adjustments: 'ბონუსები, პრემიები და ჯარიმები',
+  } as const
+  const stages: PayStage[] =
+    period === 'all'
+      ? [...(split ? ['first' as const] : []), 'salary', 'adjustments']
+      : [period]
+  return stages.map((stage) => [stage, stageLabels[stage]] as const)
+}
+
 export function formatMonthlyPayrollCsv({
   month,
   period,
@@ -107,28 +127,16 @@ export function formatMonthlyPayrollCsv({
   const amount = (minor: number | null) =>
     minor === null ? '' : (minor / 100).toFixed(2)
   const columns = monthlyPayrollColumns(period)
-  const split = paymentWindows.some((window) => window.stage === 'first')
-  const stageLabels = {
-    first: monthlySalaryLabels.first,
-    salary:
-      split || period === 'salary'
-        ? monthlySalaryLabels.salary
-        : monthlySalaryLabels.all,
-    adjustments: 'ბონუსები, პრემიები და ჯარიმები',
-  } as const
-  const stages: PayStage[] =
-    period === 'all'
-      ? [...(split ? ['first' as const] : []), 'salary', 'adjustments']
-      : [period]
+  const stages = monthlyPayrollExportStages({ period, paymentWindows })
   const headings = [
     'თანამშრომელი',
     'სახელფასო თვე',
     ...columns.map(([, label]) => label),
     'გაცემული თანხა',
-    ...stages.flatMap((stage) => [
-      `${stageLabels[stage]} - დაგეგმილი დასაწყისი`,
-      `${stageLabels[stage]} - დაგეგმილი დასასრული`,
-      `${stageLabels[stage]} - გაცემის თარიღი`,
+    ...stages.flatMap(([, label]) => [
+      `${label} - დაგეგმილი დასაწყისი`,
+      `${label} - დაგეგმილი დასასრული`,
+      `${label} - გაცემის თარიღი`,
     ]),
   ]
   const rows = records.map((row) => [
@@ -138,7 +146,7 @@ export function formatMonthlyPayrollCsv({
     month,
     ...columns.map(([key]) => amount(row[key])),
     amount(row.paidMinor),
-    ...stages.flatMap((stage) => {
+    ...stages.flatMap(([stage]) => {
       const dates = row.payoutDates[stage]
       return [dates?.start ?? '', dates?.end ?? '', dates?.paidOn ?? '']
     }),

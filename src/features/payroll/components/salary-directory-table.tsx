@@ -6,7 +6,6 @@ import {
 } from '@tanstack/react-table'
 import { IconChevronRight } from '@tabler/icons-react'
 import { Badge } from '#/components/ui/badge'
-import { Button } from '#/components/ui/button'
 import {
   Table,
   TableBody,
@@ -32,7 +31,7 @@ const columns = helper.columns([
     cell: ({ row }) => (
       <div className="flex min-w-48 flex-col gap-1 whitespace-normal">
         <Link
-          className="font-medium hover:underline"
+          className="font-medium text-foreground! hover:underline focus-visible:outline-none after:absolute after:inset-0 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
           to="/manage/payroll/$userId"
           params={{ userId: row.original.userId }}
         >
@@ -64,11 +63,15 @@ const columns = helper.columns([
             {formatSalary(row.original.current)}{' '}
             {row.original.current.kind === 'hourly' ? '/ საათში' : '/ თვეში'}
           </span>
-          <span className="text-xs text-muted-foreground">
-            {salaryBasisLabels[row.original.current.amountBasis]}
-          </span>
+          {row.original.current.amountBasis === 'gross' ? (
+            <span className="text-xs text-muted-foreground">
+              {salaryBasisLabels.gross}
+            </span>
+          ) : null}
           <Badge variant="secondary">
-            {salaryKindLabels[row.original.current.kind]}
+            {row.original.current.kind === 'monthly'
+              ? 'ყოველთვიური'
+              : salaryKindLabels.hourly}
           </Badge>
         </div>
       ) : (
@@ -94,24 +97,10 @@ const columns = helper.columns([
       ),
   }),
   helper.display({
-    id: 'actions',
+    id: 'details',
     header: () => <span className="sr-only">დეტალები</span>,
-    cell: ({ row }) => (
-      <Button
-        variant="ghost"
-        size="icon"
-        nativeButton={false}
-        role="link"
-        aria-label={`${row.original.name}: ხელფასის ნახვა`}
-        render={
-          <Link
-            to="/manage/payroll/$userId"
-            params={{ userId: row.original.userId }}
-          />
-        }
-      >
-        <IconChevronRight aria-hidden="true" />
-      </Button>
+    cell: () => (
+      <IconChevronRight className="ml-auto size-4" aria-hidden="true" />
     ),
   }),
 ])
@@ -145,7 +134,7 @@ export function SalaryDirectoryTable({
       </TableHeader>
       <TableBody>
         {table.getRowModel().rows.map((row) => (
-          <TableRow key={row.id}>
+          <TableRow key={row.id} className="relative cursor-pointer">
             {row.getAllCells().map((cell) => (
               <TableCell key={cell.id} className="px-4 py-4">
                 <table.FlexRender cell={cell} />

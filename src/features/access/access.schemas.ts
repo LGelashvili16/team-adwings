@@ -10,6 +10,7 @@ import {
   maxPasswordLength,
   minPasswordLength,
   normalizeSetupCode,
+  replaceUsernameWhitespace,
   setupCodeAlphabet,
   setupCodeLength,
 } from './access.rules'
@@ -83,7 +84,7 @@ export const provisionAccountSchema = z.object({
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
   employmentStartDate: employmentDateSchema.optional(),
-  roles: provisionableRolesSchema,
+  roles: provisionableRolesSchema.default(['employee']),
 })
 export const bootstrapOwnerSchema = z.object({
   code: employeeCodeSchema,
@@ -178,7 +179,11 @@ export const completeAccountSchema = z.object({
   newPassword: accountPasswordSchema,
 })
 export const activateAccountSchema = completeAccountSchema.extend({
-  username: employeeCodeSchema,
+  username: z
+    .string({ error: 'მიუთითეთ მომხმარებლის სახელი.' })
+    .trim()
+    .transform(replaceUsernameWhitespace)
+    .pipe(employeeCodeSchema),
 })
 export const accountSetupFormSchema = completeAccountSchema
   .extend({ confirmPassword: z.string().min(1, 'გაიმეორეთ პაროლი.') })
