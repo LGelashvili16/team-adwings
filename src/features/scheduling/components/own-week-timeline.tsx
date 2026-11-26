@@ -6,6 +6,7 @@ import {
   weeklyTimeline,
 } from '../scheduling.rules'
 import type { WorkingWeek } from '../scheduling.types'
+import { workLocationLabel } from '../scheduling.content'
 
 const shortDays = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი']
 
@@ -13,9 +14,11 @@ const shortDays = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პა�
 export function OwnWeekTimeline({
   week,
   todayWeekday,
+  remoteWeekdays,
 }: {
   week: WorkingWeek
   todayWeekday: number
+  remoteWeekdays?: Array<number>
 }) {
   const scale = weeklyTimeline(week)
   const ordered = [...week].sort(
@@ -26,11 +29,11 @@ export function OwnWeekTimeline({
       <div className="min-w-[38rem]">
         <div className="grid grid-cols-[3rem_repeat(7,minmax(0,1fr))] border-b">
           <span />
-          {ordered.map(({ weekday }) => (
+          {ordered.map(({ weekday, hours }) => (
             <div
               key={weekday}
               className={cn(
-                'flex h-16 flex-col items-center justify-center gap-1 border-l text-sm font-medium',
+                'flex min-h-16 flex-col items-center justify-center gap-1 border-l py-2 text-sm font-medium',
                 weekday === todayWeekday && 'bg-badge-blue/20',
               )}
             >
@@ -45,6 +48,11 @@ export function OwnWeekTimeline({
               </span>
               {weekday === todayWeekday ? (
                 <span className="text-xs text-muted-foreground">დღეს</span>
+              ) : null}
+              {hours && remoteWeekdays ? (
+                <span className="max-w-full wrap-break-word px-1 text-xs text-muted-foreground">
+                  {workLocationLabel(remoteWeekdays.includes(weekday))}
+                </span>
               ) : null}
             </div>
           ))}

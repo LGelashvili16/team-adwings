@@ -12,6 +12,9 @@ vi.mock('#/features/scheduling/scheduling.queries', () => ({
 vi.mock('#/features/attendance/attendance.queries', () => ({
   attendanceKey: (id: string) => ['my-attendance', id],
 }))
+vi.mock('#/features/payroll/salary.queries', () => ({
+  salaryKey: (id: string) => ['salary-workspace', id],
+}))
 it('refreshes actor-scoped destination records and reconciles missed changes on reconnect', () => {
   const client = new QueryClient()
   const invalidate = vi.spyOn(client, 'invalidateQueries')
@@ -76,7 +79,25 @@ it('refreshes actor-scoped destination records and reconciles missed changes on 
     queryKey: ['my-attendance-corrections', 'worker'],
   })
   invalidate.mockClear()
+  act(() =>
+    receive({
+      recipientId: 'worker',
+      changed: true,
+      notification: {
+        id: '019aac01-0000-7000-8000-000000000001',
+        title: 'ხელფასის გაცემა აისახა',
+        destination: { kind: 'payroll', month: '2026-11' },
+      },
+    }),
+  )
+  expect(invalidate.mock.calls).toEqual([
+    [{ queryKey: ['salary-workspace', 'worker', 'mine'] }],
+  ])
+  invalidate.mockClear()
   act(() => receive({ recipientId: 'worker', changed: false }))
+  expect(invalidate).toHaveBeenCalledWith({
+    queryKey: ['salary-workspace', 'worker', 'mine'],
+  })
   expect(invalidate).toHaveBeenCalledWith({
     queryKey: ['my-attendance-corrections', 'worker'],
   })

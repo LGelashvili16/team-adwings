@@ -1,4 +1,7 @@
-import type { WorkingWeek } from '#/features/scheduling/scheduling.types'
+import type {
+  WorkingWeek,
+  WorkLocationPlan,
+} from '#/features/scheduling/scheduling.types'
 
 export interface IssuedAccountCode {
   code: string
@@ -31,4 +34,5 @@ export interface EmployeeAccountDetail {
   record: EmployeeAccountRecord
   /** Current company week shown when the employee inherits it; null while none is configured. */
   companyWeek: WorkingWeek | null
+  workLocations?: WorkLocationPlan
 }

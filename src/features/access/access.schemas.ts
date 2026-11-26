@@ -3,12 +3,22 @@ import {
   employeeRoleSchema,
   provisionableRoleSchema,
 } from '#/lib/authorization/permissions'
-import { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
+import {
+  employeeWorkingWeekSchema,
+  remoteWeekdaysSchema,
+  workLocationOverrideSchema,
+} from '#/features/scheduling/scheduling.schemas'
 import { dayOffDaysSchema } from '#/features/leave/day-off-allowance.schemas'
+import {
+  employmentDateSchema,
+  employmentDirectoryStatusSchema,
+} from '#/features/employees/employment.schemas'
+import { accountDirectorySearchSchema } from '#/lib/account-directory.schemas'
 import {
   maxPasswordLength,
   minPasswordLength,
   normalizeSetupCode,
+  replaceUsernameWhitespace,
   setupCodeAlphabet,
   setupCodeLength,
 } from './access.rules'
@@ -69,33 +79,56 @@ export const editableEmployeeCodeSchema = z
   .trim()
   .toLowerCase()
   .pipe(z.union([z.literal(''), employeeCodeSchema]))
+export const provisionableRolesSchema = z
+  .array(provisionableRoleSchema, { error: 'მიუთითეთ როლების სია.' })
+  .min(1, 'აირჩიეთ მინიმუმ ერთი როლი.')
+  .max(provisionableRoleSchema.options.length, 'როლების რაოდენობა არასწორია.')
+
 export const provisionAccountSchema = z.object({
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
   jobTitle: jobTitleSchema,
   phone: phoneSchema,
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
+  remoteWeekdays: remoteWeekdaysSchema.optional(),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
-  role: provisionableRoleSchema,
+  employmentStartDate: employmentDateSchema.optional(),
+  roles: provisionableRolesSchema.default(['employee']),
 })
 export const bootstrapOwnerSchema = z.object({
   code: employeeCodeSchema,
   name: fullNameSchema,
   contactEmail: contactEmailSchema,
 })
-/** Administrative update of an existing employee's details, username, and single role. */
-export const employeeDetailsSchema = z.object({
-  userId: accountIdSchema,
-  code: editableEmployeeCodeSchema.optional(),
-  role: provisionableRoleSchema.optional(),
-  name: fullNameSchema,
-  contactEmail: contactEmailSchema,
-  jobTitle: jobTitleSchema,
-  phone: phoneSchema,
-  /** Omitted leaves the schedule untouched, null returns to the company schedule, an array assigns a custom week. */
-  workingWeek: employeeWorkingWeekSchema.nullable().optional(),
-})
-/** The only field employees may change themselves; everything else is administrator-controlled. */
+/** Employee profile updates and authorized changes to roles and work schedule. */
+export const employeeDetailsSchema = z
+  .object({
+    userId: accountIdSchema,
+    code: editableEmployeeCodeSchema.optional(),
+    roles: provisionableRolesSchema.optional(),
+    expectedRoles: z
+      .string({ error: 'ანგარიშის როლები არასწორია.' })
+      .min(1, 'ანგარიშის როლები არასწორია.')
+      .max(512, 'ანგარიშის როლები არასწორია.')
+      .optional(),
+    name: fullNameSchema,
+    contactEmail: contactEmailSchema,
+    jobTitle: jobTitleSchema,
+    phone: phoneSchema,
+    /** Omitted leaves the schedule untouched, null returns to the company schedule, an array assigns a custom week. */
+    workingWeek: employeeWorkingWeekSchema.nullable().optional(),
+    remoteWeekdays: remoteWeekdaysSchema.optional(),
+    workLocationOverride: workLocationOverrideSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (input) => input.roles === undefined || input.expectedRoles !== undefined,
+    {
+      path: ['roles'],
+      message: 'განაახლეთ თანამშრომლის მონაცემები და სცადეთ ხელახლა.',
+    },
+  )
+/** Phone update from personal account settings. */
 export const ownPhoneSchema = z.object({ phone: phoneSchema })
 export const accountActionSchema = z
   .object({
@@ -125,15 +158,16 @@ export const accountListSchema = z.object({
     .int('გვერდი არასწორია.')
     .min(1, 'გვერდი არასწორია.')
     .max(10000, 'გვერდი არასწორია.'),
+  q: accountDirectorySearchSchema.shape.q,
+  employment: employmentDirectoryStatusSchema.optional(),
 })
-export const accountSearchSchema = z.object({
-  page: z.coerce
-    .number()
-    .int('გვერდი არასწორია.')
-    .min(1, 'გვერდი არასწორია.')
-    .max(10000, 'გვერდი არასწორია.')
-    .default(1),
+export const accountSearchSchema = accountListSchema.extend({
+  page: z.preprocess(
+    (value) => (typeof value === 'string' ? Number(value) : value),
+    accountListSchema.shape.page.default(1),
+  ),
 })
+export type EmployeeAccountSearch = z.infer<typeof accountSearchSchema>
 export const accountPasswordSchema = z
   .string()
   .min(
@@ -157,7 +191,11 @@ export const completeAccountSchema = z.object({
   newPassword: accountPasswordSchema,
 })
 export const activateAccountSchema = completeAccountSchema.extend({
-  username: employeeCodeSchema,
+  username: z
+    .string({ error: 'მიუთითეთ მომხმარებლის სახელი.' })
+    .trim()
+    .transform(replaceUsernameWhitespace)
+    .pipe(employeeCodeSchema),
 })
 export const accountSetupFormSchema = completeAccountSchema
   .extend({ confirmPassword: z.string().min(1, 'გაიმეორეთ პაროლი.') })

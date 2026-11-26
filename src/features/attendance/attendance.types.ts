@@ -56,6 +56,7 @@ export type AttendanceCorrection = {
 export type AttendanceOverview = {
   serverNow: string
   workday: CompanyWorkday
+  remoteWorkday: boolean
   approvedLeave: ApprovedLeave | null
   openSession: WorkingSession | null
   lastSessionId: string | null

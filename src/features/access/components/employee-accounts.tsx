@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, getRouteApi } from '@tanstack/react-router'
 import { IconUsers, IconUserPlus } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { DataPagination } from '#/components/common/data-pagination'
+import { AccountDirectorySearch } from '#/components/common/account-directory-search'
+import { EmploymentDirectoryFilter } from '#/features/employees/components/employment-directory-filter'
 import { Badge } from '#/components/ui/badge'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Alert, AlertDescription } from '#/components/ui/alert'
@@ -19,26 +21,25 @@ import {
   hasEveryPermission,
   hasPermission,
 } from '#/lib/authorization/permissions'
-import { listAccounts } from '../access.functions'
+import { employeeAccountsQuery } from '../access.queries'
 import { ProvisionAccountForm } from './provision-account-form'
 import { AccountCodeDialog } from './account-code-dialog'
 import { EmployeeAccountsTable } from './employee-accounts-table'
 import type { IssuedAccountCode } from '../access.types'
 import type { Actor } from '#/lib/authorization/actor'
+import type { EmployeeAccountSearch } from '../access.schemas'
+
+const route = getRouteApi('/_authenticated/manage/employees/')
 
 export function EmployeeAccounts({
-  page,
+  search,
   actor,
 }: {
-  page: number
+  search: EmployeeAccountSearch
   actor: Actor
 }) {
-  const query = useQuery({
-    queryKey: ['employee-accounts', 'list', page],
-    queryFn: () => listAccounts({ data: { page } }),
-    retry: false,
-    staleTime: 0,
-  })
+  const navigate = route.useNavigate()
+  const query = useQuery(employeeAccountsQuery(actor.id, search))
   const [issuedCode, setIssuedCode] = useState<IssuedAccountCode | null>(null)
   const [creating, setCreating] = useState(false)
   const [creatingBusy, setCreatingBusy] = useState(false)
@@ -82,6 +83,10 @@ export function EmployeeAccounts({
                   actor,
                   'attendance.configure',
                 )}
+                canSetEmploymentDate={hasPermission(
+                  actor,
+                  'employees.employment.manage',
+                )}
               />
             </div>
           </SheetContent>
@@ -101,6 +106,26 @@ export function EmployeeAccounts({
             </CardTitle>
             {data ? <Badge variant="secondary">სულ {data.total}</Badge> : null}
           </CardHeader>
+          <div className="flex flex-col gap-3 border-b p-4 sm:flex-row">
+            <AccountDirectorySearch
+              search={search}
+              showAccountState={false}
+              onChange={(next, replace) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, q: next.q, page: 1 }),
+                  replace,
+                })
+              }}
+            />
+            <EmploymentDirectoryFilter
+              value={search.employment}
+              onChange={(employment) => {
+                void navigate({
+                  search: (previous) => ({ ...previous, employment, page: 1 }),
+                })
+              }}
+            />
+          </div>
           <CardContent className="px-0">
             {query.isPending ? (
               <div
@@ -125,7 +150,13 @@ export function EmployeeAccounts({
             ) : !data.records.length ? (
               <div className="flex flex-col items-center gap-3 px-5 py-12 text-center text-sm text-muted-foreground">
                 <IconUsers className="size-8" aria-hidden="true" />
-                <p>ამ გვერდზე თანამშრომლის ანგარიშები არ არის.</p>
+                <p>
+                  {search.q
+                    ? 'ძიების შესაბამისი თანამშრომელი ვერ მოიძებნა.'
+                    : search.employment === 'former' && search.page === 1
+                      ? 'ყოფილი თანამშრომლები ჯერ არ არიან.'
+                      : 'ამ გვერდზე თანამშრომლის ანგარიშები არ არის.'}
+                </p>
               </div>
             ) : (
               <EmployeeAccountsTable
@@ -137,11 +168,14 @@ export function EmployeeAccounts({
           {data ? (
             <div className="border-t px-4 py-3">
               <DataPagination
-                page={page}
+                page={search.page}
                 total={data.total}
                 pageSize={20}
                 renderLink={(nextPage) => (
-                  <Link to="/manage/employees" search={{ page: nextPage }} />
+                  <Link
+                    to="/manage/employees"
+                    search={{ ...search, page: nextPage }}
+                  />
                 )}
               />
             </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import {
   IconCalendarDue,
+  IconCircleDashed,
   IconChevronDown,
   IconDots,
   IconExternalLink,
@@ -30,8 +31,10 @@ import {
   jobStatuses,
 } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
+import { defaultJobGeofenceDiameter } from '../jobs.schemas'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { JobOverdueBadge } from './job-overdue-badge'
 import { JobActionDialog } from './job-actions'
 import { JobAssignmentsCard } from './job-assignments-card'
 import type { JobAction } from './job-actions'
@@ -161,6 +164,20 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
             </div>
             <div>
               <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
+                <IconCircleDashed
+                  className="size-4 shrink-0"
+                  aria-hidden="true"
+                />
+                გეოზონა
+              </dt>
+              <dd className="pl-7">
+                {located
+                  ? `დიამეტრი ${job.geofenceDiameter ?? defaultJobGeofenceDiameter} მ`
+                  : 'რუკაზე მდებარეობა არ არის მითითებული'}
+              </dd>
+            </div>
+            <div>
+              <dt className="mb-1 flex items-center gap-3 text-xs text-muted-foreground">
                 <IconUserPlus className="size-4 shrink-0" aria-hidden="true" />
                 სამუშაო დაამატა
               </dt>
@@ -174,7 +191,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
                 />
                 ვადა
               </dt>
-              <dd className="pl-7">
+              <dd className="flex flex-wrap items-center gap-2 pl-7">
                 {job.deadline ? (
                   <time dateTime={job.deadline} className="tabular-nums">
                     {formatJobDay(job.deadline)}
@@ -182,6 +199,7 @@ export function JobDetails({ job, actor }: { job: JobDetail; actor: Actor }) {
                 ) : (
                   'არ არის მითითებული'
                 )}
+                {job.isOverdue ? <JobOverdueBadge /> : null}
               </dd>
             </div>
           </dl>

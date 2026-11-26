@@ -1,15 +1,23 @@
 import { EmployeeDayOffBalanceCard } from '#/features/leave/components/day-off-allowance-card'
 import { EmployeeNetworkCard } from '#/features/attendance-security/components/employee-network-card'
+import { EmployeeEmploymentCard } from '#/features/employees/components/employee-employment-card'
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { IconArrowLeft } from '@tabler/icons-react'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
-import { hasEveryPermission, hasPermission } from '#/lib/authorization/permissions'
-import { getEmployeeAccount } from '../access.functions'
-import { availableAccountActions, canManageAccount } from '../access.actions'
+import {
+  hasEveryPermission,
+  hasPermission,
+} from '#/lib/authorization/permissions'
+import { employeeAccountKeys, employeeAccountQuery } from '../access.queries'
+import {
+  availableAccountActions,
+  canEditOwnEmployeeProfile,
+  canManageAccount,
+} from '../access.actions'
 import { AccountActionDialog } from './account-action-dialog'
 import { AccountCodeDialog } from './account-code-dialog'
 import { EmployeeDetailsSheet } from './employee-details-sheet'
@@ -21,7 +29,7 @@ import type { Actor } from '#/lib/authorization/actor'
 import type { IssuedAccountCode } from '../access.types'
 import type { AccountAction } from './account-action-content'
 
-function BackLink() {
+function BackLink({ former = false }: { former?: boolean }) {
   return (
     <Button
       nativeButton={false}
@@ -29,7 +37,12 @@ function BackLink() {
       variant="ghost"
       size="sm"
       className="w-fit"
-      render={<Link to="/manage/employees" search={{ page: 1 }} />}
+      render={
+        <Link
+          to="/manage/employees"
+          search={former ? { page: 1, employment: 'former' } : { page: 1 }}
+        />
+      }
     >
       <IconArrowLeft data-icon="inline-start" aria-hidden="true" />
       თანამშრომლების ანგარიშები
@@ -40,16 +53,16 @@ function BackLink() {
 export function UserDetail({
   userId,
   actor,
+  employmentPage = 1,
+  employmentHistoryPage = 1,
 }: {
   userId: string
   actor: Actor
+  employmentPage?: number
+  employmentHistoryPage?: number
 }) {
-  const query = useQuery({
-    queryKey: ['employee-accounts', 'detail', userId],
-    queryFn: () => getEmployeeAccount({ data: { userId } }),
-    retry: false,
-    staleTime: 0,
-  })
+  const client = useQueryClient()
+  const query = useQuery(employeeAccountQuery(actor.id, userId))
   const [action, setAction] = useState<AccountAction | null>(null)
   const [editing, setEditing] = useState(false)
   const [issuedCode, setIssuedCode] = useState<IssuedAccountCode | null>(null)
@@ -89,8 +102,11 @@ export function UserDetail({
       </div>
     )
 
-  const { record, companyWeek } = detail
+  const { record, companyWeek, workLocations } = detail
+  const isSelf = actor.id === record.userId
   const manageable = canManageAccount(record, actor)
+  const employed = record.employmentStatus === 'active'
+  const canEdit = manageable || (isSelf && canEditOwnEmployeeProfile(actor))
   const actions = manageable ? availableAccountActions(record) : []
   const canAssignAdmin = hasEveryPermission(actor, [
     'admin.access',
@@ -99,10 +115,10 @@ export function UserDetail({
   ])
   return (
     <div className="flex w-full flex-col gap-4">
-      <BackLink />
+      <BackLink former={!employed} />
       <UserProfileHeader
         record={record}
-        canEdit={manageable}
+        canEdit={canEdit}
         onEdit={() => setEditing(true)}
         actions={actions}
         onAction={setAction}
@@ -110,10 +126,26 @@ export function UserDetail({
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_25rem]">
         <div className="flex min-w-0 flex-col gap-4">
           <UserProfileCard record={record} />
-          <UserScheduleCard
-            week={record.workingWeek}
-            companyWeek={companyWeek}
+          <EmployeeEmploymentCard
+            actor={actor}
+            userId={userId}
+            name={record.name}
+            canEndEmployment={manageable && employed}
+            onEmploymentEnded={() =>
+              void client.invalidateQueries({
+                queryKey: employeeAccountKeys.all,
+              })
+            }
+            employmentPage={employmentPage}
+            employmentHistoryPage={employmentHistoryPage}
           />
+          {employed ? (
+            <UserScheduleCard
+              week={record.workingWeek}
+              companyWeek={companyWeek}
+              workLocations={workLocations}
+            />
+          ) : null}
           <UserWorkRecordsCard
             roles={actor.roles}
             permissionOverrides={actor.permissionOverrides}
@@ -143,10 +175,14 @@ export function UserDetail({
       ) : null}
       {/* Keep the sheet root mounted so Base UI can run its opening and closing transitions. */}
       <EmployeeDetailsSheet
-        open={editing}
+        open={editing && canEdit}
         target={record}
+        editingSelf={isSelf}
         canAssignAdmin={canAssignAdmin}
-        canConfigureSchedule={hasPermission(actor, 'attendance.configure')}
+        canConfigureSchedule={
+          employed && hasPermission(actor, 'attendance.configure')
+        }
+        workLocations={workLocations}
         onClose={() => setEditing(false)}
       />
       {issuedCode ? (

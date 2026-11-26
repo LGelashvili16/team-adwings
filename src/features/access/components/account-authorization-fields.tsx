@@ -1,12 +1,28 @@
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '#/components/ui/accordion'
 import { Checkbox } from '#/components/ui/checkbox'
+import { useId, useState } from 'react'
 import { IconChevronDown } from '@tabler/icons-react'
+import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { Card, CardContent } from '#/components/ui/card'
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from '#/components/ui/collapsible'
-import { Field, FieldLabel, FieldSet, FieldLegend } from '#/components/ui/field'
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  FieldSet,
+  FieldLegend,
+} from '#/components/ui/field'
 import {
   Select,
   SelectContent,
@@ -19,38 +35,58 @@ import {
   hasPermission,
   permissionSchema,
   roleLabels,
-  roleSchema,
 } from '#/lib/authorization/permissions'
 import { permissionLabels } from '../admin-access.content'
 import type { PermissionOverrides, Role } from '#/lib/authorization/permissions'
+import type { ComponentProps } from 'react'
 
-export function AccountRoleFields({
+export function AccountRoleFields<T extends Role>({
+  options,
   value,
   onChange,
-  owner,
+  owner = false,
+  collapsible = false,
   disabled,
   invalid,
+  errors,
 }: {
-  value: Array<Role>
-  onChange: (value: Array<Role>) => void
-  owner: boolean
+  options: ReadonlyArray<T>
+  value: Array<T>
+  onChange: (value: Array<T>) => void
+  owner?: boolean
+  collapsible?: boolean
   disabled: boolean
   invalid: boolean
+  errors: ComponentProps<typeof FieldError>['errors']
 }) {
-  return (
+  const id = useId()
+  const [expanded, setExpanded] = useState(false)
+  const fields = (
     <FieldSet
+      className="min-w-0"
+      aria-labelledby={collapsible ? `${id}-title` : undefined}
       aria-invalid={invalid}
-      aria-describedby="admin-roles-error"
+      aria-describedby={invalid ? `${id}-hint ${id}-error` : `${id}-hint`}
       data-invalid={invalid}
     >
-      <FieldLegend>
-        როლები <span aria-hidden="true">*</span>
-      </FieldLegend>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {roleSchema.options.map((role) => (
+      {collapsible ? null : (
+        <FieldLegend>
+          სისტემაში წვდომა{' '}
+          <span aria-hidden="true" className="text-destructive">
+            *
+          </span>
+        </FieldLegend>
+      )}
+      <FieldDescription id={`${id}-hint`}>
+        თანამდებობა აღწერს სამუშაოს. აქ არჩეული წვდომა განსაზღვრავს, რისი ნახვა
+        და მართვა შეუძლია თანამშრომელს სისტემაში.
+      </FieldDescription>
+      <div className="grid gap-x-4 gap-y-3 @md:grid-cols-2">
+        {options.map((role) => (
           <Field key={role} orientation="horizontal">
             <Checkbox
-              id={`role-${role}`}
+              id={`${id}-${role}`}
+              className="border-muted-foreground"
               checked={value.includes(role)}
               disabled={disabled || (role === 'owner' && !owner)}
               onCheckedChange={(checked) =>
@@ -61,11 +97,62 @@ export function AccountRoleFields({
                 )
               }
             />
-            <FieldLabel htmlFor={`role-${role}`}>{roleLabels[role]}</FieldLabel>
+            <FieldLabel htmlFor={`${id}-${role}`}>
+              {roleLabels[role]}
+            </FieldLabel>
           </Field>
         ))}
       </div>
+      <FieldError id={`${id}-error`} errors={errors} />
     </FieldSet>
+  )
+  return (
+    <Card>
+      <CardContent className="@container">
+        {collapsible ? (
+          <Accordion
+            value={invalid || expanded ? ['access'] : []}
+            onValueChange={(values) => setExpanded(values.includes('access'))}
+          >
+            <AccordionItem value="access">
+              <AccordionTrigger className="py-0 hover:no-underline">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span>
+                    <span
+                      id={`${id}-title`}
+                      className="group-hover/accordion-trigger:underline"
+                    >
+                      სისტემაში წვდომა
+                    </span>{' '}
+                    <span aria-hidden="true" className="text-destructive">
+                      *
+                    </span>
+                  </span>
+                  {value.length ? (
+                    <span className="flex flex-wrap gap-1">
+                      {value.map((role) => (
+                        <Badge key={role} variant="secondary">
+                          {roleLabels[role]}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      აირჩიეთ წვდომა
+                    </span>
+                  )}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent keepMounted className="pt-4 pb-0">
+                {fields}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        ) : (
+          fields
+        )}
+      </CardContent>
+    </Card>
   )
 }
 export function AccountPermissionFields({
@@ -103,11 +190,18 @@ export function AccountPermissionFields({
         >
           <FieldLegend className="sr-only">ინდივიდუალური უფლებები</FieldLegend>
           <p className="text-sm text-muted-foreground">
-            როლის წესის შეცვლა მოქმედებს მხოლოდ ამ ანგარიშზე. აკრძალვას
-            უპირატესობა აქვს.
+            ინდივიდუალური აკრძალვა როლის უფლებაზე უპირატესია. მართვის გვერდებზე
+            წვდომა ანგარიშის როლებით იზღუდება.
           </p>
           <div className="flex flex-col gap-3">
             {permissionSchema.options.map((permission) => {
+              const canAllow = hasPermission(
+                {
+                  roles,
+                  permissionOverrides: { allow: [permission], deny: [] },
+                },
+                permission,
+              )
               const selected = value.deny.includes(permission)
                 ? 'deny'
                 : value.allow.includes(permission)
@@ -118,7 +212,11 @@ export function AccountPermissionFields({
                   value: 'inherit',
                   label: `როლიდან: ${hasPermission(roles, permission) ? 'დაშვებულია' : 'აკრძალულია'}`,
                 },
-                { value: 'allow', label: 'დაშვება' },
+                {
+                  value: 'allow',
+                  label: canAllow ? 'დაშვება' : 'როლისთვის მიუწვდომელია',
+                  disabled: !canAllow,
+                },
                 { value: 'deny', label: 'აკრძალვა' },
               ]
               return (
@@ -152,7 +250,7 @@ export function AccountPermissionFields({
                   >
                     <SelectTrigger
                       id={`permission-${permission}`}
-                      className="w-full shadow-control-raised active:shadow-control-pressed"
+                      className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
                       aria-invalid={invalid}
                       aria-describedby="admin-permissions-error"
                     >
@@ -161,7 +259,11 @@ export function AccountPermissionFields({
                     <SelectContent>
                       <SelectGroup>
                         {choices.map((choice) => (
-                          <SelectItem key={choice.value} value={choice.value}>
+                          <SelectItem
+                            key={choice.value}
+                            value={choice.value}
+                            disabled={choice.disabled}
+                          >
                             {choice.label}
                           </SelectItem>
                         ))}

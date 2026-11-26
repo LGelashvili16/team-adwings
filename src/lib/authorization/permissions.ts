@@ -26,6 +26,7 @@ export const permissionSchema = z.enum(
     'complaints.read.confidential',
     'employees.read',
     'employees.manage',
+    'employees.employment.manage',
     'leave.review',
     'reports.read',
     'admin.access',
@@ -39,6 +40,10 @@ export const permissionSchema = z.enum(
     'attendance.clock.assist',
     'approvals.configure',
     'leave.configure',
+    'payroll.configure',
+    'payroll.read.all',
+    'payroll.terms.manage',
+    'payroll.manage',
     'security.configure',
     'notifications.configure',
     'locations.manage',
@@ -59,12 +64,12 @@ export const employeeRoleSchema = z.enum(
   { error: 'თანამშრომლის როლი არასწორია.' },
 )
 export const provisionableRoleSchema = z.enum(
-  [...employeeRoleSchema.options, 'admin'],
+  [...employeeRoleSchema.options, 'accountant', 'admin'],
   { error: 'როლი არასწორია.' },
 )
 export type ProvisionableRole = z.infer<typeof provisionableRoleSchema>
 export const roleSchema = z.enum(
-  [...employeeRoleSchema.options, 'admin', 'owner'],
+  [...employeeRoleSchema.options, 'accountant', 'admin', 'owner'],
   { error: 'როლი არასწორია.' },
 )
 export type Role = z.infer<typeof roleSchema>
@@ -110,6 +115,43 @@ export function currentAuthorization(value: {
   }
 }
 
+const payrollManagementPermissions = [
+  'payroll.configure',
+  'payroll.read.all',
+  'payroll.terms.manage',
+  'payroll.manage',
+] as const satisfies ReadonlyArray<Permission>
+
+const roleRestrictedManagementPermissions: ReadonlySet<Permission> = new Set([
+  'manage.access',
+  'attendance.read.team',
+  'attendance.read.all',
+  'attendance.review.team',
+  'attendance.correct.all',
+  'attendance.correct.self',
+  'attendance.record.manage',
+  'timesheets.review.team',
+  'schedule.manage',
+  'teams.manage',
+  'gps.read',
+  'gps.manage',
+  'announcements.manage',
+  'complaints.review.all',
+  'complaints.review.assigned',
+  'complaints.read.confidential',
+  'employees.read',
+  'employees.manage',
+  'employees.employment.manage',
+  'leave.review',
+  'leave.configure',
+  'reports.read',
+  'attendance.configure',
+  'attendance.devices.manage',
+  'attendance.devices.approve.self',
+  'attendance.clock.assist',
+  ...payrollManagementPermissions,
+])
+
 const administrationPermissions = [
   'gps.read',
   'gps.manage',
@@ -124,6 +166,7 @@ const administrationPermissions = [
   'manage.access',
   'employees.read',
   'employees.manage',
+  'employees.employment.manage',
   'jobs.claim',
   'jobs.complete.manage',
   'jobs.edit.all',
@@ -137,6 +180,7 @@ const administrationPermissions = [
   'attendance.configure',
   'approvals.configure',
   'leave.configure',
+  ...payrollManagementPermissions,
   'leave.review',
   'security.configure',
   'notifications.configure',
@@ -151,17 +195,16 @@ const managementPermissions: Record<
 > = {
   supervisor: [
     'teams.manage',
-    'complaints.review.assigned',
+    'gps.read',
+    'gps.manage',
     'manage.access',
-    'attendance.read.team',
-    'attendance.review.team',
-    'timesheets.review.team',
     'jobs.manage',
     'jobs.complete.manage',
     'jobs.assign',
-    'employees.read',
   ],
   hr_manager: [
+    'gps.read',
+    'gps.manage',
     'attendance.record.manage',
     'attendance.devices.manage',
     'attendance.devices.approve.self',
@@ -178,6 +221,7 @@ const managementPermissions: Record<
     'timesheets.review.team',
     'employees.read',
     'employees.manage',
+    'employees.employment.manage',
     'leave.review',
     'leave.configure',
     'reports.read',
@@ -189,6 +233,7 @@ export const roleLabels: Record<Role, string> = {
   supervisor: 'წარმოების უფროსი',
   sales_manager: 'გაყიდვების მენეჯერი',
   hr_manager: 'HR',
+  accountant: 'ბუღალტერი',
   admin: 'ადმინისტრატორი',
   owner: 'კომპანიის მფლობელი',
 }
@@ -215,15 +260,25 @@ export const roles = {
     'team-adwings': managementPermissions.supervisor,
   }),
   sales_manager: accessControl.newRole({
-    'team-adwings': ['manage.access', 'jobs.manage'],
+    'team-adwings': ['jobs.manage'],
   }),
   hr_manager: accessControl.newRole({
     'team-adwings': managementPermissions.hr_manager,
+  }),
+  accountant: accessControl.newRole({
+    'team-adwings': ['manage.access', ...payrollManagementPermissions],
   }),
   // Employee account management is explicit; attendance review and job management remain separate.
   admin: accessControl.newRole({ 'team-adwings': administrationPermissions }),
   owner: accessControl.newRole({ 'team-adwings': permissionSchema.options }),
 } satisfies Record<Role, unknown>
+
+function grantsPermission(role: Role, permission: Permission) {
+  return (
+    roleSchema.safeParse(role).success &&
+    roles[role].authorize({ 'team-adwings': [permission] }).success
+  )
+}
 
 export function hasPermission(
   subject: PermissionSubject,
@@ -232,16 +287,22 @@ export function hasPermission(
   // Also deny malformed runtime values from legacy/imported records.
   if (!permissionSchema.safeParse(permission).success) return false
   const actorRoles = 'roles' in subject ? subject.roles : subject
+  const grantedByRole = actorRoles.some((role) =>
+    grantsPermission(role, permission),
+  )
+  // Individual grants cannot open management workflows outside the account's roles.
+  if (
+    roleRestrictedManagementPermissions.has(permission) &&
+    !grantedByRole &&
+    !actorRoles.includes('admin')
+  )
+    return false
   if ('roles' in subject && subject.permissionOverrides) {
     const overrides = parsePermissionOverrides(subject.permissionOverrides)
     if (overrides.deny.includes(permission)) return false
     if (overrides.allow.includes(permission)) return true
   }
-  return actorRoles.some(
-    (role) =>
-      roleSchema.safeParse(role).success &&
-      roles[role].authorize({ 'team-adwings': [permission] }).success,
-  )
+  return grantedByRole
 }
 
 export function hasEveryPermission(

@@ -1,12 +1,16 @@
 import type { z } from 'zod'
 import type {
   jobKindSchema,
+  jobGeofenceSettingsSchema,
   jobSearchSchema,
   jobStatusSchema,
 } from './jobs.schemas'
 
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type JobKind = z.infer<typeof jobKindSchema>
+export type JobGeofenceDiameter = z.infer<
+  typeof jobGeofenceSettingsSchema
+>['diameter']
 export type JobMapPosition = {
   longitude: number
   latitude: number
@@ -20,6 +24,7 @@ export type JobSummary = {
   address: string
   kind: JobKind
   deadline: string | null
+  isOverdue?: boolean
   status: JobStatus
   longitude: number | null
   latitude: number | null
@@ -39,6 +44,7 @@ export type JobMarker = Pick<JobSummary, 'id' | 'title' | 'kind' | 'status'> & {
   latitude: number
 }
 export type JobDetail = JobSummary & {
+  geofenceDiameter?: JobGeofenceDiameter
   assignments: JobAssignments
   createdBy: string
   streetNameKa: string | null
@@ -63,8 +69,9 @@ export type JobAssignmentPerson = {
   name: string
   jobTitle: string | null
 }
-/** Device metadata is returned only for authorized GPS picker candidates. */
+/** Picker metadata is returned only for authorized assignment candidates. */
 export type JobAssignmentCandidate = JobAssignmentPerson & {
+  memberCount?: number
   reportedId?: string
   phone?: string | null
 }
@@ -74,6 +81,7 @@ export type JobAssignments = {
   gpsDevice: { id: string; name: string } | null
 }
 export type JobsWorkspace = {
+  geofenceDiameter: JobGeofenceDiameter
   items: Array<JobSummary>
   markers: Array<JobMarker>
   total: number

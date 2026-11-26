@@ -36,15 +36,23 @@ export async function listCompanyAttendanceUsers(
         ...result,
         companyTimezone: workday.timezone,
         items: result.items.map(
-          ({ hasOpenSession, hasTodaySession, latestCheckIn, ...item }) => ({
+          ({
+            hasOpenSession,
+            hasTodaySession,
+            latestCheckIn,
+            employmentStatus,
+            ...item
+          }) => ({
             ...item,
             attendanceStatus: !access.canReadAttendance
               ? ('unavailable' as const)
-              : hasOpenSession
-                ? ('working' as const)
-                : hasTodaySession
-                  ? ('recorded' as const)
-                  : ('not-recorded' as const),
+              : employmentStatus === 'inactive'
+                ? ('former' as const)
+                : hasOpenSession
+                  ? ('working' as const)
+                  : hasTodaySession
+                    ? ('recorded' as const)
+                    : ('not-recorded' as const),
             latestCheckIn: latestCheckIn
               ? new Date(latestCheckIn).toISOString()
               : null,

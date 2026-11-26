@@ -18,7 +18,7 @@ const buttonVariants = cva(
           'border-border bg-background hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:border-input dark:bg-input/30',
         'outline-solid':
           'border-border bg-popover text-popover-foreground hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground',
-        soft: 'border-primary/15 bg-accent text-accent-foreground hover:bg-[color-mix(in_srgb,var(--accent),var(--background)_35%)] aria-expanded:bg-accent aria-expanded:text-accent-foreground',
+        soft: 'border-primary/20 bg-accent text-accent-foreground hover:bg-[color-mix(in_srgb,var(--accent),var(--primary)_10%)] aria-expanded:bg-accent aria-expanded:text-accent-foreground',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         ghost:

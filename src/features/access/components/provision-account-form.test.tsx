@@ -1,6 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { format } from 'date-fns'
+import { ka } from 'date-fns/locale'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ProvisionAccountForm } from './provision-account-form'
 
@@ -31,6 +33,59 @@ beforeEach(() => {
 })
 
 describe('administrative account provisioning', () => {
+  it('keeps ordinary access when an HR job title is entered without opening access settings', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProvisionAccountForm onCode={vi.fn()} />
+      </QueryClientProvider>,
+    )
+    expect(
+      screen.getByRole('button', { name: /სისტემაში წვდომა/ }),
+    ).toHaveAttribute('aria-expanded', 'false')
+    await user.type(
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
+      'ანა მაისურაძე',
+    )
+    await user.type(screen.getByRole('textbox', { name: 'თანამდებობა' }), 'HR')
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ jobTitle: 'HR', roles: ['employee'] }),
+      }),
+    )
+  })
+  it('submits the selected employment start date', async () => {
+    const user = userEvent.setup()
+    create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ProvisionAccountForm onCode={vi.fn()} canSetEmploymentDate />
+      </QueryClientProvider>,
+    )
+    await user.type(
+      screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
+      'ანა მაისურაძე',
+    )
+    await user.click(screen.getByLabelText('მუშაობის დაწყების თარიღი'))
+    const date = new Date()
+    date.setDate(15)
+    await user.click(
+      await screen.findByRole('button', {
+        name: format(date, 'EEEE, d MMMM yyyy', { locale: ka }),
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    await waitFor(() =>
+      expect(create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          employmentStartDate: format(date, 'yyyy-MM-dd'),
+        }),
+      }),
+    )
+  })
+
   it('offers the five non-admin employee roles for HR without a username field', async () => {
     const user = userEvent.setup()
     render(
@@ -41,26 +96,26 @@ describe('administrative account provisioning', () => {
     expect(
       screen.queryByRole('textbox', { name: 'მომხმარებლის სახელი' }),
     ).not.toBeInTheDocument()
-    await user.click(screen.getByRole('combobox'))
-    expect(
-      (await screen.findAllByRole('option')).map(
-        (option) => option.textContent,
-      ),
-    ).toEqual([
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5)
+    for (const name of [
       'თანამშრომელი',
       'წარმოების სპეციალისტი',
       'წარმოების უფროსი',
       'გაყიდვების მენეჯერი',
       'HR',
     ])
+      expect(screen.getByRole('checkbox', { name })).toBeEnabled()
     await user.click(
-      screen.getByRole('option', { name: 'გაყიდვების მენეჯერი' }),
+      screen.getByRole('checkbox', { name: 'გაყიდვების მენეჯერი' }),
     )
-    expect(screen.getByRole('combobox')).toHaveTextContent(
-      'გაყიდვების მენეჯერი',
-    )
+    expect(
+      screen.getByRole('checkbox', { name: 'გაყიდვების მენეჯერი' }),
+    ).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'თანამშრომელი' })).toBeChecked()
   })
-  it('adds the admin role option for owners and admins without exposing owner', async () => {
+  it('submits HR and accountant together and requires at least one selection', async () => {
     const user = userEvent.setup()
     create.mockResolvedValue({ ok: false, message: 'საცდელი პასუხი.' })
     render(
@@ -68,28 +123,30 @@ describe('administrative account provisioning', () => {
         <ProvisionAccountForm onCode={vi.fn()} canAssignAdmin />
       </QueryClientProvider>,
     )
-    await user.click(screen.getByRole('combobox'))
+    await user.click(screen.getByRole('button', { name: /სისტემაში წვდომა/ }))
     expect(
-      (await screen.findAllByRole('option')).map(
-        (option) => option.textContent,
-      ),
-    ).toEqual([
-      'თანამშრომელი',
-      'წარმოების სპეციალისტი',
-      'წარმოების უფროსი',
-      'გაყიდვების მენეჯერი',
-      'HR',
-      'ადმინისტრატორი',
-    ])
-    await user.click(screen.getByRole('option', { name: 'ადმინისტრატორი' }))
+      screen.getByRole('checkbox', { name: 'ადმინისტრატორი' }),
+    ).toBeEnabled()
+    expect(
+      screen.queryByRole('checkbox', { name: 'კომპანიის მფლობელი' }),
+    ).not.toBeInTheDocument()
     await user.type(
       screen.getByRole('textbox', { name: 'სახელი და გვარი' }),
       'ანა მაისურაძე',
     )
+    await user.click(screen.getByRole('checkbox', { name: 'თანამშრომელი' }))
+    await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
+    expect(await screen.findByText('აირჩიეთ მინიმუმ ერთი როლი.')).toBeVisible()
+    expect(create).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('checkbox', { name: 'HR' }))
+    await user.click(screen.getByRole('checkbox', { name: 'ბუღალტერი' }))
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ role: 'admin', workingWeek: null }),
+        data: expect.objectContaining({
+          roles: ['hr_manager', 'accountant'],
+          workingWeek: null,
+        }),
       }),
     )
   })
@@ -112,7 +169,10 @@ describe('administrative account provisioning', () => {
     await user.click(screen.getByRole('button', { name: 'ანგარიშის შექმნა' }))
     await waitFor(() =>
       expect(create).toHaveBeenCalledWith({
-        data: expect.objectContaining({ role: 'employee', workingWeek: null }),
+        data: expect.objectContaining({
+          roles: ['employee'],
+          workingWeek: null,
+        }),
       }),
     )
   })
@@ -149,6 +209,11 @@ describe('administrative account provisioning', () => {
       name: 'კომპანიის განრიგის გამოყენება',
     })
     await waitFor(() => expect(inherit).toBeEnabled())
+    const remoteMonday = screen.getByRole('switch', {
+      name: 'ორშაბათი, დისტანციურად',
+    })
+    expect(remoteMonday).not.toBeChecked()
+    await user.click(remoteMonday)
     await user.click(inherit)
     await user.click(
       screen.getByRole('switch', { name: 'შაბათი: სამუშაო დღე' }),
@@ -159,6 +224,7 @@ describe('administrative account provisioning', () => {
       data: expect.objectContaining({
         jobTitle: 'დიზაინერი',
         phone: '+995 555 12 34 56',
+        remoteWeekdays: [1],
         workingWeek: days.map((day) =>
           day.weekday === 6 ? { ...day, hours: null } : day,
         ),
@@ -194,7 +260,7 @@ describe('administrative account provisioning', () => {
       data: {
         name: 'ანა მაისურაძე',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
         jobTitle: '',
         phone: '',
         workingWeek: null,

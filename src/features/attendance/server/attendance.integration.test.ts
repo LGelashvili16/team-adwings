@@ -140,7 +140,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       await import('#/features/scheduling/server/scheduling.service.server')
     database = (await import('#/db')).db
     await sql().query(
-      `INSERT INTO "user" (id, name, email, roles) VALUES ('attendance-a', 'ანა', 'a@attendance.invalid', 'employee'), ('attendance-b', 'ბექა', 'b@attendance.invalid', 'employee'), ('review-manager', 'ხელმძღვანელი', 'manager@attendance.invalid', 'supervisor'), ('review-admin', 'ადმინისტრატორი', 'admin@attendance.invalid', 'admin')`,
+      `INSERT INTO "user" (id, name, email, roles) VALUES ('attendance-a', 'ანა', 'a@attendance.invalid', 'employee'), ('attendance-b', 'ბექა', 'b@attendance.invalid', 'employee'), ('review-manager', 'ხელმძღვანელი', 'manager@attendance.invalid', 'hr_manager'), ('review-admin', 'ადმინისტრატორი', 'admin@attendance.invalid', 'admin')`,
     )
     const employees = await sql().query(
       `INSERT INTO employee (username, user_id, full_name) VALUES ('attendance-a', 'attendance-a', 'ანა'), ('attendance-b', 'attendance-b', 'ბექა'), ('review-manager', 'review-manager', 'ხელმძღვანელი'), ('review-admin', 'review-admin', 'ადმინისტრატორი') RETURNING id, user_id`,
@@ -153,16 +153,49 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     time('2026-11-04T06:05:00Z')
     await sql().query(
-      'DELETE FROM attendance_punch; DELETE FROM attendance_challenge; DELETE FROM attendance_security_audit; DELETE FROM attendance_device; DELETE FROM attendance_employee_network; DELETE FROM attendance_security_policy; DELETE FROM day_off_allowance_audit; DELETE FROM day_off_balance; DELETE FROM leave_audit; DELETE FROM leave_request; DELETE FROM employee_work_schedule; DELETE FROM attendance_audit; DELETE FROM attendance_reviewer; DELETE FROM attendance_setting; DELETE FROM attendance_session; DELETE FROM company_schedule_audit; DELETE FROM company_schedule_day; DELETE FROM company_schedule;',
+      'DELETE FROM attendance_punch; DELETE FROM attendance_challenge; DELETE FROM attendance_security_audit; DELETE FROM attendance_device; DELETE FROM attendance_employee_network; DELETE FROM attendance_security_policy; DELETE FROM day_off_allowance_audit; DELETE FROM day_off_balance; DELETE FROM leave_audit; DELETE FROM leave_request; DELETE FROM employee_work_location; DELETE FROM employee_work_schedule; DELETE FROM attendance_audit; DELETE FROM attendance_reviewer; DELETE FROM attendance_setting; DELETE FROM attendance_session; DELETE FROM company_schedule_audit; DELETE FROM company_schedule_day; DELETE FROM company_schedule;',
     )
     await sql().query(
       `INSERT INTO attendance_security_policy (id, passkey_required) VALUES (1,false); INSERT INTO attendance_device (user_id, token_hash, name, state) SELECT id,id,'ტესტის ბრაუზერი','approved' FROM "user"; UPDATE "user" SET access_state = 'active'; UPDATE employee SET status = 'active';`,
+    )
+    await sql().query(
+      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":["attendance.read.all","attendance.correct.all"]}' WHERE id = 'review-manager'`,
     )
     await sql().query(
       `INSERT INTO company_schedule (effective_from, timezone, late_grace_minutes, early_departure_grace_minutes) VALUES ('2026-01-01', 'Asia/Tbilisi', 0, 0)`,
     )
     await sql().query(
       `INSERT INTO company_schedule_day SELECT '2026-01-01', day, CASE WHEN day = 7 THEN NULL ELSE time '10:00' END, CASE WHEN day = 7 THEN NULL ELSE time '19:00' END FROM generate_series(1,7) AS day`,
+    )
+  })
+  it('reports remote only for the employee’s effective scheduled workday', async () => {
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
+    )
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, weekday, remote) VALUES ($1, 3, true)`,
+      [employeeId],
+    )
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      true,
+    )
+    expect((await service.getAttendanceOverview(other)).remoteWorkday).toBe(
+      false,
+    )
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, date, remote) VALUES ($1, '2026-11-04', false), ($1, '2026-11-05', true), ($1, '2026-11-08', true)`,
+      [employeeId],
+    )
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
+    )
+    time('2026-11-05T06:05:00Z')
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      true,
+    )
+    time('2026-11-08T06:05:00Z')
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
     )
   })
   afterAll(async () => {
@@ -646,7 +679,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
   const manager: Actor = {
     ...actor,
     id: 'review-manager',
-    roles: ['supervisor'],
+    roles: ['hr_manager'],
   }
   it('unifies employee attendance and hours without widening assignment scope or review rights', async () => {
     await service.checkIn(actor, request())
@@ -711,7 +744,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       )?.sessions[0].canReview,
     ).toBe(false)
     await sql().query(
-      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":["attendance.read.team"]}'::jsonb WHERE id = 'review-manager'`,
+      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":["attendance.read.all","attendance.correct.all","attendance.read.team"]}'::jsonb WHERE id = 'review-manager'`,
     )
     const hoursOnly = await companyAttendance.readCompanyAttendanceUser(
       manager,
@@ -752,7 +785,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       ).total,
     ).toBe(0)
     await sql().query(
-      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":[]}'::jsonb WHERE id = 'review-manager'`,
+      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":["attendance.read.all","attendance.correct.all"]}'::jsonb WHERE id = 'review-manager'`,
     )
   })
   it('reads complete monthly timesheets and preserves work-date ownership across midnight', async () => {
@@ -863,7 +896,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       timesheets.readTimesheets(manager, { month: '2026-11' }, 'team'),
     ).rejects.toThrow()
     await sql().query(
-      `UPDATE "user" SET roles = 'supervisor' WHERE id = 'review-manager'`,
+      `UPDATE "user" SET roles = 'hr_manager' WHERE id = 'review-manager'`,
     )
     await sql().query(
       `UPDATE "user" SET access_state = 'suspended' WHERE id = 'attendance-a'`,
@@ -990,7 +1023,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
 
   it('allows HR company-wide reads and rule configuration without granting unassigned review or retaining revoked access', async () => {
     await sql().query(
-      `UPDATE "user" SET roles = 'hr_manager' WHERE id = 'review-manager'`,
+      `UPDATE "user" SET permission_overrides = '{"allow":[],"deny":[]}' WHERE id = 'review-manager'`,
     )
     const hr: Actor = { ...manager, roles: ['hr_manager'] }
     try {
@@ -1085,7 +1118,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       ).rejects.toThrow()
     } finally {
       await sql().query(
-        `UPDATE "user" SET roles = 'supervisor' WHERE id = 'review-manager'`,
+        `UPDATE "user" SET roles = 'hr_manager' WHERE id = 'review-manager'`,
       )
     }
   })
@@ -1733,11 +1766,11 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       ),
     ).toEqual([record.id])
     await sql().query(
-      `UPDATE "user" SET roles='employee' WHERE id='review-manager'`,
+      `UPDATE "user" SET roles='supervisor' WHERE id='review-manager'`,
     )
     await expect(review.reviewAttendance(manager, decision)).rejects.toThrow()
     await sql().query(
-      `UPDATE "user" SET roles='supervisor' WHERE id='review-manager'`,
+      `UPDATE "user" SET roles='hr_manager' WHERE id='review-manager'`,
     )
     await review.assignAttendanceReviewer(administrator, {
       employeeId,

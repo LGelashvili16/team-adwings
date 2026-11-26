@@ -4,7 +4,7 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table'
-import { IconHistory } from '@tabler/icons-react'
+import { IconCalendarCheck, IconHistory } from '@tabler/icons-react'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import {
   Table,
@@ -16,7 +16,6 @@ import {
 } from '#/components/ui/table'
 import { formatAttendanceTime, formatWorkedTime } from '../attendance.rules'
 import type { AttendanceDay, AttendanceOverview } from '../attendance.types'
-import { cn } from '#/lib/utils'
 import { formatAttendanceDate } from '../attendance.presentation'
 import { AttendanceDeviationBadges } from './attendance-deviation-badges'
 import { companyLocalDate } from '#/features/scheduling/scheduling.rules'
@@ -38,6 +37,7 @@ export function RecentAttendance({
   overview: AttendanceOverview
   workLog?: boolean
 }) {
+  const TitleIcon = workLog ? IconCalendarCheck : IconHistory
   const table = useTable({
     features,
     columns,
@@ -48,13 +48,8 @@ export function RecentAttendance({
     <Card className="overflow-hidden pb-0">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span
-            className={cn(
-              'flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground',
-              workLog && 'hidden',
-            )}
-          >
-            <IconHistory className="size-5" aria-hidden="true" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+            <TitleIcon className="size-5" aria-hidden="true" />
           </span>
           {workLog ? <h2>ბოლო დასწრებები</h2> : 'ბოლო დასწრებები'}
         </CardTitle>
@@ -62,7 +57,7 @@ export function RecentAttendance({
       {!overview.recent.length ? (
         <CardContent className="pb-6">
           <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed bg-muted/20 px-4 py-10 text-center">
-            <IconHistory
+            <TitleIcon
               className="size-7 text-muted-foreground"
               aria-hidden="true"
             />

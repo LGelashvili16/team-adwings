@@ -1,6 +1,10 @@
 import { APP_NAME } from '#/lib/app'
 import { Link, useLocation } from '@tanstack/react-router'
-import { IconChevronRight, IconSettings } from '@tabler/icons-react'
+import {
+  IconBellRinging,
+  IconChevronRight,
+  IconSettings,
+} from '@tabler/icons-react'
 import {
   Accordion,
   AccordionItem,
@@ -94,6 +98,7 @@ export function AppSidebar({
                 <Link to="/dashboard" onClick={() => setOpenMobile(false)} />
               }
               size="lg"
+              className="rounded-lg border border-sidebar-border/80 bg-white/75 shadow-xs hover:bg-sidebar-accent dark:bg-card/80 dark:hover:bg-sidebar-accent"
             >
               <img
                 src="/favicon.svg"
@@ -156,7 +161,12 @@ export function AppSidebar({
                             isActive: isNavigationItemActive(pathname, item.to),
                           })}
                     >
-                      <item.icon aria-hidden="true" />
+                      {item.to === '/notifications' &&
+                      hasUnreadNotifications ? (
+                        <IconBellRinging aria-hidden="true" />
+                      ) : (
+                        <item.icon aria-hidden="true" />
+                      )}
                       <span>{item.label}</span>
                       {item.to === '/jobs' && hasUnreadJobs ? (
                         <>

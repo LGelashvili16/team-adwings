@@ -2,6 +2,7 @@ import {
   IconPlus,
   IconX,
   IconCalendarDue,
+  IconExclamationMark,
   IconCheck,
   IconMap2,
 } from '@tabler/icons-react'
@@ -16,6 +17,7 @@ import {
 } from '#/components/ui/card'
 import { GpsMapLegendSections } from '#/features/gps/components/gps-map-legend'
 import { jobKinds } from '../jobs.presentation'
+import { jobGeofenceColor } from '../jobs.geofence'
 import { jobStatusSchema } from '../jobs.schemas'
 import { JobStatusBadge } from './job-status-badge'
 import type { ResolvedLocation } from '../job-locations.types'
@@ -145,10 +147,27 @@ export function JobsMapLegend({ showGps = false }: { showGps?: boolean }) {
           </span>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
             <span className="flex items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="size-6 shrink-0 rounded-full border-2"
+                style={{
+                  borderColor: jobGeofenceColor,
+                  backgroundColor: `color-mix(in srgb, ${jobGeofenceColor} 20%, transparent)`,
+                }}
+              />
+              გეოზონა
+            </span>
+            <span className="flex items-center gap-2">
               <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-badge-crimson text-badge-crimson-foreground">
                 <IconCalendarDue className="size-3.5" aria-hidden="true" />
               </span>
               ვადა ხვალ
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-badge-red-vivid text-badge-red-vivid-foreground">
+                <IconExclamationMark className="size-3.5" aria-hidden="true" />
+              </span>
+              ვადაგადაცილებული
             </span>
             <span className="flex items-center gap-2">
               <Badge variant="red-vivid">ახალი</Badge>ჯერ არ გაგიხსნიათ

@@ -101,6 +101,79 @@ async function transition(id: string, status: string, by = worker, note = '') {
 }
 
 describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
+  it('counts only current eligible team members and includes empty teams', async () => {
+    const teams = (
+      await sql().query(
+        "INSERT INTO production_team (name) VALUES ('დათვლა სრული'), ('დათვლა ცარიელი') RETURNING id",
+      )
+    ).rows
+    const teamId = teams[0].id
+    const candidates = () =>
+      service.listJobAssignmentCandidates(manager, {
+        kind: 'teams',
+        q: 'დათვლა',
+        page: 1,
+      })
+    const memberCount = async () =>
+      (await candidates()).items.find((item) => item.id === teamId)?.memberCount
+    try {
+      await sql().query(
+        'INSERT INTO team_membership (team_id, user_id) VALUES ($1, $2), ($1, $3)',
+        [teamId, worker.id, other.id],
+      )
+      expect(await memberCount()).toBe(2)
+      expect(
+        (await candidates()).items.find((item) => item.id === teams[1].id)
+          ?.memberCount,
+      ).toBe(0)
+      await sql().query(
+        'UPDATE team_membership SET ended_at=now() WHERE team_id=$1 AND user_id=$2',
+        [teamId, other.id],
+      )
+      expect(await memberCount()).toBe(1)
+      await sql().query(
+        "UPDATE employee SET status='inactive' WHERE user_id=$1",
+        [worker.id],
+      )
+      expect(await memberCount()).toBe(0)
+      await sql().query(
+        "UPDATE employee SET status='active' WHERE user_id=$1",
+        [worker.id],
+      )
+      await sql().query(
+        'UPDATE "user" SET access_state=\'suspended\' WHERE id=$1',
+        [worker.id],
+      )
+      expect(await memberCount()).toBe(0)
+      await sql().query(
+        "UPDATE \"user\" SET access_state='active', roles='production_specialist,admin' WHERE id=$1",
+        [worker.id],
+      )
+      expect(await memberCount()).toBe(0)
+      await sql().query('UPDATE "user" SET roles=\'employee\' WHERE id=$1', [
+        worker.id,
+      ])
+      expect(await memberCount()).toBe(1)
+    } finally {
+      await sql().query(
+        "UPDATE employee SET status='active' WHERE user_id=$1",
+        [worker.id],
+      )
+      await sql().query(
+        "UPDATE \"user\" SET access_state='active', roles='production_specialist' WHERE id=$1",
+        [worker.id],
+      )
+      const ids = teams.map((team) => team.id)
+      await sql().query(
+        'DELETE FROM team_membership WHERE team_id=ANY($1::uuid[])',
+        [ids],
+      )
+      await sql().query(
+        'DELETE FROM production_team WHERE id=ANY($1::uuid[])',
+        [ids],
+      )
+    }
+  })
   it('filters assignment candidates by validated roles and literal search without changing eligibility', async () => {
     await sql().query(`UPDATE "user" SET roles='employee' WHERE id=$1`, [
       other.id,
@@ -389,6 +462,141 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       await sql().query('DELETE FROM production_team WHERE id=$1', [team.id])
     }
   })
+  it.each([{ roles: [] }, { roles: ['production_specialist'] }] as const)(
+    'notifies added and removed employees once with general notification roles $roles',
+    async ({ roles }) => {
+      const settings =
+        await import('#/features/notifications/server/notification-settings.service.server')
+      await settings.saveNotificationSettings(platformAdmin, {
+        jobNotificationRoles: [...roles],
+      })
+      const { id } = await createPin()
+      const draft = {
+        id,
+        version: 1,
+        employeeIds: [worker.id, other.id],
+        teamId: null,
+        teamVersion: null,
+        gpsDeviceId: null,
+      }
+      const notices = async (version: number) =>
+        (
+          await sql().query(
+            'SELECT recipient_id, title, body, destination, live_toast FROM notification WHERE event_key=$1 ORDER BY recipient_id',
+            [`job:${id}:${version}:assignments`],
+          )
+        ).rows
+      await service.saveCompanyJobAssignments(manager, draft)
+      const added = await notices(2)
+      expect(added.map((item) => item.recipient_id)).toEqual(
+        [worker.id, other.id, ...(roles.length ? [production.id] : [])].sort(),
+      )
+      for (const recipient of [worker.id, other.id]) {
+        const notification = added.find(
+          (item) => item.recipient_id === recipient,
+        )
+        expect(notification).toMatchObject({
+          title: 'სამუშაოზე დაგამატეს',
+          destination: { kind: 'job', jobId: id },
+          live_toast: true,
+        })
+        expect(notification.body).toContain(fields.title)
+        expect(notification.body).toContain(fields.address)
+        expect(notification.body).toContain(
+          `ცვლილება შეასრულა: ${manager.name}`,
+        )
+      }
+      await service.saveCompanyJobAssignments(manager, {
+        ...draft,
+        version: 2,
+        employeeIds: [other.id, worker.id],
+      })
+      expect(await notices(2)).toEqual(added)
+      expect(await notices(3)).toEqual([])
+      expect((await detail(id)).version).toBe(2)
+      await service.saveCompanyJobAssignments(manager, {
+        ...draft,
+        version: 2,
+        employeeIds: [other.id],
+      })
+      const removed = await notices(3)
+      expect(
+        removed.filter(
+          (item) => item.title !== 'სამუშაოს შემსრულებლები შეიცვალა',
+        ),
+      ).toEqual([
+        expect.objectContaining({
+          recipient_id: worker.id,
+          title: 'სამუშაოდან მოგხსნეს',
+          destination: { kind: 'job', jobId: id },
+          live_toast: true,
+        }),
+      ])
+      expect(new Set(removed.map((item) => item.recipient_id)).size).toBe(
+        removed.length,
+      )
+      expect(removed.map((item) => item.recipient_id)).toEqual(
+        [worker.id, ...(roles.length ? [other.id, production.id] : [])].sort(),
+      )
+      await expect(
+        service.saveCompanyJobAssignments(manager, {
+          ...draft,
+          version: 2,
+        }),
+      ).rejects.toThrow('უკვე შეიცვალა')
+      expect(await notices(3)).toEqual(removed)
+      await service.saveCompanyJobAssignments(manager, { ...draft, version: 3 })
+      expect(
+        (await notices(4)).filter(
+          (item) => item.title === 'სამუშაოზე დაგამატეს',
+        ),
+      ).toEqual([expect.objectContaining({ recipient_id: worker.id })])
+    },
+  )
+  it.each(['add', 'remove'] as const)(
+    'rolls back an assignment %s and its audit if personal notification delivery fails',
+    async (change) => {
+      const settings =
+        await import('#/features/notifications/server/notification-settings.service.server')
+      await settings.saveNotificationSettings(platformAdmin, {
+        jobNotificationRoles: [],
+      })
+      const { id } = await createPin()
+      const draft = {
+        id,
+        version: 1,
+        employeeIds: [worker.id],
+        teamId: null,
+        teamVersion: null,
+        gpsDeviceId: null,
+      }
+      if (change === 'remove')
+        await service.saveCompanyJobAssignments(manager, draft)
+      const before = await detail(id)
+      const notifications = (await sql().query('SELECT id FROM notification'))
+        .rows
+      await sql().query(
+        `CREATE FUNCTION fail_assignment_notification() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test notification failure'; END $$; CREATE TRIGGER fail_assignment_notification BEFORE INSERT ON notification FOR EACH ROW EXECUTE FUNCTION fail_assignment_notification()`,
+      )
+      try {
+        await expect(
+          service.saveCompanyJobAssignments(manager, {
+            ...draft,
+            version: before.version,
+            employeeIds: change === 'remove' ? [] : [worker.id],
+          }),
+        ).rejects.toThrow()
+        expect(await detail(id)).toEqual(before)
+        expect((await sql().query('SELECT id FROM notification')).rows).toEqual(
+          notifications,
+        )
+      } finally {
+        await sql().query(
+          'DROP TRIGGER fail_assignment_notification ON notification; DROP FUNCTION fail_assignment_notification()',
+        )
+      }
+    },
+  )
   it('denies direct unauthorized assignments and candidate reads using current stored grants and employment', async () => {
     const { id } = await createPin()
     const input = {
@@ -804,6 +1012,7 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     )
   }, 30_000)
   beforeEach(async () => {
+    await sql().query('TRUNCATE job_geofence_setting')
     await sql().query('TRUNCATE job_employee, job_read, job_event, job')
     await sql().query(
       'TRUNCATE notification, notification_policy, notification_policy_audit',
@@ -1241,6 +1450,71 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
       }),
     ).rejects.toThrow('მოთხოვნა არასწორია')
   })
+  it('audits shared geofence settings and applies them to map and detail reads', async () => {
+    const { id } = await createPin()
+    expect(await service.getCompanyJobGeofenceSettings(worker)).toEqual({
+      diameter: 200,
+      version: 0,
+    })
+    await expect(service.getCompanyJobGeofenceSettings(null)).rejects.toThrow()
+    await expect(
+      service.saveCompanyJobGeofenceSettings(worker, { diameter: 100 }),
+    ).rejects.toThrow('წვდომა')
+    await expect(
+      service.saveCompanyJobGeofenceSettings(platformAdmin, {
+        diameter: 32768,
+      }),
+    ).rejects.toThrow('მოთხოვნა არასწორია')
+    const setting = { diameter: 350, version: 1 }
+    expect(
+      await Promise.all([
+        service.saveCompanyJobGeofenceSettings(platformAdmin, {
+          diameter: 350,
+        }),
+        service.saveCompanyJobGeofenceSettings(platformAdmin, {
+          diameter: 350,
+        }),
+      ]),
+    ).toEqual([setting, setting])
+    expect(
+      (await service.listCompanyJobs(worker, search)).geofenceDiameter,
+    ).toBe(350)
+    expect((await detail(id)).geofenceDiameter).toBe(350)
+    expect(
+      (
+        await sql().query(
+          'SELECT version, diameter, actor_id FROM job_geofence_setting',
+        )
+      ).rows,
+    ).toEqual([{ ...setting, actor_id: platformAdmin.id }])
+  })
+  it('keeps legacy diameters on edit and clears them when removing the mapped location', async () => {
+    const { id } = await createPin()
+    await sql().query('UPDATE job SET geofence_diameter = 100 WHERE id = $1', [
+      id,
+    ])
+    const legacyDiameter = async () =>
+      (
+        await sql().query('SELECT geofence_diameter FROM job WHERE id = $1', [
+          id,
+        ])
+      ).rows[0].geofence_diameter
+    await service.editCompanyJob(manager, {
+      ...fields,
+      id,
+      version: 1,
+      title: 'განახლებული სათაური',
+    })
+    expect(await legacyDiameter()).toBe(100)
+    await service.editCompanyJob(manager, {
+      ...fields,
+      id,
+      version: 2,
+      longitude: null,
+      latitude: null,
+    })
+    expect(await legacyDiameter()).toBeNull()
+  })
   it('blocks foreign creates and location edits through direct service calls', async () => {
     const { id } = await createPin()
     const foreign = { longitude: 44.681, latitude: 43.024 }
@@ -1259,6 +1533,53 @@ describe.runIf(enabled)('jobs map against isolated PostgreSQL', () => {
     expect(record.version).toBe(1)
     expect(record.history).toHaveLength(1)
     expect((await service.listCompanyJobs(worker, search)).total).toBe(1)
+  })
+  it('finds unfinished upcoming and overdue jobs regardless of when they were created', async () => {
+    const {
+      rows: [dates],
+    } = await sql().query<{
+      today: string
+      yesterday: string
+      tomorrow: string
+    }>(
+      `select day::text as today, (day - 1)::text as yesterday, (day + 1)::text as tomorrow
+       from (select (current_timestamp at time zone 'Asia/Tbilisi')::date as day) as clock`,
+    )
+    const later = await createPin({ deadline: dates.tomorrow })
+    const today = await createPin({ deadline: dates.today })
+    const overdue = await createPin({ deadline: dates.yesterday })
+    const completed = await createPin({ deadline: dates.yesterday })
+    const rejected = await createPin({ deadline: dates.yesterday })
+    const undated = await createPin()
+    await sql().query(
+      "UPDATE job SET created_at = '2020-01-01' WHERE id = $1",
+      [overdue.id],
+    )
+    await sql().query('UPDATE job SET deadline = null WHERE id = $1', [
+      undated.id,
+    ])
+    await transition(completed.id, 'completed', manager)
+    await transition(rejected.id, 'rejected', manager, 'ობიექტი დაკეტილია')
+
+    const upcoming = await service.listCompanyJobs(worker, {
+      view: 'list',
+      deadlineState: 'upcoming',
+    })
+    expect(upcoming.total).toBe(2)
+    expect(upcoming.items.map(({ id }) => id)).toEqual([today.id, later.id])
+    expect(upcoming.markers.map(({ id }) => id)).toEqual([today.id, later.id])
+    expect(upcoming.items.every(({ isOverdue }) => !isOverdue)).toBe(true)
+
+    const pastDue = await service.listCompanyJobs(worker, {
+      deadlineState: 'overdue',
+    })
+    expect(pastDue.total).toBe(1)
+    expect(pastDue.items).toMatchObject([{ id: overdue.id, isOverdue: true }])
+    expect(pastDue.markers).toMatchObject([{ id: overdue.id }])
+    expect(await detail(overdue.id)).toMatchObject({ isOverdue: true })
+    expect(await detail(completed.id)).toMatchObject({ isOverdue: false })
+    expect(await detail(rejected.id)).toMatchObject({ isOverdue: false })
+    expect(await detail(undated.id)).toMatchObject({ isOverdue: false })
   })
   it('sorts deadlines across pages in both directions with missing deadlines last', async () => {
     const early = await createPin({ deadline: '2026-11-01' })

@@ -129,11 +129,8 @@ it.each(['installation', 'measurement', 'other'] as const)(
   'uses the completed green for the %s pin body and pointer',
   (kind) => {
     const { marker } = setup(manager, { ...job, kind, status: 'completed' })
-    expect(marker.style.backgroundColor).toBe(
-      jobStatuses.completed.markerStyle.backgroundColor,
-    )
-    const pointer = marker.querySelector('.rotate-45') as HTMLElement
-    expect(pointer.style.backgroundColor).toBe(
+    expect(marker.querySelector('.job-pin-shape > path')).toHaveAttribute(
+      'fill',
       jobStatuses.completed.markerStyle.backgroundColor,
     )
   },
@@ -153,6 +150,23 @@ it('shows tomorrow and unread indicators without replacing the category or workf
       'ბინის აზომვა, აზომვა, დაგეგმილი, ვადა ხვალ, ახალი',
     )
     expect(screen.getByText('ახალი')).toBeVisible()
+  } finally {
+    clock.mockRestore()
+  }
+})
+
+it('shows a red exclamation mark and includes overdue in the pin label', () => {
+  const clock = vi
+    .spyOn(Date, 'now')
+    .mockReturnValue(Date.parse('2026-11-25T10:00:00Z'))
+  try {
+    const { marker } = setup(manager, { ...job, deadline: '2026-11-24' })
+    expect(marker).toHaveAccessibleName(
+      'ბინის აზომვა, აზომვა, დაგეგმილი, ვადაგადაცილებული',
+    )
+    expect(
+      marker.querySelector('.bg-badge-red-vivid .tabler-icon-exclamation-mark'),
+    ).toBeInTheDocument()
   } finally {
     clock.mockRestore()
   }

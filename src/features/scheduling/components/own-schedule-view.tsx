@@ -10,9 +10,12 @@ import {
   isoWeekday,
   shiftMinutes,
   weeklyMinutes,
+  worksRemotely,
 } from '../scheduling.rules'
+import { workLocationLabel } from '../scheduling.content'
 import { OwnWeekList } from './own-week-list'
 import { OwnWeekTimeline } from './own-week-timeline'
+import { WorkLocationOverrides } from './work-location-overrides'
 import { formatAttendanceDate } from '#/features/attendance/attendance.presentation'
 
 export function OwnScheduleView({ actorId }: { actorId: string }) {
@@ -54,6 +57,7 @@ export function OwnScheduleView({ actorId }: { actorId: string }) {
     (day) => day.weekday === todayWeekday,
   )?.hours
   const workingDays = schedule.week.filter((day) => day.hours).length
+  const { workLocations } = schedule
   return (
     <div className="grid min-w-0 items-stretch gap-6 xl:grid-cols-[16rem_minmax(0,1fr)]">
       <Card className="h-full gap-0 overflow-hidden rounded-2xl py-0">
@@ -103,6 +107,9 @@ export function OwnScheduleView({ actorId }: { actorId: string }) {
           {todayHours ? (
             <p className="schedule-night-copy text-sm opacity-80">
               დაგეგმილია {formatDuration(shiftMinutes(todayHours))}
+              {workLocations
+                ? ` · ${workLocationLabel(worksRemotely(schedule.today, workLocations))}`
+                : ''}
             </p>
           ) : null}
         </CardHeader>
@@ -136,11 +143,24 @@ export function OwnScheduleView({ actorId }: { actorId: string }) {
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
-          <OwnWeekTimeline week={schedule.week} todayWeekday={todayWeekday} />
+          <OwnWeekTimeline
+            week={schedule.week}
+            todayWeekday={todayWeekday}
+            remoteWeekdays={workLocations?.remoteWeekdays}
+          />
           <div className="lg:sr-only">
-            <OwnWeekList week={schedule.week} todayWeekday={todayWeekday} />
+            <OwnWeekList
+              week={schedule.week}
+              todayWeekday={todayWeekday}
+              remoteWeekdays={workLocations?.remoteWeekdays}
+            />
           </div>
         </CardContent>
+        {workLocations?.overrides.length ? (
+          <div className="border-t px-5 py-4">
+            <WorkLocationOverrides overrides={workLocations.overrides} />
+          </div>
+        ) : null}
         <p className="border-t px-5 py-4 text-xs leading-5 text-muted-foreground">
           ყოველკვირეული განრიგი. ცვლილებისთვის მიმართეთ ადმინისტრატორს.
         </p>

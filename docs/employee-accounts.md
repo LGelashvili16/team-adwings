@@ -34,13 +34,20 @@ It is never exposed by an HTTP route or server function.
 
 ## Employee management workflow
 
-Employee creation and account management live under the management sidebar group. The existing `hr_manager` role (HR), administrators, and owners can use this workflow. HR may create ordinary employee accounts and manage their profile and access lifecycle. Assigning a management role, including HR, still requires `roles.manage`; administrator/owner creation remains excluded. Company schedule changes require `attendance.configure`, which HR managers now hold. Old admin user routes have been deleted; employee links use the management routes directly. The `$employeeId` route parameter carries the linked auth user ID, preserving existing account links.
+Employee creation and account management live under the management sidebar group. HR, administrators, and owners can use this workflow. HR can assign employee roles and manage accounts within its scope. Assigning or removing the accountant or administrator role requires platform role-assignment authority. The owner role uses protected platform administration or bootstrap. Company schedule changes require `attendance.configure`. The `$employeeId` route parameter carries the linked auth user ID.
 
 Open `/manage/employees`. The route and every server function independently require
-`manage.access` and `employees.manage`. Choose an immutable username, full name,
-optional email, job title, phone number, and role. Account creation records an automatic audit reason;
-subsequent access changes still require an administrative reason. Management-role assignment
-also requires `roles.manage`. This screen cannot create administrators or owners.
+`manage.access` and `employees.manage`. Enter the full name, optional email, job
+title and phone number. Ordinary employee access is selected by default. Additional
+access presets are available in the collapsed `სისტემაში წვდომა` section, whose
+summary shows the selected presets. This section explains the difference between
+the position and system permissions and opens automatically for validation errors.
+At least one access preset is required. The employee sets their
+username during activation. Authorized profile editors can change the assigned access in the same collapsed
+section. A position change never infers permissions. The `employee.job_title` and
+`user.roles` columns are both required; this form change needs no database migration.
+The server checks the current role set before saving, records an audit event and
+revokes active sessions when the roles change.
 
 Usernames are normalized to lowercase. Migration `0010_employee_username.sql` renames `employee.code` to `employee.username`, including its unique index and normalization constraint, without recreating employee records. Better Auth's username plugin is already enabled on the server, provisioning instance, and client; its auth-owned `user.username` column and typed SDK require no regeneration for this employee-table rename. Existing administrative request/response keys named `code` remain compatibility aliases for the username; activation and reset codes remain separate secrets.
 Database constraints enforce unique usernames in each table, one employee record
@@ -75,6 +82,39 @@ Privileged operations re-read and lock the acting account and target account.
 Changes and their audit rows commit together. Audit rows contain actor, target,
 action, reason, and timestamps; they contain neither codes nor passwords.
 
+### End employment
+
+On the employee profile, use **დასაქმების დასრულება** in the employment periods
+section. HR, administrators, and owners need the existing employment-management
+permission and authority over the target account. Enter an inclusive last
+working day and a reason. If there is no confirmed period, enter the actual
+start date.
+
+Choose a future last working day to schedule the departure. Login stays
+available through that day and stops at midnight at the start of the following
+day, in the company timezone used when scheduling. Before the cutoff, use
+**ბოლო სამუშაო დღის შეცვლა** on the profile to reschedule. While a departure is
+pending, update its date through that action. The scheduled date is saved to the
+employment period immediately for payroll calculations. A future date entered
+in the ordinary employment-period editor only updates payroll eligibility.
+
+Choose today or an earlier date to complete the departure immediately. First
+resolve any open attendance and verify sessions recorded after the proposed
+last day. Immediate login suspension also remains available separately.
+
+The internal minute task finalizes each due departure, marks the employee
+inactive, suspends login, revokes sessions and setup codes, and audits the
+change. If a session is still open, the task closes it provisionally at the
+earlier of the departure cutoff and the ordinary attendance limit for review.
+Authentication and both directories apply the cutoff even if the task runs
+late. Apply migration `0075_scheduled_employee_departure.sql` before running
+the updated application.
+
+The employee and attendance directories default to current staff. Select
+**ყოფილი თანამშრომლები** to find former employees. Their profiles, dated
+attendance, timesheets, leave, and payroll records remain available within the
+existing permissions.
+
 ## Employee workflow
 
 Use `/auth/register` to activate and `/auth/reset-password` to redeem a reset code.
@@ -100,11 +140,14 @@ Email is not marked verified by provisioning. Email delivery is not configured; 
 
 Who may change what:
 
-- **Employee managers** (`manage.access` and `employees.manage`) edit full name, email, job title and
-  phone from the account page `/manage/employees/$employeeId` (the lean list on `/manage/employees` links to it;
-  button "რედაქტირება"). No free-text reason is required. The server records a fixed
-  action description, the authenticated actor, target account and timestamp as `account.details_updated`. The username and role cannot be edited here, and the
-  usual target rules apply (not yourself, owner required for admin/owner accounts).
+- **Employee managers** (`manage.access` and `employees.manage`) use the `რედაქტირება` button on
+  `/manage/employees/$employeeId` to edit full name, username, email, job title and phone. On other
+  employees' accounts, changes to system access and the work schedule follow their own permission
+  rules. The server records the actor, target and timestamp as `account.details_updated`.
+- **Owners, administrators and HR managers** with employee-management access can use the same
+  button on their own employee page to edit those five profile fields. They can also set their own
+  working days and hours with `attendance.configure`. Self-edits to system access and account
+  status are blocked.
 - **Employees** edit only their own phone number on `/settings/profile`. The subject is always
   the signed-in account; no identifier is accepted from the browser.
 - **Email** changes require employee-management access because email is not verified yet. For accounts that
@@ -134,6 +177,21 @@ week really changed. Administrators without that permission do not see the sched
 the server rejects the attempt. The account page shows the effective week as a seven-day strip,
 labelled "ინდივიდუალური" or "კომპანიის განრიგი". Employees see their own effective week, with
 today highlighted, on `/schedule`; it is read-only and is served for the signed-in account only.
+
+### On-site and remote work
+
+Working days default to ადგილზე (on-site), including existing employee schedules. During creation
+or editing, an employee manager with `attendance.configure` can mark individual weekdays as
+დისტანციურად (remote). The work location is independent of working hours, so employees can still
+inherit the company hours. Managers can set a date-specific work location on an existing employee's
+profile, or restore the recurring choice for that date. The date is interpreted in the company
+timezone. A dated change applies to a scheduled workday and takes precedence over the recurring
+choice. The employee sees the recurring work locations and upcoming exceptions on `/schedule`.
+
+The account audit records who assigned remote weekdays or changed a dated exception. Owners,
+administrators and HR managers with `attendance.configure` can edit their own hours, working days,
+and recurring or dated work locations. See [attendance security](attendance-security.md) for the
+clock-in and clock-out rules on remote days.
 
 ## Required auth email field
 

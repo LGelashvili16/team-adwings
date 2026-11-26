@@ -21,7 +21,7 @@ export function accountStatus(
   record: Pick<EmployeeAccountSummary, 'state' | 'employmentStatus'>,
 ) {
   if (record.employmentStatus !== 'active')
-    return { label: 'დასაქმება შეჩერებულია', variant: 'orange' as const }
+    return { label: 'ყოფილი თანამშრომელი', variant: 'secondary' as const }
   return {
     label: stateLabels[record.state] ?? 'მიუწვდომელი',
     variant:

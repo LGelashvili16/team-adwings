@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { deviceStatusOptions } from '#/features/attendance-security/attendance-security.queries'
 import { CurrentDeviceSetup } from '#/features/attendance-security/components/current-device-setup'
 import { IconCirclePause, IconCirclePlay, IconClock } from '@tabler/icons-react'
+import { workLocationLabel } from '#/features/scheduling/scheduling.content'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -88,12 +89,7 @@ export function AttendanceClock({
     >
       <CardHeader className="flex flex-wrap items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-2">
-          <span
-            className={cn(
-              'flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground',
-              workLog && 'hidden',
-            )}
-          >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <IconClock className="size-5" aria-hidden="true" />
           </span>
           {oldSession
@@ -108,6 +104,9 @@ export function AttendanceClock({
             >
               {formatAttendanceDate(overview.workday.date)}
             </time>
+          ) : null}
+          {compact && !oldSession && overview.remoteWorkday ? (
+            <Badge variant="blue">{workLocationLabel(true)}</Badge>
           ) : null}
           <Badge variant={status.variant}>{status.label}</Badge>
         </div>

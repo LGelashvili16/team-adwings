@@ -29,6 +29,17 @@ vi.mock('../gps.functions', () => ({
   getGpsMapDevices: getMapDevices,
   updateGpsDevice: saveDevice,
 }))
+const { readGeofenceSettings, saveGeofenceSettings } = vi.hoisted(() => ({
+  readGeofenceSettings: vi.fn(async () => ({
+    ok: true,
+    value: { diameter: 200, version: 0 },
+  })),
+  saveGeofenceSettings: vi.fn(),
+}))
+vi.mock('#/features/jobs/jobs.functions', () => ({
+  readJobGeofenceSettings: readGeofenceSettings,
+  updateJobGeofenceSettings: saveGeofenceSettings,
+}))
 vi.mock('../components/gps-history-map', () => ({
   GpsHistoryMap: ({
     selectedPoint,
@@ -104,6 +115,85 @@ function showPage(canManage: boolean, q = '') {
     </QueryClientProvider>,
   )
 }
+
+it('lets GPS managers edit and explicitly save the diameter in the map legend', async () => {
+  getMapDevices.mockResolvedValue({ devices: [], total: 0 })
+  readGeofenceSettings.mockResolvedValueOnce({
+    ok: true,
+    value: { diameter: 200, version: 0 },
+  })
+  saveGeofenceSettings.mockImplementationOnce(async () => {
+    const setting = { ok: true, value: { diameter: 100, version: 1 } }
+    readGeofenceSettings.mockResolvedValueOnce(setting)
+    return setting
+  })
+  showPage(true)
+  const legend = await screen.findByRole('group', {
+    name: 'რუკის ნიშნების განმარტება',
+  })
+  const input = await within(legend).findByRole('textbox', {
+    name: 'სამუშაოების გეოზონის დიამეტრი (მ)',
+  })
+  const save = within(legend).getByRole('button', { name: 'შენახვა' })
+  expect(input).toHaveValue('200')
+  expect(save).toBeDisabled()
+  expect(within(legend).queryByRole('combobox')).not.toBeInTheDocument()
+  const user = userEvent.setup()
+  await user.clear(input)
+  await user.type(input, '100')
+  expect(saveGeofenceSettings).not.toHaveBeenCalled()
+  await user.click(save)
+  expect(saveGeofenceSettings).toHaveBeenCalledExactlyOnceWith({
+    data: { diameter: 100 },
+  })
+  expect(
+    await within(legend).findByRole('textbox', {
+      name: 'სამუშაოების გეოზონის დიამეტრი (მ)',
+    }),
+  ).toHaveValue('100')
+})
+
+it('shows the diameter without edit controls for GPS viewers', async () => {
+  getMapDevices.mockResolvedValue({ devices: [], total: 0 })
+  showPage(false)
+  const legend = await screen.findByRole('group', {
+    name: 'რუკის ნიშნების განმარტება',
+  })
+  expect(await within(legend).findByText('200 მ')).toBeVisible()
+  expect(within(legend).queryByRole('textbox')).not.toBeInTheDocument()
+  expect(within(legend).queryByRole('button')).not.toBeInTheDocument()
+})
+
+it('validates and saves the diameter in whole meters', async () => {
+  getMapDevices.mockResolvedValue({ devices: [], total: 0 })
+  saveGeofenceSettings.mockClear()
+  saveGeofenceSettings.mockImplementationOnce(async () => {
+    const result = { ok: true, value: { diameter: 350, version: 1 } }
+    readGeofenceSettings.mockResolvedValueOnce(result)
+    return result
+  })
+  showPage(true)
+  const user = userEvent.setup()
+  const input = await screen.findByRole('textbox', {
+    name: 'სამუშაოების გეოზონის დიამეტრი (მ)',
+  })
+  await user.clear(input)
+  await user.type(input, '0')
+  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  expect(await screen.findByText(/შეიყვანეთ მთელი რიცხვი/)).toBeVisible()
+  expect(saveGeofenceSettings).not.toHaveBeenCalled()
+  await user.clear(input)
+  await user.type(input, '350')
+  await user.click(screen.getByRole('button', { name: 'შენახვა' }))
+  expect(saveGeofenceSettings).toHaveBeenCalledExactlyOnceWith({
+    data: { diameter: 350 },
+  })
+  expect(
+    await screen.findByRole('textbox', {
+      name: 'სამუშაოების გეოზონის დიამეტრი (მ)',
+    }),
+  ).toHaveValue('350')
+})
 
 it.each([
   ['', 'GPS მოწყობილობები ჯერ არ არის დამატებული.'],
@@ -186,7 +276,7 @@ it('keeps the map mounted while searching, including when the search returns no 
   )
   const workspace = (q: string) => (
     <QueryClientProvider client={client}>
-      <GpsMapView actorId="gps-test" q={q} />
+      <GpsMapView actorId="gps-test" canManage={false} q={q} />
     </QueryClientProvider>
   )
   const view = render(workspace(''))
@@ -391,7 +481,7 @@ it('shows the Georgian search placeholder and clears the search input', async ()
   expect(onSearch).toHaveBeenCalledWith({ q: '' }, true)
 })
 
-it('validates optional phone numbers when editing a GPS device', async () => {
+it('requires a valid phone number when editing a GPS device', async () => {
   const withPhone = { ...tracker, phone: '+995 555 12 34 56', version: 2 }
   getMapDevices.mockResolvedValue({ devices: [tracker], total: 1 })
   saveDevice.mockReset().mockImplementation(async () => {
@@ -409,8 +499,13 @@ it('validates optional phone numbers when editing a GPS device', async () => {
   const phoneInput = within(editor).getByRole('textbox', {
     name: 'ტელეფონის ნომერი',
   })
-  expect(phoneInput).not.toBeRequired()
+  expect(phoneInput).toBeRequired()
   expect(within(editor).getByText('+995')).toBeVisible()
+  await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
+  expect(
+    await within(editor).findByText('მიუთითეთ ტელეფონის ნომერი.'),
+  ).toBeVisible()
+  expect(saveDevice).not.toHaveBeenCalled()
   await user.type(phoneInput, '123')
   await user.click(within(editor).getByRole('button', { name: 'შენახვა' }))
   expect(

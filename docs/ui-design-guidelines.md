@@ -1,6 +1,6 @@
 # Team Adwings UI and design guidelines
 
-Status: required project instructions. Version: 78. Last updated: 2026-11-21.
+Status: required project instructions. Version: 99. Last updated: 2026-11-26.
 
 Read this guide before designing, implementing, changing, or reviewing application UI. Apply it alongside `AGENTS.md`, feature rules, and the installed library versions. This is a living standard, not a claim that every existing screen already complies.
 
@@ -27,6 +27,16 @@ Deliver an ultra-modern, visually polished interface from the first implementati
 | Iconography            | Consistent Tabler icons reinforce meaning with predictable size and placement.                                        | Mixed icon families, decorative icons everywhere, unexplained icon-only actions.                     |
 | Consistency and polish | Matching controls look and behave alike across employee, management, and admin pages.                                 | Local substitutes for shared primitives, one-off shadows, mismatched tabs or pagination.             |
 | Clarity                | Concise Georgian copy, explicit actions, precise information, and honest loading/empty/error states.                  | Unnecessary descriptions, vague labels, fake success, unexplained empty screens.                     |
+
+## Employee position and system access
+
+Keep `თანამდებობა` as employee profile data, separate from permission-bearing account roles. Creation defaults to ordinary employee access. Put `სისტემაში წვდომა` in a closed-by-default Accordion in creation and employee editing, with selected presets visible in its summary. Explain the distinction inside and expand on validation errors. Explicit access administration remains expanded. Position edits never infer or change access.
+
+Group weekly work-location switches under the employee schedule and show the selected location beside each working day. Use ადგილზე as the default. Put date-specific changes in a separate field group on the employee edit sheet, with the date before the work location. Show saved upcoming changes beside the recurring week on the employee profile and personal schedule.
+
+Show a blue დისტანციურად badge immediately before the status badge in the dashboard timer header when today's effective working day is remote.
+
+During account activation, keep the username's typed case and replace spaces with hyphens as they are entered. Show a compact orange warning Alert below the field when a replacement occurs. Save and look up usernames in lowercase.
 
 ## Typography, hierarchy, and page structure
 
@@ -72,7 +82,7 @@ Place the page title outside and above a route-aware tabs wrapper when that wrap
 - Keep neutral first in the accent selector and group neighboring hues together. Sort new palette entries automatically through the shared registry, preserving the same DOM and keyboard order. Extend subtle accent treatment to selected select options and checked menu choices. Reserve broad content surfaces, headings, separators and semantic status colors for their established purposes.
 
 - Personal accent colors are selected in გარეგნობა on `/settings/profile`, independently of light/dark/system mode. Keep the existing neutral option as the default alongside საფირონის ლურჯი, ძველი ოქროსფერი, სპილენძისფერი and ზამბახისფერი. Define new palettes only in `src/lib/appearance.ts`; see [adding appearance colors](appearance-colors.md). Use the generated semantic tokens for primary actions, links, focus and selected navigation. Preserve status, schedule and map color meanings.
-- The accent registry also includes ნეფრიტის მწვანე, ევკალიპტის მწვანე, ტყის მწვანე, ღვინისფერი, მუქი ლურჯი, ინდიგო, კობალტის ლურჯი, მუქი ნარინჯისფერი and ზეთისხილისფერი. Use each palette's reviewed light/dark primary and foreground pairs for checked switches, checkboxes and radio buttons. Tint current pagination, selected table rows, calendar ranges and text selection subtly. Preserve neutral's existing appearance. Verify button hover contrast as well as resting states; never recolor business-status badges to match the personal accent.
+- The accent registry also includes ნეფრიტის მწვანე, ევკალიპტის მწვანე, ტყის მწვანე, ღვინისფერი, მუქი ლურჯი, ინდიგო, კობალტის ლურჯი, მუქი ნარინჯისფერი and ზეთისხილისფერი. Use each palette's reviewed light/dark primary and foreground pairs for checked switches, checkboxes and radio buttons. Tint current pagination, selected table rows, calendar ranges and text selection subtly. In light mode, keep active and hover accent surfaces visibly separated from `#f7f7f7` and `#f0f0f0` surfaces (with a deeper `--sidebar-accent` tint and auto-darkened foregrounds when needed) while maintaining readable muted-text contrast. Apply a subtle top-left-to-bottom-right diagonal background gradient derived from `--primary` on the highest-level application background (`body` and `[data-slot='sidebar-inset']`, disabled in forced-colors mode). Preserve neutral's existing appearance. Verify button hover contrast as well as resting states; never recolor business-status badges to match the personal accent.
 
 - Use semantic tokens such as `background`, `foreground`, `muted`, `muted-foreground`, `border`, `primary`, and `destructive`, plus existing badge variants. Keep foundations in `src/styles.css` and variants in shared primitives.
 - Keep primary emphasis restrained. Use status colors for their established meaning rather than decorating arbitrary rows or headings.
@@ -81,6 +91,7 @@ Place the page title outside and above a route-aware tabs wrapper when that wrap
 - Use `@tabler/icons-react`. Let shared controls determine icon size and follow their `data-icon` convention. Match stroke weight and scale in comparable contexts.
 - Hide decorative icons from assistive technology. Icon-only actions need concise Georgian accessible names and tooltips where their meaning is not obvious.
 - An unread dot is a status indicator, not a numeric badge. Preserve its accessible unread meaning. Notification row dots sit beside the corresponding bell icon, as established in the notification UI.
+- Bells accompanied by a red unread dot use the outline `IconBellRinging` in the sidebar, popup trigger and notification rows. Preserve the existing red dots, accessible unread labels and read-state icons.
 
 The personal schedule uses a sky-blue daylight-to-night palette. Its today panel has soft sunlight over a blue sky at the top, fading into twilight and a dark blue star-lit bottom. Keep atmospheric layers static, decorative, behind the text, and scoped through the schedule styles in `src/styles.css`. Use dark start-time text and light end-time text, stacked on mobile. Weekday work blocks follow the same light-to-dark direction, with a brighter sky treatment for today and quiet cool accents for days off. These calendar colors describe the schedule, not attendance completion or approval. Preserve explicit today/day-off labels and readable contrast in both themes.
 
@@ -91,6 +102,8 @@ Dark country borders use a distinct high-contrast stroke, full opacity, and a no
 The jobs map starts with flat buildings. Its separate 3D buildings control exposes a pressed state and toggles building height without changing the camera or hiding footprints. Preserve the choice across theme/POI changes and full-screen map remounts.
 
 Map cartography has its own reference palette, maintained in `src/components/ui/map-styles.ts`. Dark maps use the approved slate terrain (`#314256`), deep blue water (`#1c347a`), teal parks (`#00615e`), and muted gray road/building hierarchy with colored place labels. Apply the palette to geographic layers rather than tinting the canvas with a CSS filter. Map controls, search, dialogs, job markers and statuses continue to use the existing application tokens. Light map colors remain provider-owned.
+
+Every mapped job gets a translucent violet ring at the company diameter, which defaults to 200 m. The GPS Devices map legend shows the shared diameter. GPS managers edit it in a single labeled meter input with inline validation and save explicitly. Draw the rings above building footprints and 3D buildings, keeping the top map labels and pins clear. The map tools include a geofence toggle, on by default, that preserves camera position and carries over to fullscreen. When enabled, frame the selected ring and use a stronger outlined edge. Respect reduced-motion preferences. Show the diameter in the job information card and include the ring in the jobs map legend.
 
 ## Shared components are the default
 
@@ -127,7 +140,9 @@ Choose feedback by purpose and lifetime. These components complement one another
 - A new non-modal live announcement shows one informational Sonner toast per open app tab at the bottom right for 6 seconds, with a Georgian ნახვა action. Reconnect snapshots do not replay old announcement toasts. Keep the announcement in its directory after the toast expires; toast dismissal never marks it read. Use an accessible unread dot in personal announcement navigation, without another header icon.
 
 - Use `toast` from `sonner` and the single app-wide `Toaster` from `#/components/ui/sonner`. Do not mount another toaster or introduce the Base UI toast manager alongside it.
+- Center general Sonner toasts at the top of the viewport.
 - Emit one outcome toast per action. Avoid duplicates from hooks, components, retries, rerenders, and cache invalidation.
+- Omit the close button from app-wide Sonner toasts.
 - Show success only after the server confirms completion. Never simulate an unavailable workflow or imply that a local draft was saved remotely.
 - Say what happened and, for failures, what the user can do next. Reuse the existing green success and red error styling; do not create per-feature palettes.
 - Never expose SQL errors, stack traces, tokens, or unnecessary personal data. Preserve user input after failure and vacation controls recoverable.
@@ -149,7 +164,7 @@ Use variants from `src/components/ui/badge.tsx`. Map each feature's states to la
 - Keep colors consistent across features, labels explicit, and contrast sufficient in both themes. Never rely on color alone.
 - A count is not inherently success or danger. Reserve strong color for meaningful state rather than coloring every number.
 - Do not invent colors for every status. If a new semantic variant is necessary, implement it once in the shared component and verify both themes.
-- Job map pins identify installation with Sky blue (#38b8ff), measurement with vivid orange and other work with Bright lavender (#ba8cff) tokens. Measurement pins and type badges use a saturated orange fill with dark readable icons and labels in both themes. Use the same saturated Sky blue and Bright lavender fills with dark readable outlines and icons in both themes. Preserve the rounded-square body with a short centered downward point, anchored at its tip. Selected job pins use a prominent 4px translucent white halo with a 2px dark separation, preserving their category fill and status badge. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend; include type and status in accessible labels.
+- Job map pins identify installation with Sky blue (#38b8ff), measurement with vivid orange and other work with Bright lavender (#ba8cff) tokens. Measurement pins and type badges use a saturated orange fill with dark readable icons and labels in both themes. Use the same saturated Sky blue and Bright lavender fills with dark readable outlines and icons in both themes. The rounded head narrows into a centered point 8px below the button body. Anchor the marker at its tip. The selected and keyboard-focused outlines follow the tapered shape with a 4px translucent white halo and a 2px dark separation. Keep a separate status badge visible on each pin so category colors do not hide completion, rejection or progress. Reuse the shared type mapping for badges and the map legend. Include type and status in accessible labels.
 
 ### Alerts
 
@@ -207,11 +222,13 @@ For grouped records, paginate the meaningful group when the UI promises complete
 
 Use shadcn `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent` for tabbed sections. Higher-level tabs must appear below the page's main title.
 
+Payroll uses the same header and tab order across its tabbed pages. On narrow screens, page actions sit below the scrollable tab strip so the strip remains at the same height when actions appear or disappear.
+
 Do not add route-changing tabs that duplicate destinations already shown as separate sidebar links. The `დასწრებები` sidebar item opens the employee directory. Selecting an employee opens one detail page with local attendance and monthly-hours tabs; both tabs keep that sidebar item active. There is no standalone company-timesheets sidebar item or route. Section tabs remain appropriate for related views that are not separately exposed in the sidebar, such as personal attendance and its correction/hour views.
 
 The approved appearance is the existing attendance tab strip shown in the user's reference:
 
-- One compact rounded container with a muted surface, subtle border, and small inset around its triggers.
+- One compact rounded container with a white surface in light mode (`bg-white dark:bg-muted`), subtle border, and small inset around its triggers. Inputs, textareas, input groups, and select triggers also use a white background in light mode only, and select triggers omit the raised bottom shadow in light mode while keeping dark mode unchanged.
 - Match the inner trigger corners to the outer container, accounting for its border and inset; use the shared tab styles across pages.
 - Consistent trigger height and horizontal padding, muted inactive text, and clear hover/focus states.
 - A raised selected surface with a slight 3D edge/shadow, stronger text, and stable dimensions.
@@ -294,6 +311,28 @@ Day-off requests use one date picker labeled `თარიღი`; vacations use
 
 When the user changes a shared UI standard, update this file instead of creating a competing design manual. Increment its version, update the date, and record the substantive decision below. Update references when files move. Carry accepted rules into shared primitives when implementing them, with verification proportional to their reach.
 
+## Payroll configuration
+
+Payroll tabs use compensation-specific Tabler icons and place settings last. Use the shared shadcn Calendar to choose a whole payroll month. Payroll filters use the compact, rounded Jobs toolbar styling and wrap within the available width. Give payroll alerts an icon that matches their severity. Show the month status in the toolbar after finalization. Use one tab and one entry sheet for bonuses, premiums and fines.
+
+Use an 8px gap between the payroll filters and table results.
+
+In the salary issuance dialog, show the selected payment window above the ready employees and total. Below that summary, group employees who need review in a collapsed shadcn Accordion with a right-aligned Tabler chevron. Show each employee's name and reason in a darker, rounded, bordered row. Use the shared expand and collapse transitions and respect reduced motion. Keep the confirmation actions visible while the dialog body scrolls on narrow screens.
+
+On the employee sheet's salary tab, show **ხელფასის გაცემა** to authorized editors when a salary stage remains. Ask users to save unsaved changes before opening the confirmation. Reuse the issuance dialog with the employee's name, unpaid salary stages and confirmed amount. Refresh the sheet after issuance and return focus to the action or salary tab.
+
+The monthly payroll table and its CSV use `ხელფასი(თვე)`, `ხელფასი(1/2)` and `ხელფასი(2/2)` for the selected view. The sheet edits the full earning month from every view and labels the monthly amount and the first-installment override with the corresponding names. Prefill the applicable fixed amount when the salary needs confirmation and explain why it needs review before saving. Keep paginated change history in a closed-by-default shadcn Accordion.
+
+Use the semantic red text token for nonzero fines in the management payroll tables. Keep zero fines neutral. Tint the employee salary directory’s `განსასაზღვრი ხელფასი` summary card when its count is above zero.
+
+Use the compact `თვე`, `1/2` and `2/2` tabs for split payroll periods. Select the current half of the company-local month by default and keep explicit tab choices in the URL. Keep the desktop toolbar on one row with a usable minimum width for search and place the `ექსპორტი` menu at the far right. The menu offers CSV and PDF downloads for the loaded results. Allow scrolling within the toolbar when the available width is smaller. On mobile, group employee search, the month picker and sorting in the collapsed `ფილტრები` Accordion, using the Jobs filter style. Show the selected month on the trigger. Give the salary payment action, period tab strip and export trigger the full available width on mobile.
+
+The management salary detail uses the full available content width. Give the current agreement more emphasis than the scheduled change. Show salary history as a table on wider screens and as stacked entries on narrow screens so dates, amounts and audit details remain readable.
+
+Use the full available width on the employee's own salary page and lead with one current-pay card. Label the amount type **თანხის ტიპი**. Show the next salary change as a compact notice only when it is scheduled. Show payout totals without repeating **ხელზე ასაღები** in the desktop table and narrow statement cards. Mark each recently recorded payment with a subtle green tint and the **ახლახანს გაცემული** badge for 24 hours after recording. Keep the indicator static and let it expire while the page is open. Place salary change history in a closed-by-default shadcn Accordion and keep it open during history pagination.
+
+`/manage/payroll/settings` belongs to management navigation under `ხელფასების პარამეტრები`, guarded by `payroll.configure`. Administrators, accountants and owners can edit it without granting accountants platform-administration access. Use separate Cards for calculation rules, statutory withholding settings and the save reason, with a single Save action. Keep employee and employer pension rates separately labeled and explain that the employer share is an additional company expense. Disabled built-in calculation does not imply a statutory exemption. Retain the dated version indicator, honest unavailable-calculation notice, inline validation, required reason, pending Spinner and draft preservation after conflicts or background refetch failures. Date selection uses the Georgian shadcn Calendar. Never display estimated settings as an employee's salary or simulate deductions.
+
 | Version | Date       | Decision                                                                                                                                                                                                               |
 | ------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1       | 2026-11-06 | Established mandatory design quality, shadcn Data Tables and pagination, debounced server lists with URL state, title-first approved tabs, title-only page headers, and shared subtle 3D buttons.                      |
@@ -340,6 +379,8 @@ When the user changes a shared UI standard, update this file instead of creating
 ## Employee creation and day-off allowance
 
 - Open employee creation in a right shadcn Sheet from the page action; the employee list uses the full available width. Keep the form scrollable and preserve the one-time activation-code dialog.
+- Place the labeled role checkbox group in a shared shadcn Card in employee creation, employee editing and access administration. Use two columns when the card has room and one column in narrow layouts. Require at least one role and show only roles the current employee manager can select. Keep legacy owner role edits in access administration.
+- Show the optional employment start date in employee creation for managers with employment-date permissions. Use the shared Georgian date picker with an empty initial value.
 - Employee profiles also use the full available content width. Profile editing opens in a matching right shadcn Sheet, with the same desktop width, full width on mobile, a fixed title header, and a scrollable form. Label the leave-balance action რედაქტირება.
 - Schedule settings define the starting day-off allowance (initially 4) and a toggle for calendar-year resets. Employee creation inherits the company default with an optional override. Employee profiles show remaining days and permit authorized HR adjustments. Approved day offs consume one day; vacations are separate.
 
@@ -430,11 +471,13 @@ In job history, a status transition back to pending reads `თავიდან
 
 Jobs filters use fully rounded pill controls, including search, the date range, selects and clear action. Keep them 36px high on desktop and 44px on mobile. Space desktop filter controls 8px apart. Preserve complete Georgian option labels and the shared raised control treatment. Use a 12px gap between the filter block and map/list results.
 
+Use one Jobs dropdown on the map and list for standard sort choices, upcoming deadlines and overdue work. Show the active deadline option in the trigger. Selecting a sort choice restores the previous creation-date range.
+
 The jobs date-range popover is compact: 512px wide on desktop with two 32px-cell months and one full-width month on mobile. Place the title and month shortcuts in one header row, tighten week spacing, and group whole-month selection with the selected range. Keep the calendar inside a centering wrapper so Field's full-width child rule cannot stretch its day cells. Preserve readable Georgian labels, larger mobile footer actions and viewport-bounded scrolling when space is limited.
 
 ## Notification acknowledgement
 
-The notifications page stacks the mark-all-read and delete-all actions in separate full-width rows on mobile, with single-line labels; desktop keeps them side by side. Both filter tabs share the full content width on mobile and use the compact strip on desktop. Each notification places its icon, timestamp and three-dot actions menu above its full-width title and description. Mobile menu triggers have no background or shadow, including when open or hovered, while retaining their touch target and focus ring. Keep read/unread and delete actions in the shared shadcn dropdown menu, with the existing delete confirmation, Georgian labels, pending feedback and keyboard access. Preserve the compact notification bell preview layout.
+The notifications page stacks the mark-all-read and delete-all actions in separate full-width rows on mobile, with single-line labels. Desktop keeps them side by side. Both filter tabs share the full content width on mobile and use the compact strip on desktop. Each notification places its icon, timestamp and actions above its full-width title and description. On desktop, show direct read/unread and delete buttons with transparent backgrounds at rest and the shared shadcn ghost hover style. Keep both states flat. Preserve visible focus rings, Georgian accessible names and tooltips. Below the application shell's 768 px mobile breakpoint, use a three-dot shadcn dropdown menu with the same actions. Mobile menu triggers have no background or shadow, including when open or hovered, while retaining their touch target and focus ring. Both layouts retain delete confirmation, Georgian labels, pending feedback and keyboard access. Preserve the compact notification bell preview layout.
 
 The notification bell toolbar uses ყველა შეტყობინების ნანახად მონიშვნა and marks all of the signed-in account's unread notifications read, including older pages. Its enabled state follows the full unread count. The bell dot remains only while unread notifications exist; row controls continue to mark individual entries.
 
@@ -455,6 +498,10 @@ The employee detail attendance tab at `/manage/attendance/$userId` defaults to t
 HR and owners can correct other employees' attendance company-wide through an explicit correction permission. Supervisors retain assignment-based correction scope. Show correction and approval controls independently; company-wide correction rights do not imply approval rights. Admins and owners may correct their own attendance only with the explicit attendance.correct.self permission. Self-approval remains forbidden; retain optional reasons, corrected markers, pending review and atomic before/after audits. Employees see a read-only, paginated correction history on their own attendance page, with exact before/after check-in and checkout times including seconds, editor, reason and change timestamp. Preserve every edit, including repeated changes. Use shared Cards and pagination, Georgian labels, and the existing SSE connection to refresh the history.
 
 Do not show a separate correction requests tab while employee-submitted requests are unavailable. Keep correction history on the attendance page.
+
+On the personal attendance page, show Tabler icons in the work clock and recent attendance card titles. Put correction history in a closed-by-default shadcn Accordion with a history icon and a right-aligned chevron. Keep it open during history pagination.
+
+Display each personal attendance correction in a card with its work date and editor in the header. Group the exact before and after values by check-in and checkout. Give both after values the same inset surface and font weight. Keep the reason and edit timestamp in the footer.
 
 ## Attendance correction sheet
 
@@ -541,6 +588,6 @@ Version 76 (2026-11-17): Preserve the teams directory while an editor loads. Tea
 
 ## Job pin attention indicators
 
-Unfinished jobs due tomorrow in Asia/Tbilisi show a separate crimson calendar marker, with ვადა ხვალ in the map legend. Keep category colors and workflow status markers visible. New jobs retain a vivid red (#dc2626) ახალი badge with white text, matching across pins, cards, table titles and the legend, per account until that account successfully opens details. List cards and table titles show the same unread badge. The jobs sidebar red dot follows any unread job across the full authorized scope, independently of current filters or notification-role subscriptions. Persist receipts server-side and refresh all tabs through the existing jobs live topic. Queries, loaders, prefetches and context menus never acknowledge a job. Historical jobs before this feature are excluded; new jobs are unread for every authorized account until viewed.
+Unfinished jobs due tomorrow in Asia/Tbilisi show a separate crimson calendar marker, with ვადა ხვალ in the map legend. Overdue job pins show a red exclamation mark in the same position. Use the same icon in the legend and on overdue badges in cards, the list and job details. Keep category colors and workflow status markers visible. New jobs retain a vivid red (#dc2626) ახალი badge with white text, matching across pins, cards, table titles and the legend, per account until that account successfully opens details. List cards and table titles show the same unread badge. The jobs sidebar red dot follows any unread job across the full authorized scope, independently of current filters or notification-role subscriptions. Persist receipts server-side and refresh all tabs through the existing jobs live topic. Queries, loaders, prefetches and context menus never acknowledge a job. Historical jobs before this feature are excluded; new jobs are unread for every authorized account until viewed.
 
-Pulse the whole new pin with a subtle 2.5-second scale/opacity animation for the first five minutes after creation. Scale around the pointed tip so its map anchor stays stationary. Stop after acknowledgement and keep the pin static for reduced motion. Place the new tag 28px above the pin body, leaving a small clear gap above the deadline indicator. When job pins overlap at any zoom, draw the selected job above all other jobs, then jobs with both new and due-tomorrow indicators, new jobs, due-tomorrow jobs and ordinary jobs. Apply priority to the outer MapLibre marker container so neighboring pins cannot cover these indicators. Unread labels continue after the pulse expires. Avoid replaying a full five-minute pulse on reload.
+Pulse the whole new pin with a subtle 2.5-second scale/opacity animation for the first five minutes after creation. Scale around the pointed tip so its map anchor stays stationary. Stop after acknowledgement and keep the pin static for reduced motion. Place the new tag 28px above the pin body, leaving a small clear gap above the deadline indicator. When job pins overlap at any zoom, draw the selected job above all other jobs, then jobs with both new and deadline indicators, new jobs, jobs with a deadline indicator and ordinary jobs. Apply priority to the outer MapLibre marker container so neighboring pins cannot cover these indicators. Unread labels continue after the pulse expires. Avoid replaying a full five-minute pulse on reload.

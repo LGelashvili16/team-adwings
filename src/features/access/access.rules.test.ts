@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { accountCodeSchema, accountActionSchema } from './access.schemas'
+import {
+  accountCodeSchema,
+  accountActionSchema,
+  activateAccountSchema,
+  provisionAccountSchema,
+} from './access.schemas'
 import { formatSetupCode, normalizeSetupCode } from './access.rules'
+
+it('normalizes activation usernames before the server looks them up', () => {
+  expect(
+    activateAccountSchema.parse({
+      code: 'ABCDEFGH2345',
+      username: '  Giorgi   Beridze.2  ',
+      newPassword: 'example-password-123',
+    }).username,
+  ).toBe('giorgi-beridze.2')
+})
 
 describe('setup codes', () => {
   it('groups a code for display and reads it back unchanged', () => {
@@ -68,4 +83,15 @@ describe('account action reasons', () => {
       ).toBe(true)
     },
   )
+})
+
+it('defaults omitted system access to employee without inferring it from the position', () => {
+  const input = { name: 'ანა მაისურაძე', contactEmail: '', jobTitle: 'HR' }
+  expect(provisionAccountSchema.parse(input).roles).toEqual(['employee'])
+  expect(
+    provisionAccountSchema.safeParse({ ...input, roles: [] }).success,
+  ).toBe(false)
+  expect(
+    provisionAccountSchema.parse({ ...input, roles: ['supervisor'] }).roles,
+  ).toEqual(['supervisor'])
 })

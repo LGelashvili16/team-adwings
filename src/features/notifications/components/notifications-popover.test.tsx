@@ -14,6 +14,7 @@ const api = vi.hoisted(() => ({
   all: vi.fn(),
   clearPopup: vi.fn(),
 }))
+vi.mock('#/hooks/use-mobile', () => ({ useIsMobile: () => true }))
 vi.mock('../notifications.functions', () => ({
   getOwnNotifications: api.read,
   markOwnNotifications: api.mark,

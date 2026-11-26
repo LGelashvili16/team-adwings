@@ -271,6 +271,11 @@ export function JobAssignmentPicker({
                     <p className="text-sm font-medium break-words">
                       {item.name}
                     </p>
+                    {kind === 'teams' && item.memberCount !== undefined ? (
+                      <Badge variant="secondary">
+                        {item.memberCount} წევრი
+                      </Badge>
+                    ) : null}
                     {kind === 'devices' && item.reportedId ? (
                       <div className="mt-1 flex flex-col gap-1 text-xs break-words text-muted-foreground tabular-nums">
                         {item.phone ? (

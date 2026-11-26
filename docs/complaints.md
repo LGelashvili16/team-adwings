@@ -1,12 +1,12 @@
 # Employee complaints
 
-Employees submit complaints at `/complaints`; HR and assigned supervisors review them at `/manage/complaints`. The validated `complaintId` search parameter opens a detail sheet and `activityPage` pages its shared conversation/history.
+Employees submit complaints at `/complaints`; HR, administrators and owners review them at `/manage/complaints`. The validated `complaintId` search parameter opens a detail sheet and `activityPage` pages its shared conversation/history.
 
 ## Access and workflow
 
 - Every active account may submit and read its own complaints. Identity comes from the session and current account/employment state is rechecked in persistence.
 - HR has `complaints.review.all` and `complaints.read.confidential`. Supervisors have `complaints.review.assigned` and see only explicitly assigned ordinary complaints. Administrators have ordinary complaint review access through complaints.review.all; confidential access remains restricted to HR and owners. Owners retain their existing all-permissions policy.
-- Employees do not choose visibility or recipients. New complaints use the server-owned ordinary workflow: HR, administrators and the owner can read them, and supervisors receive access only after explicit assignment. The create endpoint rejects client-provided visibility. Existing `hr_only` records remain restricted to the requester, HR and owner. No one may review their own complaint.
+- Employees do not choose visibility or recipients. New complaints use the server-owned ordinary workflow: HR, administrators and owners can read them. Eligible reviewers with assigned-only permission can read complaints assigned to them. The create endpoint rejects client-provided visibility. Existing `hr_only` records remain restricted to the requester, HR and owner. No one may review their own complaint.
 - Ordinary records are visible to HR, administrators, the owner and their assigned reviewer. Attendance reviewer assignments do not confer complaint access.
 - Status transitions are new to in_review or closed, in_review to resolved or closed, and resolved/closed to in_review for reopening. Every transition and assignment requires an employee-visible explanation.
 - Original topic, description, category and visibility are immutable. Replies remain available while the complaint is new or in review. Completed complaints must be reopened by an authorized reviewer before another reply.

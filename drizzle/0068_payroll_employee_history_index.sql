@@ -1,0 +1,1 @@
+CREATE INDEX "payroll_monthly_entry_employee_history" ON "payroll_monthly_entry" USING btree ("employee_id","month" DESC NULLS FIRST,"version" DESC NULLS LAST);

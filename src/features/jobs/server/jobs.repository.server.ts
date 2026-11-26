@@ -7,9 +7,12 @@ import {
   count,
   desc,
   eq,
+  gte,
   gt,
   ilike,
   isNotNull,
+  lt,
+  notInArray,
   or,
   sql,
 } from 'drizzle-orm'
@@ -21,6 +24,7 @@ import {
   job,
   jobEvent,
   jobRead,
+  jobGeofenceSetting,
   jobEmployee,
   user,
 } from '#/db/schema'
@@ -28,14 +32,48 @@ import {
   readAssignments,
   employeeAssignmentCounts,
 } from './job-assignments.repository.server'
-import { jobsMapLimit, jobsPageSize } from '../jobs.schemas'
+import {
+  defaultJobGeofenceDiameter,
+  jobsMapLimit,
+  jobsPageSize,
+} from '../jobs.schemas'
 import { hasJobCoordinates } from '../jobs.rules'
-import type { JobSearch } from '../jobs.types'
+import type { JobGeofenceDiameter, JobSearch } from '../jobs.types'
 
 export type JobsTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0]
 export const transactJobs = db.transaction.bind(db)
+export async function readGeofenceSetting(tx: JobsTransaction) {
+  const current = (
+    await tx
+      .select({
+        version: jobGeofenceSetting.version,
+        diameter: jobGeofenceSetting.diameter,
+      })
+      .from(jobGeofenceSetting)
+      .orderBy(desc(jobGeofenceSetting.version))
+      .limit(1)
+  ).at(0)
+  return current ?? { version: 0, diameter: defaultJobGeofenceDiameter }
+}
+
+export async function saveGeofenceSetting(
+  tx: JobsTransaction,
+  actorId: string,
+  diameter: JobGeofenceDiameter,
+) {
+  // Serialize revisions, including the first save, and keep retries idempotent.
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtext('team-adwings-job-geofence-settings'))`,
+  )
+  const current = await readGeofenceSetting(tx)
+  if (current.diameter === diameter) return { setting: current, changed: false }
+  const setting = { diameter, version: current.version + 1 }
+  await tx.insert(jobGeofenceSetting).values({ ...setting, actorId })
+  return { setting, changed: true }
+}
+
 function unreadJob(actorId: string) {
   return sql<boolean>`${job.tracksReads} and not exists (select 1 from ${jobRead} where ${jobRead.userId} = ${actorId} and ${jobRead.jobId} = ${job.id})`
 }
@@ -107,12 +145,17 @@ export async function jobNotificationDetails(tx: JobsTransaction, id: string) {
       .where(eq(job.id, id))
   ).at(0)
 }
+const currentJobDay = sql`(current_timestamp at time zone ${jobsTimeZone})::date`
+const hasOpenDeadline = notInArray(job.status, ['completed', 'rejected'])
+const overdueDeadline = and(hasOpenDeadline, lt(job.deadline, currentJobDay))
+
 const summaryColumns = {
   id: job.id,
   title: job.title,
   address: job.address,
   kind: job.kind,
   deadline: job.deadline,
+  isOverdue: sql<boolean>`coalesce(${overdueDeadline}, false)`,
   status: job.status,
   longitude: job.longitude,
   latitude: job.latitude,
@@ -160,9 +203,17 @@ export async function listJobs(
   )
   // Escape SQL wildcard characters so ordinary input is a literal substring search.
   const term = `%${search.q.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')}%`
+  const period =
+    search.deadlineState === 'all'
+      ? and(
+          sql`${job.createdAt} >= (${search.from}::date::timestamp at time zone ${jobsTimeZone})`,
+          sql`${job.createdAt} < ((${search.to}::date + 1)::timestamp at time zone ${jobsTimeZone})`,
+        )
+      : search.deadlineState === 'upcoming'
+        ? and(hasOpenDeadline, gte(job.deadline, currentJobDay))
+        : overdueDeadline
   const where = and(
-    sql`${job.createdAt} >= (${search.from}::date::timestamp at time zone ${jobsTimeZone})`,
-    sql`${job.createdAt} < ((${search.to}::date + 1)::timestamp at time zone ${jobsTimeZone})`,
+    period,
     search.q
       ? or(
           ilike(job.title, term),
@@ -318,6 +369,7 @@ export async function updateJob(
       | 'address'
       | 'kind'
       | 'deadline'
+      | 'geofenceDiameter'
       | 'longitude'
       | 'latitude'
       | 'status'

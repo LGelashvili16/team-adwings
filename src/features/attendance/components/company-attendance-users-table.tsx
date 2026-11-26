@@ -156,7 +156,9 @@ export function CompanyAttendanceUsersTable({
                     ? 'დაფიქსირებულია'
                     : status === 'unavailable'
                       ? 'წვდომა შეზღუდულია'
-                      : 'არ დაფიქსირებულა'}
+                      : status === 'former'
+                        ? 'ყოფილი თანამშრომელი'
+                        : 'არ დაფიქსირებულა'}
               </Badge>
             )
           },

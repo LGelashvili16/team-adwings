@@ -2,15 +2,21 @@ import { IconCalendarWeek } from '@tabler/icons-react'
 import { Badge } from '#/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { WeekStrip } from '#/features/scheduling/components/week-strip'
-import type { WorkingWeek } from '#/features/scheduling/scheduling.types'
+import { WorkLocationOverrides } from '#/features/scheduling/components/work-location-overrides'
+import type {
+  WorkingWeek,
+  WorkLocationPlan,
+} from '#/features/scheduling/scheduling.types'
 
 /** Shows the employee's own week, or the company week they inherit, with a badge saying which one it is. */
 export function UserScheduleCard({
   week,
   companyWeek,
+  workLocations,
 }: {
   week: WorkingWeek | null
   companyWeek: WorkingWeek | null
+  workLocations?: WorkLocationPlan
 }) {
   const days = week ?? companyWeek
   return (
@@ -26,13 +32,20 @@ export function UserScheduleCard({
           {week ? 'ინდივიდუალური' : 'კომპანიის განრიგი'}
         </Badge>
       </CardHeader>
-      <CardContent className="px-4 sm:px-5">
+      <CardContent className="flex flex-col gap-4 px-4 sm:px-5">
         {days ? (
-          <WeekStrip days={days} density="comfortable" />
+          <WeekStrip
+            days={days}
+            density="comfortable"
+            remoteWeekdays={workLocations?.remoteWeekdays}
+          />
         ) : (
           <p className="text-sm text-muted-foreground">
             კომპანიის სამუშაო განრიგი ჯერ არ არის განსაზღვრული.
           </p>
+        )}
+        {workLocations && (
+          <WorkLocationOverrides overrides={workLocations.overrides} />
         )}
       </CardContent>
     </Card>

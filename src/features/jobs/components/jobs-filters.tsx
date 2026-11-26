@@ -52,6 +52,7 @@ const signature = (search: JobSearch) =>
     search.status,
     search.kind,
     search.scope,
+    search.deadlineState,
     search.sort,
     search.page,
     search.from,
@@ -91,13 +92,15 @@ const filterFields = [
   },
   {
     name: 'sort',
-    label: 'დალაგება',
+    label: 'დალაგება და ვადა',
     options: [
       { value: 'newest', label: 'ჯერ ახალი' },
       { value: 'oldest', label: 'ჯერ ძველი' },
       { value: 'title', label: 'სათაურით' },
       { value: 'deadline_asc', label: 'ჯერ ახლო ვადა' },
       { value: 'deadline_desc', label: 'ჯერ შორი ვადა' },
+      { value: 'upcoming', label: 'დღეს და მომავალი ვადები' },
+      { value: 'overdue', label: 'ვადაგადაცილებული' },
     ],
   },
 ] as const
@@ -105,13 +108,16 @@ const filterFields = [
 function countActiveFilters(search: JobSearch) {
   const defaultRange = jobsMonthRange()
   let count = 0
-  if (search.from !== defaultRange.from || search.to !== defaultRange.to)
+  if (
+    search.deadlineState === 'all' &&
+    (search.from !== defaultRange.from || search.to !== defaultRange.to)
+  )
     count++
   if (search.q.trim()) count++
   if (search.status !== 'all') count++
   if (search.kind !== 'all') count++
   if (search.scope !== 'all') count++
-  if (search.sort !== 'newest') count++
+  if (search.deadlineState !== 'all' || search.sort !== 'newest') count++
   return count
 }
 
@@ -136,6 +142,7 @@ export function JobsFilters({
       status: search.status,
       kind: search.kind,
       scope: search.scope,
+      deadlineState: search.deadlineState,
       sort: search.sort,
     },
     validators: { onChange: jobFilterSchema, onSubmit: jobFilterSchema },
@@ -164,6 +171,7 @@ export function JobsFilters({
       status: search.status,
       kind: search.kind,
       scope: search.scope,
+      deadlineState: search.deadlineState,
       sort: search.sort,
     })
   }, [
@@ -173,6 +181,7 @@ export function JobsFilters({
     search.status,
     search.kind,
     search.scope,
+    search.deadlineState,
     search.sort,
     search.from,
     search.to,
@@ -230,17 +239,19 @@ export function JobsFilters({
           )}
         </form.Field>
       ) : null}
-      <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
-        <JobsDateRange
-          key={`${search.from}:${search.to}`}
-          value={{ from: search.from, to: search.to }}
-          onChange={(range) => {
-            form.setFieldValue('from', range.from)
-            form.setFieldValue('to', range.to)
-            commit({ ...form.state.values, ...range }, false)
-          }}
-        />
-      </Field>
+      {draft.deadlineState === 'all' ? (
+        <Field className={cn(isMobile ? 'w-full' : 'w-full md:w-auto')}>
+          <JobsDateRange
+            key={`${search.from}:${search.to}`}
+            value={{ from: search.from, to: search.to }}
+            onChange={(range) => {
+              form.setFieldValue('from', range.from)
+              form.setFieldValue('to', range.to)
+              commit({ ...form.state.values, ...range }, false)
+            }}
+          />
+        </Field>
+      ) : null}
       {filterFields.map(({ name, label, options }) => (
         <form.Field key={name} name={name}>
           {(field) => (
@@ -249,18 +260,31 @@ export function JobsFilters({
                 {label}
               </FieldLabel>
               <Select
-                value={field.state.value}
+                value={
+                  name === 'sort' && draft.deadlineState !== 'all'
+                    ? draft.deadlineState
+                    : field.state.value
+                }
                 items={options}
                 onValueChange={(value) => {
-                  const parsed = jobFilterSchema.shape[name].safeParse(value)
+                  const deadlineState =
+                    name === 'sort' &&
+                    (value === 'upcoming' || value === 'overdue')
+                      ? value
+                      : 'all'
+                  const parsed = jobFilterSchema.shape[name].safeParse(
+                    deadlineState === 'all' ? value : 'deadline_asc',
+                  )
                   if (!parsed.success) return
                   field.handleChange(parsed.data)
+                  if (name === 'sort')
+                    form.setFieldValue('deadlineState', deadlineState)
                   commit({ ...form.state.values, [name]: parsed.data }, false)
                 }}
               >
                 <SelectTrigger
                   id={`jobs-filter-${name}`}
-                  className="w-full rounded-full px-3 shadow-control-raised active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
+                  className="w-full rounded-full px-3 dark:shadow-control-raised dark:active:shadow-control-pressed data-[size=default]:h-11 md:data-[size=default]:h-9"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -296,6 +320,7 @@ export function JobsFilters({
             status: 'all',
             kind: 'all',
             scope: 'all',
+            deadlineState: 'all',
             sort: 'newest',
           }
           pending.current.clear()

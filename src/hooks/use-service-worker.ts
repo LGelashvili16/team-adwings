@@ -1,4 +1,11 @@
+import { createClientOnlyFn } from '@tanstack/react-start'
 import { useEffect, useRef, useState } from 'react'
+
+const clearWorkerInDevelopment = createClientOnlyFn(async () => {
+  const { clearDevelopmentWorker } =
+    await import('#/lib/pwa/development-worker.client')
+  return clearDevelopmentWorker()
+})
 
 export function useServiceWorker() {
   const [updateAvailable, setUpdateAvailable] = useState(false)
@@ -10,8 +17,7 @@ export function useServiceWorker() {
     if (!('serviceWorker' in navigator)) return
     let disposed = false
     if (import.meta.env.DEV) {
-      void import('#/lib/pwa/development-worker.client')
-        .then(({ clearDevelopmentWorker }) => clearDevelopmentWorker())
+      void clearWorkerInDevelopment()
         .then((wasControlled) => {
           if (!disposed && wasControlled) window.location.reload()
         })

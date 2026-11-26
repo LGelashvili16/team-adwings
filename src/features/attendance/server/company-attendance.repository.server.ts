@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   gte,
+  isNull,
   lte,
   ilike,
   or,
@@ -17,6 +18,7 @@ import {
   employee,
   user,
 } from '#/db/schema'
+import { effectiveEmploymentStatus } from '#/features/employees/server/employment-status.server'
 import type { z } from 'zod'
 import type {
   companyAttendanceListSchema,
@@ -68,6 +70,9 @@ export async function companyAttendanceUsers(
     input.state && input.state !== 'all'
       ? eq(user.accessState, input.state)
       : undefined,
+    input.employment === 'former'
+      ? eq(effectiveEmploymentStatus, 'inactive')
+      : or(isNull(employee.id), eq(effectiveEmploymentStatus, 'active')),
   )
   const order = input.sort.endsWith('desc') ? desc : asc
   // Preserve existing code-sort URLs as aliases for the username column.
@@ -82,6 +87,7 @@ export async function companyAttendanceUsers(
       username,
       state: user.accessState,
       jobTitle: employee.jobTitle,
+      employmentStatus: effectiveEmploymentStatus,
       hasOpenSession: summary.canReadAttendance
         ? sql<boolean>`exists (select 1 from ${attendanceSession} where ${attendanceSession.employeeId} = ${employee.id} and ${attendanceSession.endedAt} is null and ${attendanceSession.startedAt} <= ${summary.now}::timestamptz)`
         : sql<boolean>`false`,

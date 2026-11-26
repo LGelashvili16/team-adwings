@@ -18,6 +18,7 @@ import { formatJobDate } from '../jobs.presentation'
 import { formatJobDay } from '../jobs.dates'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { JobOverdueBadge } from './job-overdue-badge'
 import { Badge } from '#/components/ui/badge'
 import type { JobSearch, JobSummary } from '../jobs.types'
 
@@ -105,12 +106,15 @@ export function JobsList({
           ),
           cell: ({ row }) =>
             row.original.deadline ? (
-              <time
-                dateTime={row.original.deadline}
-                className="whitespace-nowrap tabular-nums"
-              >
-                {formatJobDay(row.original.deadline)}
-              </time>
+              <div className="flex flex-wrap items-center gap-2">
+                <time
+                  dateTime={row.original.deadline}
+                  className="whitespace-nowrap tabular-nums"
+                >
+                  {formatJobDay(row.original.deadline)}
+                </time>
+                {row.original.isOverdue ? <JobOverdueBadge /> : null}
+              </div>
             ) : (
               'არ არის მითითებული'
             ),

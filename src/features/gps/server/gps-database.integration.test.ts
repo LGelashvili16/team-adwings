@@ -31,7 +31,7 @@ const reportedId = '009590038494'
 const settings = {
   name: 'საცდელი მოწყობილობა',
   reportedId,
-  phone: '',
+  phone: '+995 555 12 34 56',
   enabled: true,
 }
 const all = (input: { q?: string } = {}) =>
@@ -207,8 +207,8 @@ it.skipIf(!url)(
 
     const viewer: Actor = {
       ...owner,
-      roles: ['employee'],
-      permissionOverrides: { allow: ['manage.access', 'gps.read'], deny: [] },
+      roles: ['supervisor'],
+      permissionOverrides: { allow: [], deny: ['gps.manage'] },
     }
     expect((await readGpsMapDevices(viewer, all({ q: 'ახალი' }))).total).toBe(1)
     await expect(
@@ -218,7 +218,11 @@ it.skipIf(!url)(
       readGpsMapDevices(
         {
           ...viewer,
-          permissionOverrides: { allow: ['manage.access'], deny: [] },
+          roles: ['employee'],
+          permissionOverrides: {
+            allow: ['manage.access', 'gps.read'],
+            deny: [],
+          },
         },
         all(),
       ),

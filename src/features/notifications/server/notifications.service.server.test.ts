@@ -7,8 +7,8 @@ import {
 } from './notifications.service.server'
 import type { Actor } from '#/lib/authorization/actor'
 
-const deleteForRecipient = vi.fn(
-  (_recipientId: string, _id: string) => Promise.resolve({ deletedCount: 1 }),
+const deleteForRecipient = vi.fn((_recipientId: string, _id: string) =>
+  Promise.resolve({ deletedCount: 1 }),
 )
 const deleteAllForRecipient = vi.fn((_recipientId: string) =>
   Promise.resolve({ deletedCount: 3 }),
@@ -40,12 +40,10 @@ it.each([false, true])(
       name: 'ტესტი',
       email: null,
       emailVerified: false,
-      roles: ['employee'],
+      roles: ['hr_manager'],
       permissionOverrides: {
-        allow: manage
-          ? ['complaints.review.all', 'manage.access']
-          : ['complaints.review.all'],
-        deny: [],
+        allow: [],
+        deny: manage ? [] : ['manage.access'],
       },
     }
     const result = await listOwnNotifications(actor, { limit: 5, offset: 0 })

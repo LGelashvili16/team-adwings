@@ -19,7 +19,7 @@ import {
 import { Textarea } from '#/components/ui/textarea'
 import { Spinner } from '#/components/ui/spinner'
 import { Alert, AlertDescription } from '#/components/ui/alert'
-import { parseRoles } from '#/lib/authorization/permissions'
+import { parseRoles, roleSchema } from '#/lib/authorization/permissions'
 import { adminAccountKeys } from '../admin-access.queries'
 import {
   performAdminAccountAction,
@@ -144,19 +144,15 @@ export function AdminAccountDialog({
                 </Alert>
                 <form.Field name="roles">
                   {(field) => (
-                    <>
-                      <AccountRoleFields
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        owner={owner}
-                        disabled={pending}
-                        invalid={!field.state.meta.isValid}
-                      />
-                      <FieldError
-                        id="admin-roles-error"
-                        errors={field.state.meta.errors}
-                      />
-                    </>
+                    <AccountRoleFields
+                      options={roleSchema.options}
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      owner={owner}
+                      disabled={pending}
+                      invalid={!field.state.meta.isValid}
+                      errors={field.state.meta.errors}
+                    />
                   )}
                 </form.Field>
                 <form.Subscribe selector={(state) => state.values.roles}>

@@ -1,8 +1,23 @@
 import '@tanstack/react-start/server-only'
-import { and, asc, desc, count, eq, gt, ne, or, ilike, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  count,
+  eq,
+  getTableColumns,
+  gt,
+  lte,
+  ne,
+  or,
+  ilike,
+  sql,
+} from 'drizzle-orm'
 import { db } from '#/db'
 import type { AdminAccountList } from '../admin-access.schemas'
+import type { EmployeeAccountSearch } from '../access.schemas'
 import { parsePermissionOverrides } from '#/lib/authorization/permissions'
+import { effectiveEmploymentStatus } from '#/features/employees/server/employment-status.server'
 import {
   account,
   user,
@@ -37,7 +52,10 @@ export async function lockedAccount(tx: AccessTransaction, userId: string) {
     .then((rows) => rows.at(0))
   if (!identity) return null
   const person = await tx
-    .select()
+    .select({
+      ...getTableColumns(employee),
+      effectiveStatus: effectiveEmploymentStatus,
+    })
     .from(employee)
     .where(eq(employee.userId, userId))
     .for('update')
@@ -51,21 +69,37 @@ const accountSummaryColumns = {
   jobTitle: employee.jobTitle,
   roles: user.roles,
   state: user.accessState,
-  employmentStatus: employee.status,
+  employmentStatus: sql<string>`${effectiveEmploymentStatus}`,
 }
 /** Lean list rows: contact details and the working week are read on the single-account page only. */
-export async function queryAccounts(page: number) {
-  const [records, totals] = await Promise.all([
-    db
-      .select(accountSummaryColumns)
-      .from(employee)
-      .innerJoin(user, eq(employee.userId, user.id))
-      .orderBy(asc(employee.fullName), asc(employee.id))
-      .limit(20)
-      .offset((page - 1) * 20),
-    db.select({ count: count() }).from(employee),
-  ])
-  return { records, total: totals.at(0)?.count ?? 0 }
+export async function queryAccounts(search: EmployeeAccountSearch) {
+  const pattern = search.q ? `%${search.q.replace(/[\\%_]/g, '\\$&')}%` : null
+  const filter = and(
+    eq(
+      effectiveEmploymentStatus,
+      search.employment === 'former' ? 'inactive' : 'active',
+    ),
+    pattern
+      ? or(ilike(employee.fullName, pattern), ilike(employee.username, pattern))
+      : undefined,
+  )
+  return db.transaction(
+    async (tx) => {
+      const [records, totals] = await Promise.all([
+        tx
+          .select(accountSummaryColumns)
+          .from(employee)
+          .innerJoin(user, eq(employee.userId, user.id))
+          .where(filter)
+          .orderBy(asc(employee.fullName), asc(employee.id))
+          .limit(20)
+          .offset((search.page - 1) * 20),
+        tx.select({ count: count() }).from(employee).where(filter),
+      ])
+      return { records, total: totals.at(0)?.count ?? 0 }
+    },
+    { isolationLevel: 'repeatable read' },
+  )
 }
 export async function queryAccount(userId: string) {
   return db
@@ -90,7 +124,7 @@ export async function readAccountAccess(userId: string) {
     .select({
       state: user.accessState,
       permissionOverrides: user.permissionOverrides,
-      employment: employee.status,
+      employment: effectiveEmploymentStatus,
       contactEmail: employee.contactEmail,
     })
     .from(user)
@@ -132,7 +166,35 @@ export async function setEmployment(
   userId: string,
   status: 'active' | 'inactive',
 ) {
-  await tx.update(employee).set({ status }).where(eq(employee.userId, userId))
+  await tx
+    .update(employee)
+    .set({ status, departureEffectiveAt: null })
+    .where(eq(employee.userId, userId))
+}
+
+export async function scheduleDeparture(
+  tx: AccessTransaction,
+  userId: string,
+  cutoff: Date,
+) {
+  await tx
+    .update(employee)
+    .set({ departureEffectiveAt: cutoff })
+    .where(eq(employee.userId, userId))
+}
+
+export async function dueDepartures(now: Date) {
+  return db
+    .select({ userId: employee.userId })
+    .from(employee)
+    .where(
+      and(
+        eq(employee.status, 'active'),
+        lte(employee.departureEffectiveAt, now),
+      ),
+    )
+    .orderBy(asc(employee.departureEffectiveAt), asc(employee.id))
+    .limit(50)
 }
 export async function revokeSessions(tx: AccessTransaction, userId: string) {
   await tx.delete(session).where(eq(session.userId, userId))
@@ -249,10 +311,7 @@ export async function setAccountUsername(
   userId: string,
   username: string,
 ) {
-  await tx
-    .update(employee)
-    .set({ username })
-    .where(eq(employee.userId, userId))
+  await tx.update(employee).set({ username }).where(eq(employee.userId, userId))
   await tx.update(user).set({ username }).where(eq(user.id, userId))
 }
 export async function updateEmployeeDetails(
@@ -331,7 +390,7 @@ export async function queryAdminAccounts(search: AdminAccountList) {
             roles: user.roles,
             permissionOverrides: user.permissionOverrides,
             state: user.accessState,
-            employmentStatus: employee.status,
+            employmentStatus: effectiveEmploymentStatus,
           })
           .from(user)
           .leftJoin(employee, eq(employee.userId, user.id))

@@ -1,0 +1,2 @@
+ALTER TABLE "employee" ADD COLUMN "departure_effective_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "employee_pending_departure" ON "employee" USING btree ("departure_effective_at") WHERE "employee"."departure_effective_at" is not null;

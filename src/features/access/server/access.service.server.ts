@@ -10,13 +10,24 @@ import {
   hasEveryPermission,
 } from '#/lib/authorization/permissions'
 import { provisionIdentity } from '#/lib/auth/provisioning.server'
+import { lockAccountManagement } from '#/lib/auth/account-management-lock.server'
 import { initializeEmployeeDayOffBalance } from '#/features/leave/server/day-off-allowance.service.server'
+import {
+  closeEmploymentForDeparture,
+  createInitialEmployeeEmployment,
+  EmploymentError,
+} from '#/features/employees/server/employment.service.server'
+import { endEmploymentSchema } from '#/features/employees/employment.schemas'
+import { closeAttendanceAtDeparture } from '#/features/attendance/server/attendance-reminders.service.server'
 import {
   assignInitialEmployeeWeek,
   readCompanyWeek,
+  readEmployeeWorkLocations,
   replaceEmployeeWeek,
   ScheduleWorkflowError,
+  updateEmployeeWorkLocations,
 } from '#/features/scheduling/server/scheduling.service.server'
+import { canEditOwnEmployeeProfile } from '../access.actions'
 import {
   accountActionSchema,
   accountListSchema,
@@ -64,11 +75,13 @@ async function currentEmployeeManager(
   tx: repository.AccessTransaction,
   actor: Actor,
 ) {
+  // Match platform administration before locking any pair of accounts.
+  await lockAccountManagement(tx)
   const record = await repository.lockedAccount(tx, actor.id)
   if (
     !record ||
     record.identity.accessState !== 'active' ||
-    (record.person && record.person.status !== 'active')
+    (record.person && record.person.effectiveStatus !== 'active')
   )
     throw new AuthorizationError()
   const current = { ...actor, ...currentAuthorization(record.identity) }
@@ -80,10 +93,15 @@ function checkTarget(actor: Actor, id: string, roles: Array<Role>) {
   if (actor.id === id) throw new AuthorizationError()
   if (
     (roles.includes('owner') && !actor.roles.includes('owner')) ||
-    (roles.includes('admin') &&
+    ((roles.includes('admin') || roles.includes('accountant')) &&
       !hasEveryPermission(actor, ['admin.access', 'users.manage']))
   )
     throw new AuthorizationError()
+}
+
+function assertAssignableRoles(actor: Actor, roles: ReadonlyArray<Role>) {
+  if (roles.includes('admin') || roles.includes('accountant'))
+    assertPermissions(actor, ['admin.access', 'users.manage', 'roles.manage'])
 }
 
 async function issueChallenge(
@@ -109,9 +127,11 @@ async function issueChallenge(
 async function createEmployee(
   tx: repository.AccessTransaction,
   input: z.infer<typeof provisionAccountSchema> & { code?: string | null },
-  actorId: string | null,
-  role: Role,
+  manager: Actor | null,
+  roles: ReadonlyArray<Role>,
 ) {
+  const actorId = manager?.id ?? null
+  const storedRoles = [...new Set(roles)].sort().join(',')
   const username = input.code ?? null
   const userId = await provisionIdentity(
     tx,
@@ -133,28 +153,50 @@ async function createEmployee(
     input.dayOffAllowance,
     actorId,
   )
-  if (input.workingWeek !== null) {
-    if (!person || !actorId) throw new AuthorizationError()
-    try {
-      await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
-    } catch (error) {
-      if (error instanceof ScheduleWorkflowError)
-        throw new AccountWorkflowError(error.message)
-      throw error
+  if (!person) throw new AuthorizationError()
+  if (input.employmentStartDate) {
+    if (!manager) throw new AuthorizationError()
+    await createInitialEmployeeEmployment(
+      tx,
+      person.id,
+      manager,
+      input.employmentStartDate,
+    )
+  }
+  try {
+    await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
+    if (input.remoteWeekdays?.length) {
+      if (!actorId) throw new AuthorizationError()
+      await updateEmployeeWorkLocations(
+        person.id,
+        actorId,
+        { remoteWeekdays: input.remoteWeekdays },
+        tx,
+      )
+      await repository.auditAccess(tx, {
+        actorId,
+        targetId: userId,
+        action: 'account.recurring_work_location_updated',
+        reason: `დისტანციური სამუშაო დღეები (ორშაბათი = 1): ${[...input.remoteWeekdays].sort().join(', ')}.`,
+      })
     }
+  } catch (error) {
+    if (error instanceof ScheduleWorkflowError)
+      throw new AccountWorkflowError(error.message)
+    throw error
   }
   await tx
     .update(user)
-    .set({ roles: role })
+    .set({ roles: storedRoles })
     .where(sql`${user.id} = ${userId}`)
   await repository.updateIdentity(tx, userId, 'invited', null)
   const challenge = await issueChallenge(tx, userId, actorId, 'activation')
   await repository.auditAccess(tx, {
     actorId,
     targetId: userId,
-    action: `account.provisioned.${role}`,
+    action: `account.provisioned.${storedRoles}`,
     reason:
-      role === 'owner'
+      storedRoles === 'owner'
         ? 'კომპანიის პირველი მფლობელის პირველადი შექმნა.'
         : 'თანამშრომლის ანგარიშის შექმნა.',
   })
@@ -168,14 +210,8 @@ export async function provisionEmployee(
   const input = provisionAccountSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
-    if (input.role === 'admin') {
-      assertPermissions(manager, [
-        'admin.access',
-        'users.manage',
-        'roles.manage',
-      ])
-    }
-    return createEmployee(tx, input, manager.id, input.role)
+    assertAssignableRoles(manager, input.roles)
+    return createEmployee(tx, input, manager, input.roles)
   })
 }
 
@@ -184,8 +220,7 @@ export async function listEmployeeAccounts(
   untrusted: z.infer<typeof accountListSchema>,
 ) {
   assertPermissions(actor, ['manage.access', 'employees.manage'])
-  const { page } = accountListSchema.parse(untrusted)
-  return repository.queryAccounts(page)
+  return repository.queryAccounts(accountListSchema.parse(untrusted))
 }
 
 export async function readEmployeeAccount(
@@ -196,11 +231,11 @@ export async function readEmployeeAccount(
   const { userId } = accountLookupSchema.parse(untrusted)
   const record = await repository.queryAccount(userId)
   if (!record) return null
-  return {
-    record,
-    // Only needed (and only fetched) when the employee inherits the company week.
-    companyWeek: record.workingWeek ? null : await readCompanyWeek(),
-  }
+  const [companyWeek, workLocations] = await Promise.all([
+    record.workingWeek ? null : readCompanyWeek(),
+    readEmployeeWorkLocations(userId),
+  ])
+  return { record, companyWeek, workLocations }
 }
 
 export async function manageEmployeeAccount(
@@ -220,7 +255,7 @@ export async function manageEmployeeAccount(
       const expected = activation ? 'invited' : 'active'
       if (
         target.identity.accessState !== expected ||
-        target.person.status !== 'active'
+        target.person.effectiveStatus !== 'active'
       )
         throw new AccountWorkflowError(
           'ანგარიშის მიმდინარე სტატუსი ამ მოქმედებას არ უშვებს.',
@@ -238,7 +273,7 @@ export async function manageEmployeeAccount(
     } else {
       if (target.identity.accessState !== 'suspended')
         throw new AccountWorkflowError('ანგარიში შეჩერებული არ არის.')
-      if (target.person.status !== 'active')
+      if (target.person.effectiveStatus !== 'active')
         throw new AccountWorkflowError(
           'ანგარიშის აღდგენამდე საჭიროა დასაქმების სტატუსის აღდგენა.',
         )
@@ -258,6 +293,91 @@ export async function manageEmployeeAccount(
   })
 }
 
+export async function offboardEmployee(
+  actor: Actor | null,
+  untrusted: unknown,
+) {
+  if (!actor) throw new AuthorizationError()
+  const input = endEmploymentSchema.parse(untrusted)
+  return repository.transactAccounts(async (tx) => {
+    const manager = await currentEmployeeManager(tx, actor)
+    assertPermissions(manager, ['employees.employment.manage'])
+    const target = await repository.lockedAccount(tx, input.userId)
+    if (!target?.person)
+      throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
+    checkTarget(manager, input.userId, parseRoles(target.identity.roles))
+    if (target.person.effectiveStatus !== 'active')
+      throw new AccountWorkflowError(
+        'თანამშრომლის დასაქმება უკვე დასრულებულია.',
+      )
+
+    let cutoff: Date | null
+    try {
+      cutoff = await closeEmploymentForDeparture(
+        tx,
+        manager,
+        target.person,
+        input,
+      )
+    } catch (error) {
+      if (error instanceof EmploymentError)
+        throw new AccountWorkflowError(error.message)
+      throw error
+    }
+
+    if (cutoff) await repository.scheduleDeparture(tx, input.userId, cutoff)
+    else await finalizeEmployeeDeparture(tx, input.userId)
+    await repository.auditAccess(tx, {
+      actorId: manager.id,
+      targetId: input.userId,
+      action: cutoff
+        ? 'account.employment_end_scheduled'
+        : 'account.employment_ended',
+      reason: input.reason,
+    })
+    return { endDate: input.endDate, scheduled: cutoff !== null }
+  })
+}
+
+async function finalizeEmployeeDeparture(
+  tx: repository.AccessTransaction,
+  userId: string,
+) {
+  await repository.setEmployment(tx, userId, 'inactive')
+  await repository.updateIdentity(tx, userId, 'suspended')
+  await repository.revokeAccess(tx, userId)
+}
+
+/** Only the internal task runs due departures. Recheck after locking to handle concurrent rescheduling. */
+export async function runScheduledDepartures(now = new Date()) {
+  let completed = 0
+  for (const { userId } of await repository.dueDepartures(now)) {
+    completed += await repository.transactAccounts(async (tx) => {
+      await tx.execute(sql`set local lock_timeout='2s'`)
+      await lockAccountManagement(tx)
+      const target = await repository.lockedAccount(tx, userId)
+      const cutoff = target?.person?.departureEffectiveAt
+      if (
+        !target?.person ||
+        target.person.status !== 'active' ||
+        !cutoff ||
+        cutoff > now
+      )
+        return 0
+      await closeAttendanceAtDeparture(tx, target.person.id, cutoff)
+      await finalizeEmployeeDeparture(tx, userId)
+      await repository.auditAccess(tx, {
+        actorId: null,
+        targetId: userId,
+        action: 'account.employment_ended',
+        reason: 'დასაქმება დასრულდა დაგეგმილ თარიღში.',
+      })
+      return 1
+    })
+  }
+  return completed
+}
+
 export async function editEmployeeDetails(
   actor: Actor,
   untrusted: z.input<typeof employeeDetailsSchema>,
@@ -265,28 +385,39 @@ export async function editEmployeeDetails(
   const input = employeeDetailsSchema.parse(untrusted)
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
+    const editingSelf = manager.id === input.userId
+    const updatesWorkLocation =
+      input.remoteWeekdays !== undefined ||
+      input.workLocationOverride !== undefined
+    if (
+      editingSelf &&
+      (!canEditOwnEmployeeProfile(manager) || input.roles !== undefined)
+    )
+      throw new AuthorizationError()
+    if (input.workingWeek !== undefined || updatesWorkLocation)
+      assertPermissions(manager, ['attendance.configure'])
     const target = await repository.lockedAccount(tx, input.userId)
     if (!target?.person)
       throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
     const targetRoles = parseRoles(target.identity.roles)
-    checkTarget(manager, input.userId, targetRoles)
+    if (!editingSelf) checkTarget(manager, input.userId, targetRoles)
     let roleChanged = false
-    if (input.role !== undefined) {
-      if (targetRoles.length !== 1 || targetRoles.includes('owner'))
+    if (input.roles !== undefined) {
+      if (!targetRoles.length || targetRoles.includes('owner'))
         throw new AccountWorkflowError(
-          'ამ ანგარიშის როლის შეცვლა მხოლოდ წვდომის მართვის გვერდიდანაა შესაძლებელი.',
+          'ამ ანგარიშის როლები წვდომის მართვის გვერდიდან იმართება.',
         )
-      if (input.role !== targetRoles[0]) {
-        if (input.role === 'admin') {
-          assertPermissions(manager, [
-            'admin.access',
-            'users.manage',
-            'roles.manage',
-          ])
-        }
+      if (input.expectedRoles !== target.identity.roles)
+        throw new AccountWorkflowError(
+          'როლები შეიცვალა. განაახლეთ თანამშრომლის მონაცემები და სცადეთ ხელახლა.',
+        )
+      const storedRoles = [...new Set(input.roles)].sort().join(',')
+      if (storedRoles !== [...targetRoles].sort().join(',')) {
+        assertAssignableRoles(manager, targetRoles)
+        assertAssignableRoles(manager, input.roles)
         await tx
           .update(user)
-          .set({ roles: input.role })
+          .set({ roles: storedRoles })
           .where(sql`${user.id} = ${input.userId}`)
         await repository.revokeSessions(tx, input.userId)
         roleChanged = true
@@ -348,26 +479,52 @@ export async function editEmployeeDetails(
         actorId: manager.id,
         targetId: input.userId,
         action: 'account.role_updated',
-        reason: 'თანამშრომლის როლის განახლება.',
+        reason: 'თანამშრომლის როლების განახლება.',
       })
     }
-    if (input.workingWeek === undefined) return
-    // Schedule rights are separate from account management; replaceEmployeeWeek rechecks them against the database.
-    assertPermissions(manager, ['attendance.configure'])
     try {
-      const changed = await replaceEmployeeWeek(
-        target.person.id,
-        input.workingWeek,
-        manager.id,
-        tx,
+      if (
+        input.workingWeek !== undefined &&
+        (await replaceEmployeeWeek(
+          target.person.id,
+          input.workingWeek,
+          manager.id,
+          tx,
+        ))
       )
-      if (changed)
         await repository.auditAccess(tx, {
           actorId: manager.id,
           targetId: input.userId,
           action: 'account.schedule_updated',
           reason: 'თანამშრომლის სამუშაო განრიგის განახლება.',
         })
+      if (updatesWorkLocation) {
+        const override = input.workLocationOverride
+        const result = await updateEmployeeWorkLocations(
+          target.person.id,
+          manager.id,
+          { remoteWeekdays: input.remoteWeekdays, override },
+          tx,
+        )
+        if (result.recurringChanged) {
+          const days = [...(input.remoteWeekdays ?? [])].sort().join(', ')
+          await repository.auditAccess(tx, {
+            actorId: manager.id,
+            targetId: input.userId,
+            action: 'account.recurring_work_location_updated',
+            reason: days
+              ? `დისტანციური სამუშაო დღეები (ორშაბათი = 1): ${days}.`
+              : 'ყოველკვირეული სამუშაო ადგილი: ადგილზე.',
+          })
+        }
+        if (result.dateChanged && override)
+          await repository.auditAccess(tx, {
+            actorId: manager.id,
+            targetId: input.userId,
+            action: 'account.dated_work_location_updated',
+            reason: `${override.date} სამუშაო ადგილი: ${override.remote === null ? 'ჩვეულებრივი განრიგი' : override.remote ? 'დისტანციურად' : 'ადგილზე'}.`,
+          })
+      }
     } catch (error) {
       if (error instanceof ScheduleWorkflowError)
         throw new AccountWorkflowError(error.message)
@@ -408,7 +565,7 @@ async function executeEmployeeSetup(
     const target = await repository.lockedAccount(tx, candidate.userId)
     if (
       !target?.person ||
-      target.person.status !== 'active' ||
+      target.person.effectiveStatus !== 'active' ||
       target.identity.accessState !==
         (purpose === 'activation' ? 'invited' : 'active')
     )
@@ -484,7 +641,7 @@ export async function bootstrapOwner(
     ...provisionAccountSchema.parse({
       name: ownerInput.name,
       contactEmail: ownerInput.contactEmail,
-      role: 'employee',
+      roles: ['employee'],
     }),
     code: ownerInput.code,
   }
@@ -501,7 +658,7 @@ export async function bootstrapOwner(
       throw new AccountWorkflowError(
         'პრივილეგირებული ანგარიში უკვე არსებობს. გამოიყენეთ ანგარიშების მართვის გვერდი.',
       )
-    return createEmployee(tx, input, null, 'owner')
+    return createEmployee(tx, input, null, ['owner'])
   })
 }
 

@@ -90,18 +90,15 @@ export const gpsDeviceSchema = z.object({
       /^(?=[0-9]*[1-9])[0-9]{5,20}$/,
       'მიუთითეთ მოწყობილობის 5-დან 20-მდე ციფრიანი იდენტიფიკატორი.',
     ),
-  phone: gpsPhoneSchema,
-  enabled: z.boolean({ error: 'მიუთითეთ მოწყობილობის სტატუსი.' }),
-})
-export const gpsCreateDeviceSchema = gpsDeviceSchema.extend({
   phone: gpsPhoneSchema.refine(
     (value) => value !== '',
     'მიუთითეთ ტელეფონის ნომერი.',
   ),
+  enabled: z.boolean({ error: 'მიუთითეთ მოწყობილობის სტატუსი.' }),
 })
 export const gpsSaveSchema = z.union(
   [
-    gpsCreateDeviceSchema.extend({ id: z.null(), version: z.null() }),
+    gpsDeviceSchema.extend({ id: z.null(), version: z.null() }),
     gpsDeviceSchema.extend({
       id: z.uuid({ error: 'მოწყობილობა არასწორია.' }),
       version: z

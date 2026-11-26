@@ -379,6 +379,160 @@
       "when": 1795527530105,
       "tag": "0053_job_assignments",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1795549449638,
+      "tag": "0054_payroll_configuration",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1795552801538,
+      "tag": "0055_employee_schedule_history",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1795553815755,
+      "tag": "0056_employee_employment_periods",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1795555703272,
+      "tag": "0057_employee_salary_terms",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1795557805446,
+      "tag": "0058_payroll_calendar_exceptions",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1795559719204,
+      "tag": "0059_bonus_rule_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795561011693,
+      "tag": "0060_award_proposals",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1795581257752,
+      "tag": "0061_award_allocation_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1795587939771,
+      "tag": "0062_bulk_fixed_premiums",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795589596991,
+      "tag": "0063_reviewed_deductions",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1795592367956,
+      "tag": "0064_simple_monthly_payroll",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1795595744124,
+      "tag": "0065_remove_payroll_calendar_and_bonus_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1795601404584,
+      "tag": "0066_bonus_only_monthly_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1795603122690,
+      "tag": "0067_unified_monthly_adjustments",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1795611303959,
+      "tag": "0068_payroll_employee_history_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1795616775564,
+      "tag": "0069_job_geofence_diameter",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1795678217590,
+      "tag": "0070_job_geofence_setting",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1795679783303,
+      "tag": "0071_job_geofence_manual_diameter",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1795680325972,
+      "tag": "0072_payroll_payment_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1795683598300,
+      "tag": "0073_payroll_adjustment_dates",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1795727703400,
+      "tag": "0074_employee_work_locations",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1795735556457,
+      "tag": "0075_scheduled_employee_departure",
+      "breakpoints": true
     }
   ]
 }

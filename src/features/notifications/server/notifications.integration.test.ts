@@ -112,6 +112,7 @@ describe.runIf(enabled)('notification inbox against PostgreSQL', () => {
     })
     expect(result).toEqual({
       unseenCount: 1,
+      totalCount: 1,
       hasMore: false,
       items: [
         {

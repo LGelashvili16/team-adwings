@@ -22,6 +22,7 @@ import type { ReactNode } from 'react'
 import type { MapCamera } from '#/components/ui/map'
 import type {
   JobDetail,
+  JobGeofenceDiameter,
   JobMarker,
   JobSearch,
   JobMapPosition,
@@ -44,6 +45,7 @@ export function JobsMapPanel({
   search,
   pins,
   pinsReady,
+  geofenceDiameter,
   selected,
   canCreate,
   location,
@@ -60,6 +62,7 @@ export function JobsMapPanel({
   search: JobSearch
   pins: Array<JobMarker>
   pinsReady: boolean
+  geofenceDiameter?: JobGeofenceDiameter
   selected?: JobDetail
   canCreate: boolean
   location: ResolvedLocation | null
@@ -75,6 +78,7 @@ export function JobsMapPanel({
   const [expanded, setExpanded] = useState(false)
   const [showPlaces, setShowPlaces] = useState(false)
   const [showBuildings, setShowBuildings] = useState(false)
+  const [showGeofences, setShowGeofences] = useState(true)
   const [showGps, setShowGps] = useState(true)
   const [showCompleted, setShowCompleted] = useState(true)
   // The server also requires these permissions; this only decides whether to offer the layer.
@@ -138,8 +142,11 @@ export function JobsMapPanel({
               onPlacesChange={setShowPlaces}
               showBuildings={showBuildings}
               onBuildingsChange={setShowBuildings}
+              showGeofences={showGeofences}
+              onGeofencesChange={setShowGeofences}
               pins={pins}
               pinsReady={pinsReady}
+              geofenceDiameter={geofenceDiameter}
               initialPin={initialPin.current}
               selected={
                 selected && hasJobCoordinates(selected) ? selected : undefined

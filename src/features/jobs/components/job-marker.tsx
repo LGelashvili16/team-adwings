@@ -7,6 +7,7 @@ import {
   IconUser,
   IconUserPlus,
   IconCalendarDue,
+  IconExclamationMark,
 } from '@tabler/icons-react'
 import { Button } from '#/components/ui/button'
 import { Alert, AlertDescription } from '#/components/ui/alert'
@@ -34,6 +35,9 @@ import type { JobAction } from './job-actions'
 import type { Actor } from '#/lib/authorization/actor'
 import type { JobMarker as Marker } from '../jobs.types'
 
+const jobPinPath =
+  'M22 1C8 1 1 8 1 22c0 10 4 16 12 20 4 2 7 6 9 9 2-3 5-7 9-9 8-4 12-10 12-20C43 8 36 1 22 1Z'
+
 export function JobMarker({
   pin,
   actor,
@@ -60,22 +64,31 @@ export function JobMarker({
   const Icon = kind.icon
   const StatusIcon = status.icon
   const indicators = jobIndicators(pin, now)
-  const indicatorLabel = `${indicators.dueTomorrow ? ', ვადა ხვალ' : ''}${indicators.isNew ? ', ახალი' : ''}`
+  const DeadlineIcon = indicators.isOverdue
+    ? IconExclamationMark
+    : IconCalendarDue
+  const deadlineLabel = indicators.isOverdue
+    ? ', ვადაგადაცილებული'
+    : indicators.dueTomorrow
+      ? ', ვადა ხვალ'
+      : ''
+  const indicatorLabel = `${deadlineLabel}${indicators.isNew ? ', ახალი' : ''}`
   return (
     <>
       <ContextMenu open={open} onOpenChange={setOpen}>
-        <ContextMenuTrigger {...hold} data-job-marker className="pb-2.5">
+        <ContextMenuTrigger
+          {...hold}
+          data-job-marker
+          className="job-pin-trigger"
+        >
           <Button
-            variant="outline"
-            depth="raised"
+            variant="ghost"
             className={cn(
-              'relative size-11 rounded-2xl border-2 p-0 shadow-md',
+              'relative size-11 rounded-2xl border-0 p-0 hover:bg-transparent aria-expanded:bg-transparent focus-visible:ring-0',
               indicators.pulse && 'job-new-pulse',
-              selected &&
-                'ring-4 ring-white/75 ring-offset-2 ring-offset-black/50',
             )}
             style={{
-              ...markerStyle,
+              color: markerStyle.color,
               animationDelay: pin.createdAt
                 ? `${-Math.max(0, pulseMountedAt - Date.parse(pin.createdAt))}ms`
                 : undefined,
@@ -89,6 +102,40 @@ export function JobMarker({
               if (!open) onSelect(pin.id)
             }}
           >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 44 52"
+              className="job-pin-shape absolute inset-x-0 top-0 size-full overflow-visible drop-shadow-md"
+            >
+              <g
+                fill="none"
+                strokeLinejoin="round"
+                className={cn(
+                  'group-focus-visible/button:opacity-100',
+                  !selected && 'opacity-0',
+                )}
+              >
+                <path
+                  d={jobPinPath}
+                  stroke="white"
+                  strokeOpacity=".75"
+                  strokeWidth="14"
+                />
+                <path
+                  d={jobPinPath}
+                  stroke="black"
+                  strokeOpacity=".5"
+                  strokeWidth="6"
+                />
+              </g>
+              <path
+                d={jobPinPath}
+                fill={markerStyle.backgroundColor}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+            </svg>
             {indicators.isNew ? (
               <Badge
                 variant="red-vivid"
@@ -97,23 +144,23 @@ export function JobMarker({
                 ახალი
               </Badge>
             ) : null}
-            {indicators.dueTomorrow ? (
+            {indicators.dueTomorrow || indicators.isOverdue ? (
               <span
                 aria-hidden="true"
-                className="absolute -top-1 -left-1 z-10 flex size-5 items-center justify-center rounded-full border-2 border-background bg-badge-crimson text-badge-crimson-foreground"
+                className={cn(
+                  'absolute -top-1 -left-1 z-10 flex size-5 items-center justify-center rounded-full border-2 border-background',
+                  indicators.isOverdue
+                    ? 'bg-badge-red-vivid text-badge-red-vivid-foreground'
+                    : 'bg-badge-crimson text-badge-crimson-foreground',
+                )}
               >
-                <IconCalendarDue className="size-3" />
+                <DeadlineIcon className="size-3" />
               </span>
             ) : null}
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute -bottom-1.75 left-1/2 size-3.5 -translate-x-1/2 rotate-45 rounded-br-sm border-r-2 border-b-2"
-              style={markerStyle}
-            />
             <Icon className="relative size-5" aria-hidden="true" />
             <span
               aria-hidden="true"
-              className="absolute -right-1 -bottom-1 z-10 flex size-5 items-center justify-center rounded-full border-2"
+              className="absolute -right-0.5 -bottom-0.5 z-10 flex size-5 items-center justify-center rounded-full border-2"
               style={{
                 ...status.markerStyle,
                 borderColor: 'var(--background)',

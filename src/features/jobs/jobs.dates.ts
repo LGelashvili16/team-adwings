@@ -1,14 +1,15 @@
 import { formatGeorgianDate, formatGeorgianShortDate } from '#/lib/date-format'
 
 export const jobsTimeZone = 'Asia/Tbilisi'
+const jobsDayFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: jobsTimeZone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
 
 export function jobsToday(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: jobsTimeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(now)
+  const parts = jobsDayFormat.formatToParts(now)
   const part = (type: string) => parts.find((item) => item.type === type)?.value
   return `${part('year')}-${part('month')}-${part('day')}`
 }

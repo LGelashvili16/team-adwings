@@ -2,15 +2,18 @@ import { Badge } from '#/components/ui/badge'
 import { cn } from '#/lib/utils'
 import { formatDuration, shiftMinutes } from '../scheduling.rules'
 import { weekdayLabels } from './schedule-week-editor'
+import { workLocationLabel } from '../scheduling.content'
 import type { WorkingWeek } from '../scheduling.types'
 
 /** One row per weekday; today's row is highlighted and days off stay readable but muted. */
 export function OwnWeekList({
   week,
   todayWeekday,
+  remoteWeekdays,
 }: {
   week: WorkingWeek
   todayWeekday: number
+  remoteWeekdays?: Array<number>
 }) {
   const ordered = [...week].sort(
     (first, second) => first.weekday - second.weekday,
@@ -32,6 +35,11 @@ export function OwnWeekList({
             <span className="flex flex-wrap items-center gap-2 text-sm font-medium">
               {weekdayLabels[weekday - 1]}
               {today ? <Badge variant="blue">დღეს</Badge> : null}
+              {hours && remoteWeekdays ? (
+                <span className="text-xs text-muted-foreground">
+                  {workLocationLabel(remoteWeekdays.includes(weekday))}
+                </span>
+              ) : null}
             </span>
             {hours ? (
               <span className="flex flex-col items-end gap-1 text-sm text-badge-blue-foreground tabular-nums">

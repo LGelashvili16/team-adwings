@@ -24,8 +24,22 @@ it('keeps ownership, assigned review and confidential permissions separate', () 
     false,
   )
   expect(canManageComplaint(actor('supervisor', 'supervisor'), standard)).toBe(
-    true,
+    false,
   )
+  const scopedReviewer = {
+    id: 'supervisor',
+    authorization: {
+      roles: ['admin'] as Array<Role>,
+      permissionOverrides: {
+        allow: [
+          'complaints.review.assigned',
+        ] as Array<'complaints.review.assigned'>,
+        deny: ['complaints.review.all'] as Array<'complaints.review.all'>,
+      },
+    },
+  }
+  expect(canManageComplaint(scopedReviewer, standard)).toBe(true)
+  expect(canAssignComplaint(scopedReviewer, standard)).toBe(false)
   expect(canAssignComplaint(actor('supervisor', 'supervisor'), standard)).toBe(
     false,
   )

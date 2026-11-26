@@ -79,7 +79,20 @@ beforeEach(() => {
       value: {
         items:
           data.kind === 'teams'
-            ? [{ id: teamId, name: 'სატესტო გუნდი', jobTitle: null }]
+            ? [
+                {
+                  id: teamId,
+                  name: 'სატესტო გუნდი',
+                  jobTitle: null,
+                  memberCount: 2,
+                },
+                {
+                  id: 'empty-team',
+                  name: 'ცარიელი გუნდი',
+                  jobTitle: null,
+                  memberCount: 0,
+                },
+              ]
             : data.kind === 'devices'
               ? [
                   {
@@ -149,6 +162,8 @@ it('keeps changes local until save, deduplicates team members, and saves employe
     within(dialog).getByRole('button', { name: 'დამატებითი პარამეტრები' }),
   )
   await user.click(within(dialog).getByRole('button', { name: 'გუნდი' }))
+  expect(await screen.findByText('2 წევრი')).toBeVisible()
+  expect(screen.getByText('0 წევრი')).toBeVisible()
   await user.click(
     await screen.findByRole('button', { name: 'სატესტო გუნდი არჩევა' }),
   )

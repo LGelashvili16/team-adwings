@@ -13,10 +13,14 @@ it.each([true, false])(
     })
     try {
       expect(nitro.options.scheduledTasks['* * * * *']).toEqual([
+        'employees:departures',
         'attendance:reminders',
       ])
       expect(nitro.options.tasks['attendance:reminders'].handler).toMatch(
         /attendance-reminders\.ts$/,
+      )
+      expect(nitro.options.tasks['employees:departures'].handler).toMatch(
+        /employee-departures\.ts$/,
       )
       expect(
         nitro.options.handlers.some((handler) =>

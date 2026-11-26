@@ -1,9 +1,13 @@
 // @vitest-environment node
 import 'dotenv/config'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import pg from 'pg'
 import { and, count, eq } from 'drizzle-orm'
+import {
+  followingDate,
+  isoWeekday,
+} from '#/features/scheduling/scheduling.rules'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Actor } from '#/lib/authorization/actor'
 import type * as AccessService from './access.service.server'
@@ -99,7 +103,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     return service.provisionEmployee(owner, {
       name,
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
     })
   }
   async function identity(code: string) {
@@ -127,6 +131,21 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     auth.$context.then((context) => context.password.hash(value))
 
   it('bootstraps exactly one privileged owner and keeps public signup closed', async () => {
+    const opening = await testDatabase()
+      .select({
+        source: tables.employeeScheduleVersion.source,
+        actorId: tables.employeeScheduleVersion.actorId,
+        days: tables.employeeScheduleVersion.days,
+      })
+      .from(tables.employeeScheduleVersion)
+      .innerJoin(
+        tables.employee,
+        eq(tables.employee.id, tables.employeeScheduleVersion.employeeId),
+      )
+      .where(eq(tables.employee.userId, owner.id))
+    expect(opening).toEqual([
+      { source: 'provisioned', actorId: null, days: null },
+    ])
     await expect(
       service.bootstrapOwner({
         code: 'second-owner',
@@ -157,7 +176,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
         const issued = await service.provisionEmployee(owner, {
           name: label,
           contactEmail: '',
-          role: 'employee',
+          roles: ['employee'],
           dayOffAllowance: override,
         })
         const record = await identityForCode(issued.code)
@@ -184,6 +203,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     'sales_manager',
     'production_specialist',
     'hr_manager',
+    'accountant',
     'admin',
   ] as const)(
     'provisions and stores the %s role through the employee workflow for owner',
@@ -191,7 +211,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       const issued = await service.provisionEmployee(owner, {
         name: `ტესტის ${role}`,
         contactEmail: '',
-        role,
+        roles: [role],
       })
       const record = await identityForCode(issued.code)
       expect(record.roles).toBe(role)
@@ -203,7 +223,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'HR',
       contactEmail: '',
-      role: 'hr_manager',
+      roles: ['hr_manager'],
     })
     await service.completeEmployeeActivation(
       { code: issued.code, username: 'hr-operator', newPassword: password },
@@ -214,10 +234,24 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const input = {
       name: 'ახალი თანამშრომელი',
       contactEmail: '',
-      role: 'employee' as const,
+      roles: ['employee' as const],
     }
-    const activation = await service.provisionEmployee(hr, input)
+    const startDate = '2026-11-20'
+    const activation = await service.provisionEmployee(hr, {
+      ...input,
+      employmentStartDate: startDate,
+    })
     const worker = await identityForCode(activation.code)
+    const { readEmployeeEmployment } =
+      await import('#/features/employees/server/employment.service.server')
+    expect(
+      await readEmployeeEmployment(hr, { userId: worker.id }),
+    ).toMatchObject({
+      confirmed: true,
+      revision: 1,
+      periods: [{ startDate, endDate: null }],
+      history: [{ action: 'created', after: { startDate, endDate: null } }],
+    })
     expect(
       (await service.listEmployeeAccounts(hr, { page: 1 })).records.some(
         (record) => record.userId === worker.id,
@@ -282,23 +316,64 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
           reason: 'აკრძალული მოქმედების შემოწმება.',
         }),
       ).rejects.toThrow()
-      await expect(
-        service.editEmployeeDetails(hr, {
-          userId,
-          name: 'დაუშვებელი ცვლილება',
-          contactEmail: '',
-        }),
-      ).rejects.toThrow()
     }
+    await expect(
+      service.editEmployeeDetails(hr, {
+        userId: owner.id,
+        name: 'დაუშვებელი ცვლილება',
+        contactEmail: '',
+      }),
+    ).rejects.toThrow()
     const hrSupervisor = await service.provisionEmployee(hr, {
       ...input,
-      role: 'supervisor',
+      roles: ['supervisor'],
     })
     expect((await identityForCode(hrSupervisor.code)).roles).toBe('supervisor')
     await expect(
       service.provisionEmployee(hr, {
         ...input,
-        role: 'admin',
+        roles: ['hr_manager', 'accountant'],
+      }),
+    ).rejects.toThrow()
+    await expect(
+      service.editEmployeeDetails(hr, {
+        userId: worker.id,
+        name: 'აკრძალული მინიჭება',
+        contactEmail: '',
+        roles: ['hr_manager', 'accountant'],
+        expectedRoles: 'employee',
+      }),
+    ).rejects.toThrow()
+    const accountantCode = await service.provisionEmployee(owner, {
+      ...input,
+      roles: ['hr_manager', 'accountant', 'hr_manager'],
+    })
+    const accountantRecord = await identityForCode(accountantCode.code)
+    expect(accountantRecord.roles).toBe('accountant,hr_manager')
+    const editRoles = {
+      ...input,
+      userId: accountantRecord.id,
+      expectedRoles: accountantRecord.roles,
+      roles: ['accountant', 'supervisor'] as Array<'accountant' | 'supervisor'>,
+    }
+    await service.editEmployeeDetails(owner, editRoles)
+    expect((await identityById(accountantRecord.id)).roles).toBe(
+      'accountant,supervisor',
+    )
+    await expect(service.editEmployeeDetails(owner, editRoles)).rejects.toThrow(
+      'როლები შეიცვალა',
+    )
+    await expect(
+      service.manageEmployeeAccount(hr, {
+        userId: accountantRecord.id,
+        action: 'issue_reset',
+        reason: 'აკრძალული წვდომის შემოწმება',
+      }),
+    ).rejects.toThrow()
+    await expect(
+      service.provisionEmployee(hr, {
+        ...input,
+        roles: ['admin'],
       }),
     ).rejects.toThrow()
     // Mutation authority comes from the locked current account, not the caller's stale role projection.
@@ -360,7 +435,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const editWorkerCode = await service.provisionEmployee(owner, {
       name: 'რედაქტირების თანამშრომელი',
       contactEmail: 'edit-worker@example.com',
-      role: 'employee',
+      roles: ['employee'],
     })
     await service.completeEmployeeActivation(
       {
@@ -444,7 +519,6 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     expect((await identity('edit-plain')).email).toMatch(
       /@accounts\.teamwork\.invalid$/,
     )
-    await expect(edit(owner.id)).rejects.toThrow()
   })
 
   it('lets an active employee change only their own phone number', async () => {
@@ -503,7 +577,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'ელფოსტის თანამშრომელი',
       contactEmail: '  Worker@Example.com  ',
-      role: 'employee',
+      roles: ['employee'],
       jobTitle: 'დიზაინერი',
       phone: '+995 555 12 34 56',
     })
@@ -542,7 +616,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(owner, {
         name: 'დუბლიკატი',
         contactEmail: 'WORKER@example.com',
-        role: 'employee',
+        roles: ['employee'],
       }),
     ).rejects.toThrow()
     expect(
@@ -575,7 +649,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const officeIssued = await service.provisionEmployee(owner, {
       name: 'ოფისის თანამშრომელი',
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
       workingWeek: days,
     })
     await service.completeEmployeeActivation(
@@ -607,7 +681,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(owner, {
         name: 'არასწორი კვირა',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
         workingWeek: days.map((day) => ({ ...day, weekday: 1 })),
       }),
     ).rejects.toThrow()
@@ -683,6 +757,167 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     await expect(
       edit(saturdayShift.map((day) => ({ ...day, hours: null }))),
     ).rejects.toThrow()
+  })
+
+  it.each(['owner', 'admin', 'hr_manager', 'employee'] as const)(
+    'enforces the self-edit policy for %s',
+    async (role) => {
+      let target = owner
+      if (role !== 'owner') {
+        const name = `პროფილის ტესტი ${role}`
+        const issued = await service.provisionEmployee(owner, {
+          name,
+          contactEmail: '',
+          roles: [role],
+        })
+        const record = await identityForCode(issued.code)
+        await service.completeEmployeeActivation(
+          {
+            code: issued.code,
+            username: `profile-${role}`,
+            newPassword: password,
+          },
+          hashPassword,
+        )
+        target = { ...owner, id: record.id, name, roles: [role] }
+      }
+
+      const details = {
+        userId: target.id,
+        name: target.name,
+        contactEmail: '',
+        jobTitle: 'განახლებული თანამდებობა',
+        phone: '',
+      }
+      const workingWeek = Array.from({ length: 7 }, (_, index) => ({
+        weekday: index + 1,
+        hours: index === 5 ? { start: '10:00', end: '14:00' } : null,
+      }))
+      const remoteWeekdays = [6]
+      if (role === 'employee') {
+        const staleActor: Actor = { ...target, roles: ['admin'] }
+        await expect(
+          service.editEmployeeDetails(staleActor, {
+            ...details,
+            remoteWeekdays,
+          }),
+        ).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+        })
+        return
+      }
+
+      await expect(
+        service.editEmployeeDetails(target, {
+          ...details,
+          roles: ['employee'],
+          expectedRoles: role,
+        }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+      const account = await service.readEmployeeAccount(target, {
+        userId: target.id,
+      })
+      let date = account!.workLocations.today
+      while (isoWeekday(date) !== 6) date = followingDate(date)
+      const workLocationOverride = { date, remote: false }
+      const schedule = { workingWeek, remoteWeekdays, workLocationOverride }
+      await service.editEmployeeDetails(target, { ...details, ...schedule })
+      expect(
+        await service.readEmployeeAccount(target, { userId: target.id }),
+      ).toMatchObject({
+        record: { jobTitle: details.jobTitle, roles: role, workingWeek },
+        workLocations: { remoteWeekdays, overrides: [workLocationOverride] },
+      })
+
+      await service.editEmployeeDetails(target, {
+        ...details,
+        workingWeek: null,
+      })
+      expect(
+        (await service.readEmployeeAccount(target, { userId: target.id }))
+          ?.record.workingWeek,
+      ).toBeNull()
+
+      if (role === 'admin') {
+        await testDatabase()
+          .update(tables.user)
+          .set({
+            permissionOverrides: { allow: [], deny: ['attendance.configure'] },
+          })
+          .where(eq(tables.user.id, target.id))
+        await expect(
+          service.editEmployeeDetails(target, {
+            ...details,
+            remoteWeekdays: [],
+          }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+        await expect(
+          service.editEmployeeDetails(target, {
+            ...details,
+            workLocationOverride: { date, remote: true },
+          }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+        await service.editEmployeeDetails(target, details)
+      }
+    },
+  )
+
+  it('provisions remote weekdays without copying the company hours and audits changes by HR', async () => {
+    const hrIdentity = await identity('profile-hr_manager')
+    const hr: Actor = { ...owner, id: hrIdentity.id, roles: ['hr_manager'] }
+    const name = 'დისტანციური თანამშრომელი'
+    const issued = await service.provisionEmployee(hr, {
+      name,
+      contactEmail: '',
+      remoteWeekdays: [1],
+    })
+    const { id: userId } = await identityForCode(issued.code)
+    const initial = await service.readEmployeeAccount(hr, { userId })
+    expect(initial).toMatchObject({
+      record: { workingWeek: null },
+      workLocations: { remoteWeekdays: [1], overrides: [] },
+    })
+    const today = initial!.workLocations.today
+    const date = isoWeekday(today) === 7 ? followingDate(today) : today
+    const details = { userId, name, contactEmail: '' }
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      remoteWeekdays: [5],
+      workLocationOverride: { date, remote: true },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations,
+    ).toMatchObject({
+      remoteWeekdays: [5],
+      overrides: [{ date, remote: true }],
+    })
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      workLocationOverride: { date, remote: false },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations
+        .overrides,
+    ).toEqual([{ date, remote: false }])
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      workLocationOverride: { date, remote: null },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations
+        .overrides,
+    ).toEqual([])
+    const audits = await testDatabase()
+      .select()
+      .from(tables.accessAudit)
+      .where(
+        and(
+          eq(tables.accessAudit.targetId, userId),
+          eq(tables.accessAudit.action, 'account.dated_work_location_updated'),
+        ),
+      )
+    expect(audits).toHaveLength(3)
+    expect(audits.every((entry) => entry.actorId === hr.id)).toBe(true)
   })
 
   it('allows only one concurrent consumption and authenticates through Better Auth username login', async () => {
@@ -775,7 +1010,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
       service.provisionEmployee(forged, {
         name: 'ტესტი',
         contactEmail: '',
-        role: 'employee',
+        roles: ['employee'],
       }),
     ).rejects.toThrow()
     await expect(
@@ -936,7 +1171,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'წვდომის ადმინისტრატორი',
       contactEmail: '',
-      role: 'admin',
+      roles: ['admin'],
     })
     await service.completeEmployeeActivation(
       { code: issued.code, username: 'access-admin', newPassword: password },
@@ -947,7 +1182,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const createdByAdmin = await service.provisionEmployee(adminActor, {
       name: 'ადმინის შექმნილი ადმინი',
       contactEmail: '',
-      role: 'admin',
+      roles: ['admin'],
     })
     expect((await identityForCode(createdByAdmin.code)).roles).toBe('admin')
     await testDatabase().insert(tables.user).values({
@@ -1063,7 +1298,7 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     const issued = await service.provisionEmployee(owner, {
       name: 'უფლებების ტესტი',
       contactEmail: '',
-      role: 'employee',
+      roles: ['employee'],
     })
     await service.completeEmployeeActivation(
       {
@@ -1108,9 +1343,9 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     ).toHaveLength(0)
     const attendance =
       await import('#/features/attendance/server/company-attendance.service.server')
-    expect(
-      (await attendance.listCompanyAttendanceUsers(actor, {})).total,
-    ).toBeGreaterThan(0)
+    await expect(
+      attendance.listCompanyAttendanceUsers(actor, {}),
+    ).rejects.toThrow()
     await expect(
       administration.updateAccountAuthorization(owner, {
         ...grant,
@@ -1196,6 +1431,319 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
     ).toBe(0)
     await expect(
       administration.listAdminAccounts(owner, { page: -1 }),
+    ).rejects.toThrow()
+  })
+
+  it('offboards once, revokes login access, and retains dated attendance and payroll eligibility', async () => {
+    const issued = await service.provisionEmployee(owner, {
+      name: 'გასული თანამშრომელი',
+      contactEmail: '',
+      roles: ['employee'],
+      employmentStartDate: '2026-01-02',
+    })
+    await service.completeEmployeeActivation(
+      {
+        code: issued.code,
+        username: 'worker-departure',
+        newPassword: password,
+      },
+      hashPassword,
+    )
+    const worker = await identity('worker-departure')
+    const login = await auth.api.signInUsername({
+      body: { username: 'worker-departure', password },
+    })
+    await service.manageEmployeeAccount(owner, {
+      userId: worker.id,
+      action: 'issue_reset',
+      reason: '',
+    })
+    const [person] = await testDatabase()
+      .select()
+      .from(tables.employee)
+      .where(eq(tables.employee.userId, worker.id))
+    const departure = {
+      userId: worker.id,
+      expectedRevision: 1,
+      startDate: '',
+      endDate: '2026-01-15',
+      reason: 'დასაქმების დასრულება თანამშრომლის მოთხოვნით.',
+    }
+    await expect(
+      service.offboardEmployee(null, departure),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(
+      service.offboardEmployee({ ...owner, id: worker.id }, departure),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(
+      service.offboardEmployee(owner, { ...departure, userId: owner.id }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+    await expect(
+      service.offboardEmployee(owner, { ...departure, expectedRevision: 0 }),
+    ).rejects.toThrow('განაახლეთ')
+
+    const from = new Date('2026-01-15T05:00:00Z')
+    const until = new Date('2026-01-15T13:00:00Z')
+    const [attendance] = await testDatabase()
+      .insert(tables.attendanceSession)
+      .values({
+        employeeId: person.id,
+        requestId: randomUUID(),
+        workDate: departure.endDate,
+        timezone: 'Asia/Tbilisi',
+        scheduleEffectiveFrom: '2026-01-01',
+        expectedStartAt: from,
+        expectedEndAt: until,
+        startedAt: from,
+      })
+      .returning({ id: tables.attendanceSession.id })
+    await expect(service.offboardEmployee(owner, departure)).rejects.toThrow(
+      'ღია დასწრება',
+    )
+    expect((await service.getLoginAccess(worker.id)).allowed).toBe(true)
+
+    await testDatabase()
+      .update(tables.attendanceSession)
+      .set({
+        endedAt: until,
+      })
+      .where(eq(tables.attendanceSession.id, attendance.id))
+    await expect(
+      service.offboardEmployee(owner, { ...departure, endDate: '2026-01-14' }),
+    ).rejects.toThrow('ჩაწერილი დასწრებები')
+    const results = await Promise.allSettled([
+      service.offboardEmployee(owner, departure),
+      service.offboardEmployee(owner, departure),
+    ])
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1)
+    expect((await identityById(worker.id)).accessState).toBe('suspended')
+    expect((await service.getLoginAccess(worker.id)).allowed).toBe(false)
+    expect(
+      await testDatabase()
+        .select()
+        .from(tables.session)
+        .where(eq(tables.session.token, login.token)),
+    ).toHaveLength(0)
+    expect(
+      await testDatabase()
+        .select()
+        .from(tables.accountSetup)
+        .where(eq(tables.accountSetup.userId, worker.id)),
+    ).toHaveLength(0)
+    expect(
+      await testDatabase()
+        .select()
+        .from(tables.accessAudit)
+        .where(
+          and(
+            eq(tables.accessAudit.targetId, worker.id),
+            eq(tables.accessAudit.action, 'account.employment_ended'),
+          ),
+        ),
+    ).toMatchObject([{ actorId: owner.id, reason: departure.reason }])
+
+    const employment =
+      await import('#/features/employees/server/employment.service.server')
+    const [lastDay, later] = await testDatabase().transaction(async (tx) => {
+      const base = { employeeId: person.id }
+      return [
+        await employment.readEmploymentEligibility(tx, {
+          ...base,
+          startDate: departure.endDate,
+          endDate: departure.endDate,
+        }),
+        await employment.readEmploymentEligibility(tx, {
+          ...base,
+          startDate: '2026-01-16',
+          endDate: '2026-01-16',
+        }),
+      ]
+    })
+    expect(lastDay.periods).toEqual([
+      { startDate: '2026-01-02', endDate: departure.endDate },
+    ])
+    expect(later.periods).toEqual([])
+    expect(
+      (await employment.readEmployeeEmployment(owner, { userId: worker.id }))
+        .history[0],
+    ).toMatchObject({
+      reason: departure.reason,
+      before: { endDate: null },
+      after: { endDate: departure.endDate },
+    })
+    const search = { page: 1, q: 'worker-departure' }
+    expect((await service.listEmployeeAccounts(owner, search)).total).toBe(0)
+    expect(
+      (
+        await service.listEmployeeAccounts(owner, {
+          ...search,
+          employment: 'former',
+        })
+      ).records,
+    ).toMatchObject([{ userId: worker.id, employmentStatus: 'inactive' }])
+    const directory =
+      await import('#/features/attendance/server/company-attendance.service.server')
+    expect(
+      (await directory.listCompanyAttendanceUsers(owner, search)).total,
+    ).toBe(0)
+    expect(
+      (
+        await directory.listCompanyAttendanceUsers(owner, {
+          ...search,
+          employment: 'former',
+        })
+      ).items,
+    ).toMatchObject([{ userId: worker.id, attendanceStatus: 'former' }])
+    const timesheets =
+      await import('#/features/timesheets/server/timesheets.service.server')
+    const historical = await timesheets.readTimesheets(
+      owner,
+      { month: '2026-01', userId: worker.id },
+      'company',
+    )
+    expect(historical.rows).toMatchObject([{ date: departure.endDate }])
+  })
+
+  it('requires an explicit start date for an employee with no confirmed periods', async () => {
+    const issued = await provision('თანამშრომელი დადასტურებული თარიღის გარეშე')
+    const worker = await identityForCode(issued.code)
+    const input = {
+      userId: worker.id,
+      expectedRevision: 0,
+      startDate: '',
+      endDate: '2026-01-31',
+      reason: 'დასაქმება დასრულდა.',
+    }
+    await expect(service.offboardEmployee(owner, input)).rejects.toThrow(
+      'დაწყების თარიღი',
+    )
+    await expect(
+      service.offboardEmployee(owner, { ...input, startDate: '2026-01-02' }),
+    ).resolves.toEqual({ endDate: input.endDate, scheduled: false })
+  })
+
+  it('keeps a scheduled employee active until the cutoff and finalizes the departure once', async () => {
+    const issued = await service.provisionEmployee(owner, {
+      name: 'დაგეგმილი დასრულება',
+      contactEmail: '',
+      roles: ['employee'],
+      employmentStartDate: '2026-01-02',
+    })
+    await service.completeEmployeeActivation(
+      {
+        code: issued.code,
+        username: 'scheduled-departure',
+        newPassword: password,
+      },
+      hashPassword,
+    )
+    const worker = await identity('scheduled-departure')
+    const command = {
+      userId: worker.id,
+      startDate: '',
+      endDate: '2099-12-01',
+      reason: 'წინასწარ შეთანხმებული ბოლო სამუშაო დღე.',
+      expectedRevision: 1,
+    }
+    await expect(service.offboardEmployee(owner, command)).resolves.toEqual({
+      endDate: command.endDate,
+      scheduled: true,
+    })
+    await expect(
+      service.offboardEmployee(owner, {
+        ...command,
+        expectedRevision: 2,
+        endDate: '2099-12-02',
+      }),
+    ).resolves.toEqual({ endDate: '2099-12-02', scheduled: true })
+    const [person] = await testDatabase()
+      .select()
+      .from(tables.employee)
+      .where(eq(tables.employee.userId, worker.id))
+    expect(person.status).toBe('active')
+    expect(person.departureEffectiveAt?.toISOString()).toBe(
+      '2099-12-02T20:00:00.000Z',
+    )
+    expect(
+      await service.runScheduledDepartures(
+        new Date('2099-12-02T19:59:59.999Z'),
+      ),
+    ).toBe(0)
+    expect((await service.getLoginAccess(worker.id)).allowed).toBe(true)
+    const login = await auth.api.signInUsername({
+      body: { username: 'scheduled-departure', password },
+    })
+
+    const startsAt = new Date('2099-12-02T17:00:00Z')
+    await testDatabase().insert(tables.attendanceSession).values({
+      employeeId: person.id,
+      requestId: randomUUID(),
+      workDate: '2099-12-02',
+      timezone: 'Asia/Tbilisi',
+      scheduleEffectiveFrom: '2026-01-01',
+      expectedStartAt: startsAt,
+      expectedEndAt: startsAt,
+      startedAt: startsAt,
+    })
+    const cutoff = new Date('2099-12-02T20:00:00Z')
+    const runs = await Promise.all([
+      service.runScheduledDepartures(cutoff),
+      service.runScheduledDepartures(cutoff),
+    ])
+    expect(runs.sort()).toEqual([0, 1])
+    expect((await service.getLoginAccess(worker.id)).allowed).toBe(false)
+    expect(
+      await testDatabase()
+        .select()
+        .from(tables.session)
+        .where(eq(tables.session.token, login.token)),
+    ).toHaveLength(0)
+    expect(
+      await testDatabase()
+        .select()
+        .from(tables.attendanceSession)
+        .where(eq(tables.attendanceSession.employeeId, person.id)),
+    ).toMatchObject([
+      { endedAt: cutoff, autoClosedAt: cutoff, reviewState: 'pending' },
+    ])
+    await expect(
+      auth.api.signInUsername({
+        body: { username: 'scheduled-departure', password },
+      }),
+    ).rejects.toThrow()
+  })
+
+  it('enforces an elapsed departure cutoff before the background task has run', async () => {
+    const issued = await provision('დასრულებული დაგეგმილი თარიღი')
+    const worker = await identityForCode(issued.code)
+    await testDatabase()
+      .update(tables.user)
+      .set({ accessState: 'active' })
+      .where(eq(tables.user.id, worker.id))
+    await testDatabase()
+      .update(tables.employee)
+      .set({ departureEffectiveAt: new Date('2026-01-01T20:00:00Z') })
+      .where(eq(tables.employee.userId, worker.id))
+    expect((await service.getLoginAccess(worker.id)).allowed).toBe(false)
+    expect(
+      (await service.readEmployeeAccount(owner, { userId: worker.id }))?.record
+        .employmentStatus,
+    ).toBe('inactive')
+    await testDatabase()
+      .update(tables.user)
+      .set({ accessState: 'invited' })
+      .where(eq(tables.user.id, worker.id))
+    await expect(
+      service.completeEmployeeActivation(
+        {
+          code: issued.code,
+          username: 'elapsed-departure',
+          newPassword: password,
+        },
+        hashPassword,
+      ),
     ).rejects.toThrow()
   })
 })

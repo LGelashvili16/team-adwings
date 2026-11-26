@@ -45,10 +45,12 @@ export function AccountDirectorySearch({
   search,
   onChange,
   searchLabel = 'თანამშრომლის ძიება',
+  showAccountState = true,
 }: {
   search: Search
   onChange: (search: Search, replace: boolean) => void
   searchLabel?: string
+  showAccountState?: boolean
 }) {
   const id = useId()
   const pending = useRef(new Set<string>())
@@ -146,52 +148,54 @@ export function AccountDirectorySearch({
             </Field>
           )}
         </form.Field>
-        <form.Field name="state">
-          {(field) => (
-            <Field
-              className="w-full sm:w-48"
-              data-invalid={!field.state.meta.isValid}
-            >
-              <FieldLabel htmlFor={`${id}-state`} className="sr-only">
-                ანგარიშის სტატუსი
-              </FieldLabel>
-              <Select
-                value={field.state.value}
-                items={states}
-                onValueChange={(value) => {
-                  const parsed =
-                    accountDirectorySearchSchema.shape.state.safeParse(value)
-                  if (!parsed.success || !parsed.data) return
-                  field.handleChange(parsed.data)
-                  commit(form.getFieldValue('q'), parsed.data, false)
-                }}
+        {showAccountState ? (
+          <form.Field name="state">
+            {(field) => (
+              <Field
+                className="w-full sm:w-48"
+                data-invalid={!field.state.meta.isValid}
               >
-                <SelectTrigger
-                  id={`${id}-state`}
-                  className="w-full shadow-control-raised active:shadow-control-pressed"
-                  aria-label="ანგარიშის სტატუსი"
-                  aria-invalid={!field.state.meta.isValid}
-                  aria-describedby={`${id}-state-error`}
+                <FieldLabel htmlFor={`${id}-state`} className="sr-only">
+                  ანგარიშის სტატუსი
+                </FieldLabel>
+                <Select
+                  value={field.state.value}
+                  items={states}
+                  onValueChange={(value) => {
+                    const parsed =
+                      accountDirectorySearchSchema.shape.state.safeParse(value)
+                    if (!parsed.success || !parsed.data) return
+                    field.handleChange(parsed.data)
+                    commit(form.getFieldValue('q'), parsed.data, false)
+                  }}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {states.map((state) => (
-                      <SelectItem key={state.value} value={state.value}>
-                        {state.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <FieldError
-                id={`${id}-state-error`}
-                errors={field.state.meta.errors}
-              />
-            </Field>
-          )}
-        </form.Field>
+                  <SelectTrigger
+                    id={`${id}-state`}
+                    className="w-full dark:shadow-control-raised dark:active:shadow-control-pressed"
+                    aria-label="ანგარიშის სტატუსი"
+                    aria-invalid={!field.state.meta.isValid}
+                    aria-describedby={`${id}-state-error`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {states.map((state) => (
+                        <SelectItem key={state.value} value={state.value}>
+                          {state.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldError
+                  id={`${id}-state-error`}
+                  errors={field.state.meta.errors}
+                />
+              </Field>
+            )}
+          </form.Field>
+        ) : null}
         {search.q || (search.state && search.state !== 'all') ? (
           <Button
             type="button"

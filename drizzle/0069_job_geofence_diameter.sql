@@ -1,0 +1,2 @@
+ALTER TABLE "job" ADD COLUMN "geofence_diameter" integer;--> statement-breakpoint
+ALTER TABLE "job" ADD CONSTRAINT "job_geofence_valid" CHECK ("job"."geofence_diameter" is null or ("job"."geofence_diameter" in (100, 200) and "job"."longitude" is not null and "job"."latitude" is not null));

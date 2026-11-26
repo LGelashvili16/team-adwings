@@ -9,6 +9,7 @@ import {
   IconUserCircle,
   IconLock,
   IconCalendarCog,
+  IconWallet,
   IconUsers,
   IconUser,
   IconCalendarCheck,
@@ -49,6 +50,7 @@ export const navigationItems = [
     label: 'დასწრება',
     permission: null,
   },
+  { to: '/payroll', icon: IconWallet, label: 'ხელფასი', permission: null },
   {
     to: '/leave',
     icon: IconCalendarOff,
@@ -101,6 +103,12 @@ export const navigationItems = [
     permission: null,
   },
   // Management (high priority first)
+  {
+    to: '/manage/payroll/monthly',
+    icon: IconWallet,
+    label: 'ხელფასები',
+    permission: 'payroll.read.all',
+  },
   {
     to: '/manage/attendance',
     icon: IconClock,
@@ -242,6 +250,11 @@ export const navigationItems = [
 
 export function isNavigationItemActive(pathname: string, destination: string) {
   const path = pathname.replace(/\/$/, '')
+  if (
+    destination === '/manage/payroll' ||
+    destination === '/manage/payroll/monthly'
+  )
+    return path === '/manage/payroll' || path.startsWith('/manage/payroll/')
   if (destination === '/attendance') {
     return (
       path === '/attendance' ||

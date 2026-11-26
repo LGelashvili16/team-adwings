@@ -75,6 +75,21 @@ describe('accent registry and startup restoration', () => {
           `${palette.id} ${mode} selection`,
         ).toBeGreaterThanOrEqual(4.5)
         expect(
+          contrast(tokens.sidebarAccent, tokens.sidebarAccentForeground),
+          `${palette.id} ${mode} sidebar selection`,
+        ).toBeGreaterThanOrEqual(4.5)
+        if (mode === 'light') {
+          // Light active/hover highlights must sit visibly below the #f0f0f0 sidebar surface.
+          expect(
+            luminance(tokens.accent),
+            `${palette.id} light accent separation`,
+          ).toBeLessThan(luminance('#f0f0f0') - 0.05)
+          expect(
+            luminance(tokens.sidebarAccent),
+            `${palette.id} light sidebar accent separation`,
+          ).toBeLessThan(luminance('#f0f0f0') - 0.1)
+        }
+        expect(
           contrast(tokens.primary, background),
           `${palette.id} ${mode} link`,
         ).toBeGreaterThanOrEqual(4.5)

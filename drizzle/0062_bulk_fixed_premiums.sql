@@ -1,0 +1,2 @@
+ALTER TABLE "payroll_award_pool" ADD COLUMN "allocation_mode" text DEFAULT 'shared_pool' NOT NULL;--> statement-breakpoint
+ALTER TABLE "payroll_award_pool" ADD CONSTRAINT "payroll_award_pool_allocation_mode_valid" CHECK ("payroll_award_pool"."allocation_mode" = 'shared_pool' or ("payroll_award_pool"."allocation_mode" = 'per_person' and "payroll_award_pool"."source_type" = 'external'));

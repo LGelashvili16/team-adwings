@@ -4,6 +4,8 @@ import {
   timestamp,
   uniqueIndex,
   check,
+  index,
+  integer,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { user } from '../auth/auth.schema'
@@ -31,14 +33,27 @@ export const employee = pgTable(
     phone: text('phone'),
     /** Active employment permits login; inactive records remain available for restoration. */
     status: text('status').notNull().default('active'),
+    /** UTC midnight after a planned last working day in the company timezone. Null when no departure is pending. */
+    departureEffectiveAt: timestamp('departure_effective_at', {
+      withTimezone: true,
+    }),
+    /** Revision of HR-confirmed payroll eligibility periods; zero means no period changes have been recorded. This is separate from login and employment access state. */
+    employmentRevision: integer('employment_revision').notNull().default(0),
     ...timestamps(),
   },
   (table) => [
     uniqueIndex('employee_username_unique').on(table.username),
     uniqueIndex('employee_one_account').on(table.userId),
+    index('employee_pending_departure')
+      .on(table.departureEffectiveAt)
+      .where(sql`${table.departureEffectiveAt} is not null`),
     check(
       'employee_status_valid',
       sql`${table.status} in ('active', 'inactive')`,
+    ),
+    check(
+      'employee_employment_revision_valid',
+      sql`${table.employmentRevision} >= 0`,
     ),
     check(
       'employee_username_normalized',
@@ -79,7 +94,7 @@ export const accountSetup = pgTable(
 export const accessAudit = pgTable('access_audit', {
   /** PostgreSQL-generated time-ordered audit identifier. */
   id: uuidv7PrimaryKey(),
-  /** Acting account; null identifies an operator-only bootstrap or owner recovery. */
+  /** Acting account; null identifies an automated or operator-only action. */
   actorId: text('actor_id').references(() => user.id, { onDelete: 'restrict' }),
   /** Account whose access changed; history cannot be cascade-deleted with a user. */
   targetId: text('target_id')

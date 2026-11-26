@@ -1,5 +1,18 @@
 import '@tanstack/react-start/server-only'
-import { and, asc, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { db } from '#/db'
 import {
   companySchedule,
@@ -8,16 +21,148 @@ import {
   user,
   employee,
   employeeWorkSchedule,
+  employeeWorkLocation,
 } from '#/db/schema'
 import type { CompanySchedule } from '../scheduling.schemas'
-import { companyLocalDate, sameWorkingWeek } from '../scheduling.rules'
-import type { CompanyWorkday } from '../scheduling.types'
+import {
+  companyLocalDate,
+  isoWeekday,
+  sameWorkingWeek,
+} from '../scheduling.rules'
+import type { CompanyWorkday, WorkLocationPlan } from '../scheduling.types'
 import { employeeWorkingWeekSchema } from '../scheduling.schemas'
 
 export type ScheduleTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
 >[0]
 export const transactSchedules = db.transaction.bind(db)
+
+export async function readWorkLocationPlan(
+  tx: ScheduleTransaction,
+  userId: string,
+  today: string,
+): Promise<WorkLocationPlan> {
+  const rows = await tx
+    .select({
+      weekday: employeeWorkLocation.weekday,
+      date: employeeWorkLocation.date,
+      remote: employeeWorkLocation.remote,
+    })
+    .from(employeeWorkLocation)
+    .innerJoin(employee, eq(employee.id, employeeWorkLocation.employeeId))
+    .where(
+      and(
+        eq(employee.userId, userId),
+        or(
+          isNotNull(employeeWorkLocation.weekday),
+          gte(employeeWorkLocation.date, today),
+        ),
+      ),
+    )
+    .orderBy(asc(employeeWorkLocation.weekday), asc(employeeWorkLocation.date))
+    .limit(27)
+  return {
+    today,
+    remoteWeekdays: rows.flatMap((row) =>
+      row.weekday === null ? [] : [row.weekday],
+    ),
+    overrides: rows.flatMap((row) =>
+      row.date === null ? [] : [{ date: row.date, remote: row.remote }],
+    ),
+  }
+}
+
+export async function readClockEmployeeId(
+  tx: ScheduleTransaction,
+  userId: string,
+) {
+  const rows = await tx
+    .select({ id: employee.id })
+    .from(employee)
+    .where(eq(employee.userId, userId))
+  return rows.at(0)?.id
+}
+
+export async function readRemoteFlag(
+  tx: ScheduleTransaction,
+  employeeId: string,
+  date: string,
+) {
+  const rows = await tx
+    .select({ remote: employeeWorkLocation.remote })
+    .from(employeeWorkLocation)
+    .where(
+      and(
+        eq(employeeWorkLocation.employeeId, employeeId),
+        or(
+          eq(employeeWorkLocation.date, date),
+          eq(employeeWorkLocation.weekday, isoWeekday(date)),
+        ),
+      ),
+    )
+    .orderBy(sql`${employeeWorkLocation.date} is null`)
+    .limit(1)
+  return rows.at(0)?.remote ?? false
+}
+
+/** The employee account transaction locks the target before replacing location entries. */
+export async function replaceRemoteWeekdays(
+  tx: ScheduleTransaction,
+  employeeId: string,
+  weekdays: Array<number>,
+) {
+  const filter = and(
+    eq(employeeWorkLocation.employeeId, employeeId),
+    isNotNull(employeeWorkLocation.weekday),
+  )
+  const rows = await tx
+    .select({ weekday: employeeWorkLocation.weekday })
+    .from(employeeWorkLocation)
+    .where(filter)
+  if (
+    rows.length === weekdays.length &&
+    weekdays.every((day) => rows.some((row) => row.weekday === day))
+  )
+    return false
+  await tx.delete(employeeWorkLocation).where(filter)
+  if (weekdays.length)
+    await tx
+      .insert(employeeWorkLocation)
+      .values(
+        weekdays.map((weekday) => ({ employeeId, weekday, remote: true })),
+      )
+  return true
+}
+
+export async function setWorkLocationOverride(
+  tx: ScheduleTransaction,
+  employeeId: string,
+  date: string,
+  remote: boolean | null,
+) {
+  if (remote === null) {
+    const removed = await tx
+      .delete(employeeWorkLocation)
+      .where(
+        and(
+          eq(employeeWorkLocation.employeeId, employeeId),
+          eq(employeeWorkLocation.date, date),
+        ),
+      )
+      .returning({ date: employeeWorkLocation.date })
+    return removed.length > 0
+  }
+  const saved = await tx
+    .insert(employeeWorkLocation)
+    .values({ employeeId, date, remote })
+    .onConflictDoUpdate({
+      target: [employeeWorkLocation.employeeId, employeeWorkLocation.date],
+      set: { remote },
+      setWhere: sql`${employeeWorkLocation.remote} is distinct from ${remote}`,
+    })
+    .returning({ date: employeeWorkLocation.date })
+  return saved.length > 0
+}
 
 export async function insertEmployeeWeek(
   tx: ScheduleTransaction,
@@ -92,8 +237,9 @@ export async function employeeWorkdayAt(
   now: Date,
   employeeId: string,
   tx: ScheduleTransaction,
+  localDate?: string,
 ): Promise<CompanyWorkday> {
-  const base = await companyWorkdayAt(now, tx)
+  const base = await companyWorkdayAt(now, tx, localDate)
   const assignment = (
     await tx
       .select()
@@ -252,6 +398,7 @@ export async function insertVersion(
 export async function companyWorkdayAt(
   now: Date,
   connection: ScheduleTransaction,
+  localDate?: string,
 ): Promise<CompanyWorkday> {
   // Match the schedule writer's exclusive lock so first-time configuration cannot change timezone/date between these reads.
   await connection.execute(sql`select pg_advisory_xact_lock_shared(812734, 1)`)
@@ -263,7 +410,7 @@ export async function companyWorkdayAt(
       .limit(1)
   ).at(0)
   const timezone = latest?.timezone ?? 'Asia/Tbilisi'
-  const date = companyLocalDate(now, timezone)
+  const date = localDate ?? companyLocalDate(now, timezone)
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay() || 7
   const start = sql`(${date}::date + ${companyScheduleDay.startTime}) at time zone ${companySchedule.timezone}`
   const end = sql`(${date}::date + ${companyScheduleDay.endTime}) at time zone ${companySchedule.timezone}`

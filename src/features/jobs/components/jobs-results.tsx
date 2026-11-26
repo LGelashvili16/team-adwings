@@ -17,6 +17,7 @@ import { formatJobDay } from '../jobs.dates'
 import { hasJobCoordinates } from '../jobs.rules'
 import { JobStatusBadge } from './job-status-badge'
 import { JobKindBadge } from './job-kind-badge'
+import { JobOverdueBadge } from './job-overdue-badge'
 import { Badge } from '#/components/ui/badge'
 import type { JobSearch, JobSummary } from '../jobs.types'
 
@@ -35,7 +36,8 @@ export function JobsEmpty({
     search.q ||
     search.kind !== 'all' ||
     search.status !== 'all' ||
-    search.scope !== 'all',
+    search.scope !== 'all' ||
+    search.deadlineState !== 'all',
   )
   return (
     <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
@@ -115,7 +117,7 @@ export function JobsCards({
                     </span>
                   </p>
                   {job.deadline ? (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                       <IconCalendarDue
                         className="size-4 shrink-0"
                         aria-hidden="true"
@@ -126,6 +128,7 @@ export function JobsCards({
                           {formatJobDay(job.deadline)}
                         </time>
                       </span>
+                      {job.isOverdue ? <JobOverdueBadge /> : null}
                     </p>
                   ) : null}
                 </CardContent>

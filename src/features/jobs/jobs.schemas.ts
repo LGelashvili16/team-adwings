@@ -22,6 +22,24 @@ export const jobStatusSchema = z.enum(
 export const jobKindSchema = z.enum(['installation', 'measurement', 'other'], {
   error: 'სამუშაოს ტიპი არასწორია.',
 })
+export const defaultJobGeofenceDiameter = 200
+const geofenceDiameterError = 'შეიყვანეთ მთელი რიცხვი 1-დან 32767 მეტრამდე.'
+const jobGeofenceDiameterSchema = z
+  .number({ error: geofenceDiameterError })
+  .int(geofenceDiameterError)
+  .min(1, geofenceDiameterError)
+  .max(32767, geofenceDiameterError)
+export const jobGeofenceSettingsSchema = z.object({
+  diameter: jobGeofenceDiameterSchema,
+})
+export const jobGeofenceFormSchema = z.object({
+  diameter: z
+    .string()
+    .trim()
+    .regex(/^\d+$/, geofenceDiameterError)
+    .transform(Number)
+    .pipe(jobGeofenceDiameterSchema),
+})
 export const jobIdSchema = z.uuid({
   error: 'სამუშაოს იდენტიფიკატორი არასწორია.',
 })
@@ -206,6 +224,9 @@ export const jobFilterSchema = z
       error: 'ტიპი არასწორია.',
     }),
     scope: z.enum(['all', 'mine', 'related'], { error: 'ფილტრი არასწორია.' }),
+    deadlineState: z.enum(['all', 'upcoming', 'overdue'], {
+      error: 'ვადის ფილტრი არასწორია.',
+    }),
     sort: z.enum(
       ['newest', 'oldest', 'title', 'deadline_asc', 'deadline_desc'],
       {
@@ -225,7 +246,8 @@ export const jobSearchSchema = z
     status: jobFilterSchema.shape.status.default('all'),
     kind: jobFilterSchema.shape.kind.default('all'),
     scope: jobFilterSchema.shape.scope.default('all'),
-    sort: jobFilterSchema.shape.sort.default('newest'),
+    deadlineState: jobFilterSchema.shape.deadlineState.default('all'),
+    sort: jobFilterSchema.shape.sort.optional(),
     page: z.coerce
       .number({ error: 'გვერდი არასწორია.' })
       .int('გვერდი არასწორია.')
@@ -251,6 +273,8 @@ export const jobSearchSchema = z
   })
   .transform((value) => ({
     ...value,
+    sort:
+      value.sort ?? (value.deadlineState === 'all' ? 'newest' : 'deadline_asc'),
     ...(value.from !== undefined && value.to !== undefined
       ? { from: value.from, to: value.to }
       : jobsMonthRange()),

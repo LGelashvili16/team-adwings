@@ -27,6 +27,10 @@ export function normalizeSetupCode(input: string) {
   return input.replace(/[\s-]/g, '').toUpperCase()
 }
 
+export function replaceUsernameWhitespace(input: string) {
+  return input.replace(/\s+/g, '-')
+}
+
 export function formatSetupCode(code: string) {
   const groups = code.match(new RegExp(`.{1,${setupCodeGroupSize}}`, 'g'))
   return groups ? groups.join('-') : code

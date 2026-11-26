@@ -19,6 +19,7 @@ import { Route as AuthenticatedComplaintsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedLeaveRouteImport } from './routes/_authenticated/leave'
 import { Route as AuthenticatedManageRouteRouteImport } from './routes/_authenticated/manage/route'
 import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
+import { Route as AuthenticatedPayrollRouteImport } from './routes/_authenticated/payroll'
 import { Route as AuthenticatedScheduleRouteImport } from './routes/_authenticated/schedule'
 import { Route as AuthenticatedVacationRouteImport } from './routes/_authenticated/vacation'
 import { Route as ApiEventsRouteImport } from './routes/api/events'
@@ -54,6 +55,7 @@ import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_aut
 import { Route as AuthenticatedTimesheetsIndexRouteImport } from './routes/_authenticated/timesheets/index'
 import { Route as AuthenticatedTimesheetsTimesheetIdRouteImport } from './routes/_authenticated/timesheets/$timesheetId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiPayrollMonthlyPdfRouteImport } from './routes/api/payroll/monthly-pdf'
 import { Route as AuthenticatedAdminSettingsApprovalsRouteImport } from './routes/_authenticated/admin/settings/approvals'
 import { Route as AuthenticatedAdminSettingsCompanyRouteImport } from './routes/_authenticated/admin/settings/company'
 import { Route as AuthenticatedAdminSettingsLeaveRouteImport } from './routes/_authenticated/admin/settings/leave'
@@ -65,6 +67,12 @@ import { Route as AuthenticatedManageAttendanceUserIdRouteImport } from './route
 import { Route as AuthenticatedManageEmployeesIndexRouteImport } from './routes/_authenticated/manage/employees/index'
 import { Route as AuthenticatedManageEmployeesEmployeeIdRouteImport } from './routes/_authenticated/manage/employees/$employeeId'
 import { Route as AuthenticatedManageGpsDeviceIdRouteImport } from './routes/_authenticated/manage/gps_.$deviceId'
+import { Route as AuthenticatedManagePayrollIndexRouteImport } from './routes/_authenticated/manage/payroll/index'
+import { Route as AuthenticatedManagePayrollUserIdRouteImport } from './routes/_authenticated/manage/payroll/$userId'
+import { Route as AuthenticatedManagePayrollMonthlyRouteImport } from './routes/_authenticated/manage/payroll/monthly'
+import { Route as AuthenticatedManagePayrollSettingsRouteImport } from './routes/_authenticated/manage/payroll/settings'
+import { Route as AuthenticatedManagePayrollDeductionsIndexRouteImport } from './routes/_authenticated/manage/payroll/deductions/index'
+import { Route as AuthenticatedManagePayrollDeductionsDeductionIdRouteImport } from './routes/_authenticated/manage/payroll/deductions/$deductionId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -119,6 +127,11 @@ const AuthenticatedNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPayrollRoute = AuthenticatedPayrollRouteImport.update({
+  id: '/payroll',
+  path: '/payroll',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedScheduleRoute = AuthenticatedScheduleRouteImport.update({
   id: '/schedule',
   path: '/schedule',
@@ -315,6 +328,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPayrollMonthlyPdfRoute = ApiPayrollMonthlyPdfRouteImport.update({
+  id: '/api/payroll/monthly-pdf',
+  path: '/api/payroll/monthly-pdf',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedAdminSettingsApprovalsRoute =
   AuthenticatedAdminSettingsApprovalsRouteImport.update({
     id: '/settings/approvals',
@@ -381,6 +399,42 @@ const AuthenticatedManageGpsDeviceIdRoute =
     path: '/gps/$deviceId',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
+const AuthenticatedManagePayrollIndexRoute =
+  AuthenticatedManagePayrollIndexRouteImport.update({
+    id: '/payroll/',
+    path: '/payroll/',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
+const AuthenticatedManagePayrollUserIdRoute =
+  AuthenticatedManagePayrollUserIdRouteImport.update({
+    id: '/payroll/$userId',
+    path: '/payroll/$userId',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
+const AuthenticatedManagePayrollMonthlyRoute =
+  AuthenticatedManagePayrollMonthlyRouteImport.update({
+    id: '/payroll/monthly',
+    path: '/payroll/monthly',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
+const AuthenticatedManagePayrollSettingsRoute =
+  AuthenticatedManagePayrollSettingsRouteImport.update({
+    id: '/payroll/settings',
+    path: '/payroll/settings',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
+const AuthenticatedManagePayrollDeductionsIndexRoute =
+  AuthenticatedManagePayrollDeductionsIndexRouteImport.update({
+    id: '/payroll/deductions/',
+    path: '/payroll/deductions/',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
+const AuthenticatedManagePayrollDeductionsDeductionIdRoute =
+  AuthenticatedManagePayrollDeductionsDeductionIdRouteImport.update({
+    id: '/payroll/deductions/$deductionId',
+    path: '/payroll/deductions/$deductionId',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -392,6 +446,7 @@ export interface FileRoutesByFullPath {
   '/complaints': typeof AuthenticatedComplaintsRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/payroll': typeof AuthenticatedPayrollRoute
   '/schedule': typeof AuthenticatedScheduleRoute
   '/vacation': typeof AuthenticatedVacationRoute
   '/api/events': typeof ApiEventsRoute
@@ -423,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/jobs/': typeof AuthenticatedJobsIndexRoute
@@ -436,8 +492,14 @@ export interface FileRoutesByFullPath {
   '/manage/attendance/$userId': typeof AuthenticatedManageAttendanceUserIdRoute
   '/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
+  '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
+  '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
+  '/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
+  '/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/manage/payroll/deductions/': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -448,6 +510,7 @@ export interface FileRoutesByTo {
   '/complaints': typeof AuthenticatedComplaintsRoute
   '/leave': typeof AuthenticatedLeaveRoute
   '/notifications': typeof AuthenticatedNotificationsRoute
+  '/payroll': typeof AuthenticatedPayrollRoute
   '/schedule': typeof AuthenticatedScheduleRoute
   '/vacation': typeof AuthenticatedVacationRoute
   '/api/events': typeof ApiEventsRoute
@@ -478,6 +541,7 @@ export interface FileRoutesByTo {
   '/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/attendance': typeof AuthenticatedAttendanceIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/jobs': typeof AuthenticatedJobsIndexRoute
@@ -491,8 +555,14 @@ export interface FileRoutesByTo {
   '/manage/attendance/$userId': typeof AuthenticatedManageAttendanceUserIdRoute
   '/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
+  '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
+  '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees': typeof AuthenticatedManageEmployeesIndexRoute
+  '/manage/payroll': typeof AuthenticatedManagePayrollIndexRoute
+  '/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/manage/payroll/deductions': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -506,6 +576,7 @@ export interface FileRoutesById {
   '/_authenticated/complaints': typeof AuthenticatedComplaintsRoute
   '/_authenticated/leave': typeof AuthenticatedLeaveRoute
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/payroll': typeof AuthenticatedPayrollRoute
   '/_authenticated/schedule': typeof AuthenticatedScheduleRoute
   '/_authenticated/vacation': typeof AuthenticatedVacationRoute
   '/api/events': typeof ApiEventsRoute
@@ -537,6 +608,7 @@ export interface FileRoutesById {
   '/_authenticated/settings/security': typeof AuthenticatedSettingsSecurityRoute
   '/_authenticated/timesheets/$timesheetId': typeof AuthenticatedTimesheetsTimesheetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/payroll/monthly-pdf': typeof ApiPayrollMonthlyPdfRoute
   '/_authenticated/attendance/': typeof AuthenticatedAttendanceIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/jobs/': typeof AuthenticatedJobsIndexRoute
@@ -550,8 +622,14 @@ export interface FileRoutesById {
   '/_authenticated/manage/attendance/$userId': typeof AuthenticatedManageAttendanceUserIdRoute
   '/_authenticated/manage/employees/$employeeId': typeof AuthenticatedManageEmployeesEmployeeIdRoute
   '/_authenticated/manage/gps_/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
+  '/_authenticated/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
+  '/_authenticated/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/_authenticated/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/_authenticated/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/_authenticated/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
+  '/_authenticated/manage/payroll/': typeof AuthenticatedManagePayrollIndexRoute
+  '/_authenticated/manage/payroll/deductions/$deductionId': typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  '/_authenticated/manage/payroll/deductions/': typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -565,6 +643,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/leave'
     | '/notifications'
+    | '/payroll'
     | '/schedule'
     | '/vacation'
     | '/api/events'
@@ -596,6 +675,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/attendance/'
     | '/dashboard/'
     | '/jobs/'
@@ -609,8 +689,14 @@ export interface FileRouteTypes {
     | '/manage/attendance/$userId'
     | '/manage/employees/$employeeId'
     | '/manage/gps/$deviceId'
+    | '/manage/payroll/$userId'
+    | '/manage/payroll/monthly'
+    | '/manage/payroll/settings'
     | '/manage/attendance/'
     | '/manage/employees/'
+    | '/manage/payroll/'
+    | '/manage/payroll/deductions/$deductionId'
+    | '/manage/payroll/deductions/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -621,6 +707,7 @@ export interface FileRouteTypes {
     | '/complaints'
     | '/leave'
     | '/notifications'
+    | '/payroll'
     | '/schedule'
     | '/vacation'
     | '/api/events'
@@ -651,6 +738,7 @@ export interface FileRouteTypes {
     | '/settings/security'
     | '/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/attendance'
     | '/dashboard'
     | '/jobs'
@@ -664,8 +752,14 @@ export interface FileRouteTypes {
     | '/manage/attendance/$userId'
     | '/manage/employees/$employeeId'
     | '/manage/gps/$deviceId'
+    | '/manage/payroll/$userId'
+    | '/manage/payroll/monthly'
+    | '/manage/payroll/settings'
     | '/manage/attendance'
     | '/manage/employees'
+    | '/manage/payroll'
+    | '/manage/payroll/deductions/$deductionId'
+    | '/manage/payroll/deductions'
   id:
     | '__root__'
     | '/'
@@ -678,6 +772,7 @@ export interface FileRouteTypes {
     | '/_authenticated/complaints'
     | '/_authenticated/leave'
     | '/_authenticated/notifications'
+    | '/_authenticated/payroll'
     | '/_authenticated/schedule'
     | '/_authenticated/vacation'
     | '/api/events'
@@ -709,6 +804,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/security'
     | '/_authenticated/timesheets/$timesheetId'
     | '/api/auth/$'
+    | '/api/payroll/monthly-pdf'
     | '/_authenticated/attendance/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/jobs/'
@@ -722,8 +818,14 @@ export interface FileRouteTypes {
     | '/_authenticated/manage/attendance/$userId'
     | '/_authenticated/manage/employees/$employeeId'
     | '/_authenticated/manage/gps_/$deviceId'
+    | '/_authenticated/manage/payroll/$userId'
+    | '/_authenticated/manage/payroll/monthly'
+    | '/_authenticated/manage/payroll/settings'
     | '/_authenticated/manage/attendance/'
     | '/_authenticated/manage/employees/'
+    | '/_authenticated/manage/payroll/'
+    | '/_authenticated/manage/payroll/deductions/$deductionId'
+    | '/_authenticated/manage/payroll/deductions/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -733,6 +835,7 @@ export interface RootRouteChildren {
   ApiEventsRoute: typeof ApiEventsRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiPayrollMonthlyPdfRoute: typeof ApiPayrollMonthlyPdfRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -805,6 +908,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payroll': {
+      id: '/_authenticated/payroll'
+      path: '/payroll'
+      fullPath: '/payroll'
+      preLoaderRoute: typeof AuthenticatedPayrollRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/schedule': {
@@ -1052,6 +1162,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/payroll/monthly-pdf': {
+      id: '/api/payroll/monthly-pdf'
+      path: '/api/payroll/monthly-pdf'
+      fullPath: '/api/payroll/monthly-pdf'
+      preLoaderRoute: typeof ApiPayrollMonthlyPdfRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/admin/settings/approvals': {
       id: '/_authenticated/admin/settings/approvals'
       path: '/settings/approvals'
@@ -1127,6 +1244,48 @@ declare module '@tanstack/react-router' {
       path: '/gps/$deviceId'
       fullPath: '/manage/gps/$deviceId'
       preLoaderRoute: typeof AuthenticatedManageGpsDeviceIdRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/': {
+      id: '/_authenticated/manage/payroll/'
+      path: '/payroll'
+      fullPath: '/manage/payroll/'
+      preLoaderRoute: typeof AuthenticatedManagePayrollIndexRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/$userId': {
+      id: '/_authenticated/manage/payroll/$userId'
+      path: '/payroll/$userId'
+      fullPath: '/manage/payroll/$userId'
+      preLoaderRoute: typeof AuthenticatedManagePayrollUserIdRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/monthly': {
+      id: '/_authenticated/manage/payroll/monthly'
+      path: '/payroll/monthly'
+      fullPath: '/manage/payroll/monthly'
+      preLoaderRoute: typeof AuthenticatedManagePayrollMonthlyRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/settings': {
+      id: '/_authenticated/manage/payroll/settings'
+      path: '/payroll/settings'
+      fullPath: '/manage/payroll/settings'
+      preLoaderRoute: typeof AuthenticatedManagePayrollSettingsRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/deductions/': {
+      id: '/_authenticated/manage/payroll/deductions/'
+      path: '/payroll/deductions'
+      fullPath: '/manage/payroll/deductions/'
+      preLoaderRoute: typeof AuthenticatedManagePayrollDeductionsIndexRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
+    '/_authenticated/manage/payroll/deductions/$deductionId': {
+      id: '/_authenticated/manage/payroll/deductions/$deductionId'
+      path: '/payroll/deductions/$deductionId'
+      fullPath: '/manage/payroll/deductions/$deductionId'
+      preLoaderRoute: typeof AuthenticatedManagePayrollDeductionsDeductionIdRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
   }
@@ -1221,7 +1380,13 @@ interface AuthenticatedManageRouteRouteChildren {
   AuthenticatedManageVacationsRoute: typeof AuthenticatedManageVacationsRoute
   AuthenticatedManageEmployeesEmployeeIdRoute: typeof AuthenticatedManageEmployeesEmployeeIdRoute
   AuthenticatedManageGpsDeviceIdRoute: typeof AuthenticatedManageGpsDeviceIdRoute
+  AuthenticatedManagePayrollUserIdRoute: typeof AuthenticatedManagePayrollUserIdRoute
+  AuthenticatedManagePayrollMonthlyRoute: typeof AuthenticatedManagePayrollMonthlyRoute
+  AuthenticatedManagePayrollSettingsRoute: typeof AuthenticatedManagePayrollSettingsRoute
   AuthenticatedManageEmployeesIndexRoute: typeof AuthenticatedManageEmployeesIndexRoute
+  AuthenticatedManagePayrollIndexRoute: typeof AuthenticatedManagePayrollIndexRoute
+  AuthenticatedManagePayrollDeductionsDeductionIdRoute: typeof AuthenticatedManagePayrollDeductionsDeductionIdRoute
+  AuthenticatedManagePayrollDeductionsIndexRoute: typeof AuthenticatedManagePayrollDeductionsIndexRoute
 }
 
 const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildren =
@@ -1241,8 +1406,19 @@ const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildr
     AuthenticatedManageEmployeesEmployeeIdRoute:
       AuthenticatedManageEmployeesEmployeeIdRoute,
     AuthenticatedManageGpsDeviceIdRoute: AuthenticatedManageGpsDeviceIdRoute,
+    AuthenticatedManagePayrollUserIdRoute:
+      AuthenticatedManagePayrollUserIdRoute,
+    AuthenticatedManagePayrollMonthlyRoute:
+      AuthenticatedManagePayrollMonthlyRoute,
+    AuthenticatedManagePayrollSettingsRoute:
+      AuthenticatedManagePayrollSettingsRoute,
     AuthenticatedManageEmployeesIndexRoute:
       AuthenticatedManageEmployeesIndexRoute,
+    AuthenticatedManagePayrollIndexRoute: AuthenticatedManagePayrollIndexRoute,
+    AuthenticatedManagePayrollDeductionsDeductionIdRoute:
+      AuthenticatedManagePayrollDeductionsDeductionIdRoute,
+    AuthenticatedManagePayrollDeductionsIndexRoute:
+      AuthenticatedManagePayrollDeductionsIndexRoute,
   }
 
 const AuthenticatedManageRouteRouteWithChildren =
@@ -1258,6 +1434,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedComplaintsRoute: typeof AuthenticatedComplaintsRoute
   AuthenticatedLeaveRoute: typeof AuthenticatedLeaveRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedPayrollRoute: typeof AuthenticatedPayrollRoute
   AuthenticatedScheduleRoute: typeof AuthenticatedScheduleRoute
   AuthenticatedVacationRoute: typeof AuthenticatedVacationRoute
   AuthenticatedSettingsProfileRoute: typeof AuthenticatedSettingsProfileRoute
@@ -1277,6 +1454,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedComplaintsRoute: AuthenticatedComplaintsRoute,
   AuthenticatedLeaveRoute: AuthenticatedLeaveRoute,
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedPayrollRoute: AuthenticatedPayrollRoute,
   AuthenticatedScheduleRoute: AuthenticatedScheduleRoute,
   AuthenticatedVacationRoute: AuthenticatedVacationRoute,
   AuthenticatedSettingsProfileRoute: AuthenticatedSettingsProfileRoute,
@@ -1320,6 +1498,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiEventsRoute: ApiEventsRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiPayrollMonthlyPdfRoute: ApiPayrollMonthlyPdfRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

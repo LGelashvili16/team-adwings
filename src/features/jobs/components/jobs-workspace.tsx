@@ -220,6 +220,9 @@ export function JobsWorkspace({
               actor={actor}
               search={search}
               pins={records?.markers ?? noMarkers}
+              geofenceDiameter={
+                records?.geofenceDiameter ?? selected.data?.geofenceDiameter
+              }
               pinsReady={Boolean(records) && !query.isFetching}
               selected={selected.data}
               canCreate={manager}

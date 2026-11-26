@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { payrollMonthSchema } from '#/features/payroll/salary.schemas'
 
 export const markAllNotificationsSeenSchema = z.strictObject(
   {},
@@ -28,6 +29,7 @@ export const notificationDestinationSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('devices') }).strict(),
   z.object({ kind: z.literal('security') }).strict(),
   z.object({ kind: z.literal('attendance_clock') }).strict(),
+  z.strictObject({ kind: z.literal('payroll'), month: payrollMonthSchema }),
 ])
 export const deliverNotificationsSchema = z
   .object({

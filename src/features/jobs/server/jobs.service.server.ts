@@ -1,6 +1,10 @@
-import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
+import {
+  deliverNotificationBatch,
+  deliverNotifications,
+} from '#/features/notifications/server/notifications.service.server'
 import { readJobNotificationRoles } from '#/features/notifications/server/notification-settings.service.server'
 import { signalRealtime } from '#/lib/realtime/postgres-events.server'
+import { assertPermissions } from '#/lib/authorization/access'
 import '@tanstack/react-start/server-only'
 import {
   createJobSchema,
@@ -11,6 +15,7 @@ import {
   jobAssignmentsSchema,
   jobAssignmentSearchSchema,
   jobAssignmentTeamSchema,
+  jobGeofenceSettingsSchema,
 } from '../jobs.schemas'
 import {
   hasJobCoordinates,
@@ -164,6 +169,7 @@ export async function saveCompanyJobAssignments(
       eventKey: `job:${record.id}:${record.version + 1}:assignments`,
       title: 'სამუშაოს შემსრულებლები შეიცვალა',
       body: 'გადაამოწმეთ სამუშაოზე დამატებული თანამშრომლები, გუნდი და GPS მოწყობილობა.',
+      assignmentChange: { before, after },
     })
     return { id: record.id }
   })
@@ -179,6 +185,7 @@ export async function listCompanyJobs(
       const result = await repository.listJobs(tx, current.id, search)
       return {
         ...result,
+        geofenceDiameter: (await repository.readGeofenceSetting(tx)).diameter,
         markers: result.markers.map((marker) => ({
           ...marker,
           createdAt: marker.createdAt.toISOString(),
@@ -205,6 +212,7 @@ export async function getCompanyJob(
       if (!record) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
       return {
         ...record,
+        geofenceDiameter: (await repository.readGeofenceSetting(tx)).diameter,
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         locationResolvedAt: record.locationResolvedAt?.toISOString() ?? null,
@@ -220,6 +228,33 @@ export async function getCompanyJob(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
+}
+export async function getCompanyJobGeofenceSettings(actor: Actor | null) {
+  return repository.transactJobs(
+    async (tx) => {
+      await requireJobActor(tx, actor)
+      return repository.readGeofenceSetting(tx)
+    },
+    { accessMode: 'read only' },
+  )
+}
+
+export async function saveCompanyJobGeofenceSettings(
+  actor: Actor | null,
+  input: unknown,
+) {
+  const { diameter } = validateInput(jobGeofenceSettingsSchema, input)
+  return repository.transactJobs(async (tx) => {
+    const current = await requireJobActor(tx, actor, true)
+    assertPermissions(current, ['manage.access', 'gps.read', 'gps.manage'])
+    const { setting, changed } = await repository.saveGeofenceSetting(
+      tx,
+      current.id,
+      diameter,
+    )
+    if (changed) await signalRealtime(tx, { topic: 'jobs' })
+    return setting
+  })
 }
 export async function getUnreadCompanyJobs(actor: Actor | null) {
   return repository.transactJobs(
@@ -344,6 +379,8 @@ export async function editCompanyJob(actor: Actor | null, input: unknown) {
       address: data.address,
       kind: data.kind,
       deadline: data.deadline,
+      // The legacy diameter constraint still requires coordinates.
+      ...(hasJobCoordinates(data) ? {} : { geofenceDiameter: null }),
       longitude: data.longitude,
       latitude: data.latitude,
       version: record.version + 1,
@@ -433,7 +470,7 @@ const jobStatusNotificationTitles = {
   rejected: 'სამუშაო უარყოფილია',
 }
 
-/** Each job change uses one policy and one deduplicated delivery path inside the owning transaction. */
+/** Personal assignment alerts and configured broadcasts share one transaction and event identity. */
 async function notifyJobEvent(
   tx: repository.JobsTransaction,
   actor: Actor,
@@ -442,21 +479,48 @@ async function notifyJobEvent(
     eventKey: string
     title: string
     body: string
+    assignmentChange?: { before: JobAssignments; after: JobAssignments }
   },
 ) {
   const roles = await readJobNotificationRoles(tx)
-  if (!roles.length) return
+  if (!roles.length && !event.assignmentChange) return
   const job = await repository.jobNotificationDetails(tx, event.jobId)
   if (!job) throw new JobWorkflowError('სამუშაო ვერ მოიძებნა.')
-  const body = [
+  const details = [
     `სამუშაო: ${job.title}`,
     `შემქმნელი: ${job.creatorName}`,
     `მისამართი: ${job.address || 'არ არის მითითებული'}`,
     ...(job.deadline ? [`ვადა: ${formatJobDay(job.deadline)}`] : []),
-    event.body,
   ]
-    .join('\n')
-    .slice(0, 2000)
+  const destination = { kind: 'job' as const, jobId: event.jobId }
+  if (event.assignmentChange) {
+    const { before, after } = event.assignmentChange
+    const beforeIds = new Set(before.employees.map((person) => person.id))
+    const afterIds = new Set(after.employees.map((person) => person.id))
+    const personal = {
+      eventKey: event.eventKey,
+      actorId: actor.id,
+      body: [...details, `ცვლილება შეასრულა: ${actor.name}`]
+        .join('\n')
+        .slice(0, 2000),
+      destination,
+    }
+    // Deliver personal messages first; event deduplication suppresses the generic message for the same recipient.
+    await deliverNotificationBatch(tx, [
+      {
+        ...personal,
+        recipientIds: [...afterIds].filter((id) => !beforeIds.has(id)),
+        title: 'სამუშაოზე დაგამატეს',
+      },
+      {
+        ...personal,
+        recipientIds: [...beforeIds].filter((id) => !afterIds.has(id)),
+        title: 'სამუშაოდან მოგხსნეს',
+      },
+    ])
+  }
+  if (!roles.length) return
+  const body = [...details, event.body].join('\n').slice(0, 2000)
   const includeOwn = actor.roles.some(
     (role) => role === 'admin' || role === 'owner',
   )
@@ -467,7 +531,7 @@ async function notifyJobEvent(
       eventKey: event.eventKey,
       title: event.title,
       body,
-      destination: { kind: 'job' as const, jobId: event.jobId },
+      destination,
     }
     await deliverNotifications(tx, {
       ...delivery,

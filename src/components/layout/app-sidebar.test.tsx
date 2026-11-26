@@ -55,6 +55,42 @@ function renderSidebar(
 }
 
 describe('workspace navigation', () => {
+  it('gives accountants payroll access without a settings shortcut or account administration', () => {
+    renderSidebar('accountant')
+    expect(screen.getByRole('link', { name: 'ხელფასი' })).toHaveAttribute(
+      'href',
+      '/payroll',
+    )
+    expect(screen.getByRole('link', { name: 'ხელფასები' })).toHaveAttribute(
+      'href',
+      '/manage/payroll/monthly',
+    )
+    expect(
+      screen.queryByRole('link', { name: 'ხელფასების პარამეტრები' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'მომხმარებლების წვდომა' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'თანამშრომლები' }),
+    ).not.toBeInTheDocument()
+  })
+  it('keeps HR on personal payroll even with management payroll overrides', () => {
+    renderSidebar('hr_manager', false, {
+      allow: ['payroll.read.all', 'payroll.configure'],
+      deny: [],
+    })
+    expect(screen.getByRole('link', { name: 'ხელფასი' })).toHaveAttribute(
+      'href',
+      '/payroll',
+    )
+    expect(
+      screen.queryByRole('link', { name: 'ხელფასები' }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'ხელფასების პარამეტრები' }),
+    ).not.toBeInTheDocument()
+  })
   it('shows an accessible jobs dot only when this account has unread jobs', () => {
     const view = renderSidebar(
       'employee',
@@ -245,6 +281,7 @@ describe('workspace navigation', () => {
         ),
       ).map((link) => link.textContent.trim()),
     ).toEqual([
+      'ხელფასები',
       'დასწრებები',
       'თანამშრომლები',
       'გუნდები',
@@ -328,7 +365,7 @@ describe('workspace navigation', () => {
       ).not.toBeInTheDocument()
     },
   )
-  it.each(['owner', 'supervisor'] as const)(
+  it.each(['owner', 'hr_manager'] as const)(
     'uses one attendance workspace for %s without duplicate management routes',
     (role) => {
       location.pathname = '/manage/attendance/worker'
@@ -347,6 +384,50 @@ describe('workspace navigation', () => {
       expect(
         screen.getByRole('link', { name: 'სამუშაოების რუკა' }),
       ).toHaveAttribute('href', '/jobs')
+    },
+  )
+  it.each([
+    { roles: ['supervisor'], paths: ['teams', 'gps'] },
+    {
+      roles: ['hr_manager'],
+      paths: [
+        'attendance',
+        'employees',
+        'gps',
+        'devices',
+        'leave',
+        'schedule',
+        'announcements',
+        'complaints',
+        'reports',
+      ],
+    },
+    {
+      roles: ['accountant', 'hr_manager'],
+      paths: [
+        'payroll/monthly',
+        'attendance',
+        'employees',
+        'gps',
+        'devices',
+        'leave',
+        'schedule',
+        'announcements',
+        'complaints',
+        'reports',
+      ],
+    },
+    { roles: ['sales_manager'], paths: [] },
+    { roles: ['production_specialist'], paths: [] },
+  ] satisfies Array<{ roles: Array<Role>; paths: Array<string> }>)(
+    'renders exactly the management pages granted to $roles',
+    ({ roles, paths }) => {
+      const { container } = renderSidebar(roles)
+      expect(
+        Array.from(container.querySelectorAll('a[href^="/manage/"]'), (link) =>
+          link.getAttribute('href'),
+        ),
+      ).toEqual(paths.map((path) => `/manage/${path}`))
     },
   )
   it.each(['admin', 'owner'] as const)(
@@ -393,6 +474,7 @@ describe('workspace navigation', () => {
       'მთავარი',
       'სამუშაოების რუკა',
       'დასწრება',
+      'ხელფასი',
       'შვებულება & ბიულეტენი',
       'ჩემი განრიგი',
       'შეტყობინებები',

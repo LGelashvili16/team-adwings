@@ -8,3 +8,5 @@ export const schedulingContent = {
     description: 'კომპანიის სამუშაო განრიგი, დასწრების წესები და შეხსენებები.',
   },
 } as const
+export const workLocationLabel = (remote: boolean) =>
+  remote ? 'დისტანციურად' : 'ადგილზე'

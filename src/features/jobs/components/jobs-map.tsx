@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   IconFocus2,
   IconMapPin,
@@ -9,6 +9,7 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconCircleCheck,
+  IconCircleDashed,
 } from '@tabler/icons-react'
 import { Map, MapControls, MapMarker, useMap } from '#/components/ui/map'
 import { Button } from '#/components/ui/button'
@@ -17,14 +18,22 @@ import { cn } from '#/lib/utils'
 import { JobsMapMenu, MapContextLocation } from './jobs-map-menu'
 import { JobMarker as JobMapMarker } from './job-marker'
 import { jobIndicators, jobMarkerPriority } from '../jobs.indicators'
+import { jobGeofenceRing } from '../jobs.geofence'
+import { defaultJobGeofenceDiameter } from '../jobs.schemas'
+import { JobsGeofenceLayer } from './jobs-geofence-layer'
 import type { Actor } from '#/lib/authorization/actor'
-import type { JobMapPosition, JobMarker } from '../jobs.types'
+import type {
+  JobGeofenceDiameter,
+  JobMapPosition,
+  JobMarker,
+} from '../jobs.types'
 import type { ReactNode, RefObject } from 'react'
 import type { MapCamera } from '#/components/ui/map'
 import type { ResolvedLocation } from '../job-locations.types'
 
 // Markers anchor at their bottom edge; reserve their height as well as the top controls.
 const fitPadding = { top: 112, right: 128, bottom: 80, left: 64 }
+const geofenceFocusPadding = 52
 
 function MapFocus({
   pins,
@@ -38,6 +47,8 @@ function MapFocus({
   focusRequest,
   actor,
   controls,
+  showGeofences,
+  geofenceDiameter,
   expanded,
   onExpand,
 }: {
@@ -52,6 +63,8 @@ function MapFocus({
   focusRequest: number
   actor: Actor
   controls?: ReactNode
+  showGeofences: boolean
+  geofenceDiameter: JobGeofenceDiameter
   expanded: boolean
   onExpand: () => void
 }) {
@@ -81,7 +94,8 @@ function MapFocus({
     initialized.current = true
     if (
       location ||
-      (selected && (selected.id !== initialPin || focusRequest > 0)) ||
+      (selected &&
+        (showGeofences || selected.id !== initialPin || focusRequest > 0)) ||
       !pins.length
     )
       return
@@ -107,9 +121,11 @@ function MapFocus({
     selected,
     initialPin,
     focusRequest,
+    showGeofences,
   ])
   useEffect(() => {
     const target = location ?? selected
+    const fitGeofence = showGeofences && Boolean(selected) && !location
     const key = target
       ? [
           focusRequest,
@@ -121,17 +137,38 @@ function MapFocus({
     // The map is recreated in the expanded dialog. A previously focused result must not reset the restored camera.
     if (focused.current === key) return
     focused.current = key
-    if (selected?.id === initialPin && !location && focusRequest === 0) return
-    if (target)
+    if (
+      !target ||
+      (selected?.id === initialPin &&
+        !location &&
+        focusRequest === 0 &&
+        !fitGeofence)
+    )
+      return
+    const duration = window.matchMedia('(prefers-reduced-motion: reduce)')
+      .matches
+      ? 0
+      : 500
+    if (fitGeofence) {
+      const bounds = new library.LngLatBounds()
+      for (const point of jobGeofenceRing(target, geofenceDiameter))
+        bounds.extend(point)
+      map.fitBounds(bounds, {
+        padding: geofenceFocusPadding,
+        maxZoom: 17,
+        duration,
+        linear: true,
+      })
+    } else {
       map.flyTo({
         center: [target.longitude, target.latitude],
         zoom: Math.max(map.getZoom(), 13),
-        duration: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 0
-          : 500,
+        duration,
       })
+    }
   }, [
     map,
+    library,
     selected?.id,
     selected?.longitude,
     selected?.latitude,
@@ -141,13 +178,31 @@ function MapFocus({
     focused,
     focusRequest,
     initialPin,
+    showGeofences,
+    geofenceDiameter,
   ])
-  const visiblePins =
-    selected && !pins.some((pin) => pin.id === selected.id)
-      ? [...pins, selected]
-      : pins
+  const visiblePins = useMemo(() => {
+    if (!selected) return pins
+    return pins.some((pin) => pin.id === selected.id)
+      ? pins.map((pin) =>
+          pin.id === selected.id
+            ? {
+                ...pin,
+                longitude: selected.longitude,
+                latitude: selected.latitude,
+              }
+            : pin,
+        )
+      : [...pins, selected]
+  }, [pins, selected])
   return (
     <>
+      <JobsGeofenceLayer
+        pins={visiblePins}
+        selectedId={selected?.id}
+        visible={showGeofences}
+        diameter={geofenceDiameter}
+      />
       {location ? (
         <MapMarker longitude={location.longitude} latitude={location.latitude}>
           <span
@@ -268,6 +323,9 @@ export default function JobsMap({
   onPlacesChange,
   showBuildings,
   onBuildingsChange,
+  showGeofences = true,
+  geofenceDiameter = defaultJobGeofenceDiameter,
+  onGeofencesChange,
   showCompleted = true,
   onCompletedChange,
   controlExtras,
@@ -292,6 +350,9 @@ export default function JobsMap({
   onPlacesChange: (show: boolean) => void
   showBuildings: boolean
   onBuildingsChange: (show: boolean) => void
+  showGeofences?: boolean
+  geofenceDiameter?: JobGeofenceDiameter
+  onGeofencesChange?: (show: boolean) => void
   showCompleted?: boolean
   onCompletedChange?: (show: boolean) => void
   controlExtras?: ReactNode
@@ -320,6 +381,8 @@ export default function JobsMap({
         actor={actor}
         expanded={expanded}
         onExpand={onExpand}
+        showGeofences={showGeofences}
+        geofenceDiameter={geofenceDiameter}
         controls={
           <>
             <Button
@@ -347,6 +410,20 @@ export default function JobsMap({
               onClick={() => onBuildingsChange(!showBuildings)}
             >
               <IconBuildingSkyscraper aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              variant={showGeofences ? 'default' : 'outline-solid'}
+              depth="raised"
+              size="icon-lg"
+              aria-label="გეოზონების ჩვენება"
+              aria-pressed={showGeofences}
+              title={
+                showGeofences ? 'გეოზონების დამალვა' : 'გეოზონების ჩვენება'
+              }
+              onClick={() => onGeofencesChange?.(!showGeofences)}
+            >
+              <IconCircleDashed aria-hidden="true" />
             </Button>
             <Button
               type="button"

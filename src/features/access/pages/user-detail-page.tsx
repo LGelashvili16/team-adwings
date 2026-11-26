@@ -8,6 +8,7 @@ const route = getRouteApi('/_authenticated/manage/employees/$employeeId')
 export function UserDetailPage() {
   const { employeeId: userId } = route.useParams()
   const { actor } = route.useRouteContext()
+  const search = route.useSearch()
   // This private feature owns its cache; leaving the authenticated page discards it.
   const [client] = useState(
     () =>
@@ -20,7 +21,7 @@ export function UserDetailPage() {
   )
   return (
     <QueryClientProvider client={client}>
-      <UserDetail userId={userId} actor={actor} />
+      <UserDetail userId={userId} actor={actor} {...search} />
     </QueryClientProvider>
   )
 }
