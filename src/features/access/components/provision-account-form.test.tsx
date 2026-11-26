@@ -209,6 +209,11 @@ describe('administrative account provisioning', () => {
       name: 'კომპანიის განრიგის გამოყენება',
     })
     await waitFor(() => expect(inherit).toBeEnabled())
+    const remoteMonday = screen.getByRole('switch', {
+      name: 'ორშაბათი, დისტანციურად',
+    })
+    expect(remoteMonday).not.toBeChecked()
+    await user.click(remoteMonday)
     await user.click(inherit)
     await user.click(
       screen.getByRole('switch', { name: 'შაბათი: სამუშაო დღე' }),
@@ -219,6 +224,7 @@ describe('administrative account provisioning', () => {
       data: expect.objectContaining({
         jobTitle: 'დიზაინერი',
         phone: '+995 555 12 34 56',
+        remoteWeekdays: [1],
         workingWeek: days.map((day) =>
           day.weekday === 6 ? { ...day, hours: null } : day,
         ),

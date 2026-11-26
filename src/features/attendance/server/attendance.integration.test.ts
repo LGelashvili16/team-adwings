@@ -153,7 +153,7 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
     vi.useFakeTimers({ toFake: ['Date'] })
     time('2026-11-04T06:05:00Z')
     await sql().query(
-      'DELETE FROM attendance_punch; DELETE FROM attendance_challenge; DELETE FROM attendance_security_audit; DELETE FROM attendance_device; DELETE FROM attendance_employee_network; DELETE FROM attendance_security_policy; DELETE FROM day_off_allowance_audit; DELETE FROM day_off_balance; DELETE FROM leave_audit; DELETE FROM leave_request; DELETE FROM employee_work_schedule; DELETE FROM attendance_audit; DELETE FROM attendance_reviewer; DELETE FROM attendance_setting; DELETE FROM attendance_session; DELETE FROM company_schedule_audit; DELETE FROM company_schedule_day; DELETE FROM company_schedule;',
+      'DELETE FROM attendance_punch; DELETE FROM attendance_challenge; DELETE FROM attendance_security_audit; DELETE FROM attendance_device; DELETE FROM attendance_employee_network; DELETE FROM attendance_security_policy; DELETE FROM day_off_allowance_audit; DELETE FROM day_off_balance; DELETE FROM leave_audit; DELETE FROM leave_request; DELETE FROM employee_work_location; DELETE FROM employee_work_schedule; DELETE FROM attendance_audit; DELETE FROM attendance_reviewer; DELETE FROM attendance_setting; DELETE FROM attendance_session; DELETE FROM company_schedule_audit; DELETE FROM company_schedule_day; DELETE FROM company_schedule;',
     )
     await sql().query(
       `INSERT INTO attendance_security_policy (id, passkey_required) VALUES (1,false); INSERT INTO attendance_device (user_id, token_hash, name, state) SELECT id,id,'ტესტის ბრაუზერი','approved' FROM "user"; UPDATE "user" SET access_state = 'active'; UPDATE employee SET status = 'active';`,
@@ -166,6 +166,36 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
     )
     await sql().query(
       `INSERT INTO company_schedule_day SELECT '2026-01-01', day, CASE WHEN day = 7 THEN NULL ELSE time '10:00' END, CASE WHEN day = 7 THEN NULL ELSE time '19:00' END FROM generate_series(1,7) AS day`,
+    )
+  })
+  it('reports remote only for the employee’s effective scheduled workday', async () => {
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
+    )
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, weekday, remote) VALUES ($1, 3, true)`,
+      [employeeId],
+    )
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      true,
+    )
+    expect((await service.getAttendanceOverview(other)).remoteWorkday).toBe(
+      false,
+    )
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, date, remote) VALUES ($1, '2026-11-04', false), ($1, '2026-11-05', true), ($1, '2026-11-08', true)`,
+      [employeeId],
+    )
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
+    )
+    time('2026-11-05T06:05:00Z')
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      true,
+    )
+    time('2026-11-08T06:05:00Z')
+    expect((await service.getAttendanceOverview(actor)).remoteWorkday).toBe(
+      false,
     )
   })
   afterAll(async () => {

@@ -78,6 +78,20 @@ export function isoWeekday(date: string) {
   return new Date(`${date}T12:00:00Z`).getUTCDay() || 7
 }
 
+export function worksRemotely(
+  date: string,
+  plan?: {
+    remoteWeekdays: ReadonlyArray<number>
+    overrides: ReadonlyArray<{ date: string; remote: boolean }>
+  },
+) {
+  return (
+    plan?.overrides.find((override) => override.date === date)?.remote ??
+    plan?.remoteWeekdays.includes(isoWeekday(date)) ??
+    false
+  )
+}
+
 /** Compares by meaning, since stored JSON may reorder keys and days. */
 export function sameWorkingWeek(first: WeekDays, second: WeekDays) {
   const canonical = (days: WeekDays) =>

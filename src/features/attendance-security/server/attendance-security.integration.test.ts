@@ -224,7 +224,7 @@ describe.runIf(process.env.RUN_ATTENDANCE_SECURITY_DB_TESTS === '1')(
     }, 30000)
     beforeEach(async () => {
       await sql().query(
-        `delete from notification; delete from attendance_challenge; delete from attendance_punch; delete from attendance_audit; delete from attendance_session; delete from attendance_security_audit; delete from attendance_device; delete from attendance_employee_network; delete from attendance_security_policy; update "user" set roles=case id when 'worker' then 'employee' when 'hr' then 'hr_manager' else 'admin' end, access_state='active', permission_overrides='{"allow":[],"deny":[]}'::jsonb; insert into attendance_security_policy (id,passkey_required) values (1,false)`,
+        `delete from notification; delete from attendance_challenge; delete from attendance_punch; delete from attendance_audit; delete from attendance_session; delete from attendance_security_audit; delete from attendance_device; delete from attendance_employee_network; delete from employee_work_location; delete from attendance_security_policy; update "user" set roles=case id when 'worker' then 'employee' when 'hr' then 'hr_manager' else 'admin' end, access_state='active', permission_overrides='{"allow":[],"deny":[]}'::jsonb; insert into attendance_security_policy (id,passkey_required) values (1,false)`,
       )
       for (const actor of [worker, hr, administrator])
         await sql().query(
@@ -383,20 +383,18 @@ describe.runIf(process.env.RUN_ATTENDANCE_SECURITY_DB_TESTS === '1')(
         )
       },
     )
-    it('does not let a delegated device reviewer self-approve without the separate permission', async () => {
+    it('does not let an HR device reviewer self-approve when the separate permission is denied', async () => {
       await sql().query(
-        `update "user" set permission_overrides='{"allow":["attendance.devices.manage"],"deny":[]}'::jsonb where id='worker'`,
+        `update "user" set permission_overrides='{"allow":[],"deny":["attendance.devices.approve.self"]}'::jsonb where id='hr'`,
       )
       const device = (
         await sql().query(
-          `update attendance_device set state='pending' where user_id='worker' returning id,revision`,
+          `update attendance_device set state='pending' where user_id='hr' returning id,revision`,
         )
       ).rows[0]
-      expect((await security.reviewDevices(worker, {})).canApproveOwn).toBe(
-        false,
-      )
+      expect((await security.reviewDevices(hr, {})).canApproveOwn).toBe(false)
       await expect(
-        security.decideDevice(worker, { ...device, decision: 'approved' }),
+        security.decideDevice(hr, { ...device, decision: 'approved' }),
       ).rejects.toThrow()
     })
     it.each(['missing Passkey', 'revoked permission', 'suspended account'])(
@@ -941,6 +939,89 @@ describe.runIf(process.env.RUN_ATTENDANCE_SECURITY_DB_TESTS === '1')(
         ).resolves.toBeDefined()
       },
     )
+    it('allows personal clock actions from home only while a working date is assigned remote', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      try {
+        vi.setSystemTime(new Date('2026-11-22T21:00:00Z')) // Monday in the company timezone.
+        await sql().query(
+          `update attendance_security_policy set ip_restriction_enabled=true,allowed_ips='["203.0.113.10"]'::jsonb`,
+        )
+        await sql().query(
+          `insert into employee_work_location (employee_id,weekday,remote) select id,1,true from employee where user_id='worker'`,
+        )
+        const data = clockInput()
+        const prepare = () =>
+          security.prepareClock(worker, { kind: 'in', data }, context())
+        await expect(prepare()).resolves.toBeDefined()
+
+        await sql().query(
+          `insert into employee_work_location (employee_id,date,remote) select id,'2026-11-23',false from employee where user_id='worker'`,
+        )
+        await expect(
+          attendance.checkIn(worker, data, context()),
+        ).rejects.toThrow('ამ ქსელიდან')
+        vi.setSystemTime(new Date('2026-11-23T21:00:00Z')) // Tuesday in the company timezone.
+        await expect(prepare()).rejects.toThrow('ამ ქსელიდან')
+        await sql().query(
+          `insert into employee_work_location (employee_id,date,remote) select id,'2026-11-24',true from employee where user_id='worker'`,
+        )
+        await expect(
+          security.prepareClock(hr, { kind: 'in', data }, context(hr)),
+        ).rejects.toThrow('ამ ქსელიდან')
+
+        await sql().query(
+          `update attendance_security_policy set blocked_ips='["192.0.2.10"]'::jsonb`,
+        )
+        await expect(prepare()).rejects.toThrow('ამ ქსელიდან')
+        await sql().query(
+          `update attendance_security_policy set blocked_ips='[]'::jsonb; insert into attendance_employee_network(user_id,allowed_ips) values ('worker','[]'::jsonb)`,
+        )
+        await expect(prepare()).rejects.toThrow('ამ ქსელიდან')
+        await sql().query(
+          `delete from attendance_employee_network; update attendance_device set state='pending' where user_id='worker'`,
+        )
+        await expect(prepare()).rejects.toThrow('მოწყობილობა')
+        await sql().query(
+          `update attendance_device set state='approved' where user_id='worker'; update attendance_security_policy set passkey_required=true`,
+        )
+        await expect(
+          attendance.checkIn(worker, data, context()),
+        ).rejects.toThrow('დადასტურება')
+        await sql().query(
+          `update attendance_security_policy set passkey_required=false`,
+        )
+
+        await prepare()
+        const opened = await attendance.checkIn(worker, data, context())
+        vi.setSystemTime(new Date('2026-11-23T21:01:00Z'))
+        const out = { sessionId: opened.id, confirmEarly: true }
+        await security.prepareClock(
+          worker,
+          { kind: 'out', data: out },
+          context(),
+        )
+        await attendance.checkOut(worker, out, context())
+        expect(
+          (
+            await sql().query(
+              `select details from attendance_security_audit where action='clock.ip_allowlist_exempted' order by details->>'kind'`,
+            )
+          ).rows,
+        ).toEqual(
+          ['in', 'out'].map((kind) => ({
+            details: expect.objectContaining({
+              kind,
+              subjectUserId: worker.id,
+              workDate: '2026-11-24',
+            }),
+          })),
+        )
+        vi.setSystemTime(new Date('2026-11-24T21:00:00Z'))
+        await expect(prepare()).rejects.toThrow('ამ ქსელიდან')
+      } finally {
+        vi.useRealTimers()
+      }
+    })
     it.each(['admin', 'owner'] as const)(
       'exempts persisted %s roles from company and individual allowlists and audits both punches',
       async (role) => {

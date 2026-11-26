@@ -1,6 +1,9 @@
 import '@tanstack/react-start/server-only'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
-import { getEmployeeWorkday } from '#/features/scheduling/server/scheduling.service.server'
+import {
+  getEmployeeWorkday,
+  isRemoteWorkday,
+} from '#/features/scheduling/server/scheduling.service.server'
 import { readApprovedLeaveForAttendance } from '#/features/leave/server/leave.service.server'
 import {
   checkInSchema,
@@ -69,6 +72,7 @@ export async function getAttendanceOverview(
     const employeeId = await activeEmployee(tx, actor, false)
     const now = new Date()
     const workday = await getEmployeeWorkday(now, employeeId, tx)
+    const remoteWorkday = await isRemoteWorkday(workday, employeeId, tx)
     const approvedLeave = await readApprovedLeaveForAttendance(
       tx,
       actor.id,
@@ -86,6 +90,7 @@ export async function getAttendanceOverview(
     return {
       serverNow: now.toISOString(),
       workday,
+      remoteWorkday,
       approvedLeave,
       lastSessionId: last?.id ?? null,
       openSession: open
@@ -196,7 +201,7 @@ export async function checkIn(
       throw new AttendanceWorkflowError(
         'დასწრების მდგომარეობა შეიცვალა. განაახლეთ გვერდი.',
       )
-    const now = new Date()
+    const now = security.remoteClockCheckedAt ?? new Date()
     if (latest?.endedAt && now < latest.endedAt)
       throw new AttendanceWorkflowError(
         'დროის აღრიცხვა დროებით მიუწვდომელია. სცადეთ ხელახლა.',
@@ -315,7 +320,7 @@ export async function checkOut(
       throw new AttendanceWorkflowError(
         'ღია სამუშაო ჩანაწერი ვერ მოიძებნა. განაახლეთ გვერდი.',
       )
-    const now = new Date()
+    const now = security.remoteClockCheckedAt ?? new Date()
     if (
       await repository.automaticCheckoutDue(
         tx,

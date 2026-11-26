@@ -75,6 +75,7 @@ function overview(): Overview {
   return {
     serverNow: '2026-11-04T07:00:00.000Z',
     approvedLeave: null,
+    remoteWorkday: false,
     workday: {
       date: '2026-11-04',
       timezone: 'Asia/Tbilisi',
@@ -164,6 +165,24 @@ afterEach(() => {
 })
 
 describe('persisted attendance dashboard', () => {
+  it.each([true, false])(
+    'shows the remote badge beside the clock status when remote is %s',
+    async (remoteWorkday) => {
+      calls.read.mockResolvedValue({
+        ok: true,
+        value: { ...overview(), remoteWorkday },
+      })
+      render(
+        <ModalProvider>
+          <AttendanceOverview actorId="employee" dashboardLayout />
+        </ModalProvider>,
+      )
+      const status = await screen.findByText('არ დაწყებულა')
+      if (remoteWorkday)
+        expect(status.previousElementSibling).toHaveTextContent('დისტანციურად')
+      else expect(screen.queryByText('დისტანციურად')).toBeNull()
+    },
+  )
   it('disables another clock-in once the current workday has 18 combined hours', async () => {
     const state = working()
     state.openSession = null

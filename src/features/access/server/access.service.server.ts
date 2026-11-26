@@ -15,8 +15,10 @@ import { createInitialEmployeeEmployment } from '#/features/employees/server/emp
 import {
   assignInitialEmployeeWeek,
   readCompanyWeek,
+  readEmployeeWorkLocations,
   replaceEmployeeWeek,
   ScheduleWorkflowError,
+  updateEmployeeWorkLocations,
 } from '#/features/scheduling/server/scheduling.service.server'
 import { canEditOwnEmployeeProfile } from '../access.actions'
 import {
@@ -154,6 +156,21 @@ async function createEmployee(
   }
   try {
     await assignInitialEmployeeWeek(person.id, input.workingWeek, actorId, tx)
+    if (input.remoteWeekdays?.length) {
+      if (!actorId) throw new AuthorizationError()
+      await updateEmployeeWorkLocations(
+        person.id,
+        actorId,
+        { remoteWeekdays: input.remoteWeekdays },
+        tx,
+      )
+      await repository.auditAccess(tx, {
+        actorId,
+        targetId: userId,
+        action: 'account.recurring_work_location_updated',
+        reason: `დისტანციური სამუშაო დღეები (ორშაბათი = 1): ${[...input.remoteWeekdays].sort().join(', ')}.`,
+      })
+    }
   } catch (error) {
     if (error instanceof ScheduleWorkflowError)
       throw new AccountWorkflowError(error.message)
@@ -206,11 +223,11 @@ export async function readEmployeeAccount(
   const { userId } = accountLookupSchema.parse(untrusted)
   const record = await repository.queryAccount(userId)
   if (!record) return null
-  return {
-    record,
-    // Only needed (and only fetched) when the employee inherits the company week.
-    companyWeek: record.workingWeek ? null : await readCompanyWeek(),
-  }
+  const [companyWeek, workLocations] = await Promise.all([
+    record.workingWeek ? null : readCompanyWeek(),
+    readEmployeeWorkLocations(userId),
+  ])
+  return { record, companyWeek, workLocations }
 }
 
 export async function manageEmployeeAccount(
@@ -276,11 +293,16 @@ export async function editEmployeeDetails(
   return repository.transactAccounts(async (tx) => {
     const manager = await currentEmployeeManager(tx, actor)
     const editingSelf = manager.id === input.userId
+    const updatesWorkLocation =
+      input.remoteWeekdays !== undefined ||
+      input.workLocationOverride !== undefined
     if (
       editingSelf &&
       (!canEditOwnEmployeeProfile(manager) || input.roles !== undefined)
     )
       throw new AuthorizationError()
+    if (input.workingWeek !== undefined || updatesWorkLocation)
+      assertPermissions(manager, ['attendance.configure'])
     const target = await repository.lockedAccount(tx, input.userId)
     if (!target?.person)
       throw new AccountWorkflowError('თანამშრომლის ანგარიში ვერ მოიძებნა.')
@@ -367,23 +389,49 @@ export async function editEmployeeDetails(
         reason: 'თანამშრომლის როლების განახლება.',
       })
     }
-    if (input.workingWeek === undefined) return
-    // Schedule rights are separate from account management; replaceEmployeeWeek rechecks them against the database.
-    assertPermissions(manager, ['attendance.configure'])
     try {
-      const changed = await replaceEmployeeWeek(
-        target.person.id,
-        input.workingWeek,
-        manager.id,
-        tx,
+      if (
+        input.workingWeek !== undefined &&
+        (await replaceEmployeeWeek(
+          target.person.id,
+          input.workingWeek,
+          manager.id,
+          tx,
+        ))
       )
-      if (changed)
         await repository.auditAccess(tx, {
           actorId: manager.id,
           targetId: input.userId,
           action: 'account.schedule_updated',
           reason: 'თანამშრომლის სამუშაო განრიგის განახლება.',
         })
+      if (updatesWorkLocation) {
+        const override = input.workLocationOverride
+        const result = await updateEmployeeWorkLocations(
+          target.person.id,
+          manager.id,
+          { remoteWeekdays: input.remoteWeekdays, override },
+          tx,
+        )
+        if (result.recurringChanged) {
+          const days = [...(input.remoteWeekdays ?? [])].sort().join(', ')
+          await repository.auditAccess(tx, {
+            actorId: manager.id,
+            targetId: input.userId,
+            action: 'account.recurring_work_location_updated',
+            reason: days
+              ? `დისტანციური სამუშაო დღეები (ორშაბათი = 1): ${days}.`
+              : 'ყოველკვირეული სამუშაო ადგილი: ადგილზე.',
+          })
+        }
+        if (result.dateChanged && override)
+          await repository.auditAccess(tx, {
+            actorId: manager.id,
+            targetId: input.userId,
+            action: 'account.dated_work_location_updated',
+            reason: `${override.date} სამუშაო ადგილი: ${override.remote === null ? 'ჩვეულებრივი განრიგი' : override.remote ? 'დისტანციურად' : 'ადგილზე'}.`,
+          })
+      }
     } catch (error) {
       if (error instanceof ScheduleWorkflowError)
         throw new AccountWorkflowError(error.message)

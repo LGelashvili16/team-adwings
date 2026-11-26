@@ -24,6 +24,7 @@ import {
   provisionAccountSchema,
 } from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
+import { RecurringWorkLocationFields } from './employee-work-location-fields'
 import { AccountRoleFields } from './account-authorization-fields'
 import type { z } from 'zod'
 import type { IssuedAccountCode } from '../access.types'
@@ -210,6 +211,22 @@ export function ProvisionAccountForm({
                   value={field.state.value ?? null}
                   onChange={field.handleChange}
                   disabled={mutation.isPending}
+                  renderWorkLocations={(week) => (
+                    <form.Field name="remoteWeekdays">
+                      {(locations) => (
+                        <>
+                          <RecurringWorkLocationFields
+                            idPrefix="provision"
+                            week={week}
+                            value={locations.state.value ?? []}
+                            onChange={locations.handleChange}
+                            disabled={mutation.isPending}
+                          />
+                          <FieldError errors={locations.state.meta.errors} />
+                        </>
+                      )}
+                    </form.Field>
+                  )}
                 />
                 <FieldError errors={field.state.meta.errors} />
               </Field>

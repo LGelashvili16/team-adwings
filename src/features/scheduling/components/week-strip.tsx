@@ -1,5 +1,6 @@
 import { cn } from '#/lib/utils'
 import { weekdayLabels } from './schedule-week-editor'
+import { workLocationLabel } from '../scheduling.content'
 import type { WorkingWeek } from '../scheduling.types'
 
 const shortWeekdayLabels = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 'პარ', 'შაბ', 'კვი']
@@ -8,9 +9,11 @@ const shortWeekdayLabels = ['ორშ', 'სამ', 'ოთხ', 'ხუთ', 
 export function WeekStrip({
   days,
   density = 'compact',
+  remoteWeekdays,
 }: {
   days: WorkingWeek
   density?: 'compact' | 'comfortable'
+  remoteWeekdays?: Array<number>
 }) {
   const comfortable = density === 'comfortable'
   const ordered = [...days].sort(
@@ -74,6 +77,11 @@ export function WeekStrip({
             {weekdayLabels[weekday - 1]}:{' '}
             {hours ? `${hours.start}-დან ${hours.end}-მდე` : 'უქმე დღე'}
           </span>
+          {hours && remoteWeekdays ? (
+            <span className="max-w-full wrap-break-word px-1 text-xs text-muted-foreground">
+              {workLocationLabel(remoteWeekdays.includes(weekday))}
+            </span>
+          ) : null}
         </li>
       ))}
     </ul>

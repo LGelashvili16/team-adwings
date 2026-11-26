@@ -519,6 +519,13 @@
       "when": 1795683598300,
       "tag": "0073_payroll_adjustment_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1795727703400,
+      "tag": "0074_employee_work_locations",
+      "breakpoints": true
     }
   ]
 }

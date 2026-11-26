@@ -145,6 +145,21 @@ the server rejects the attempt. The account page shows the effective week as a s
 labelled "ინდივიდუალური" or "კომპანიის განრიგი". Employees see their own effective week, with
 today highlighted, on `/schedule`; it is read-only and is served for the signed-in account only.
 
+### On-site and remote work
+
+Working days default to ადგილზე (on-site), including existing employee schedules. During creation
+or editing, an employee manager with `attendance.configure` can mark individual weekdays as
+დისტანციურად (remote). The work location is independent of working hours, so employees can still
+inherit the company hours. Managers can set a date-specific work location on an existing employee's
+profile, or restore the recurring choice for that date. The date is interpreted in the company
+timezone. A dated change applies to a scheduled workday and takes precedence over the recurring
+choice. The employee sees the recurring work locations and upcoming exceptions on `/schedule`.
+
+The account audit records who assigned remote weekdays or changed a dated exception. Owners,
+administrators and HR managers with `attendance.configure` can edit their own hours, working days,
+and recurring or dated work locations. See [attendance security](attendance-security.md) for the
+clock-in and clock-out rules on remote days.
+
 ## Required auth email field
 
 Better Auth still requires an email-shaped protocol identifier. Newly provisioned

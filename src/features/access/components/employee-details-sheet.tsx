@@ -31,9 +31,14 @@ import {
   provisionableRolesSchema,
 } from '../access.schemas'
 import { EmployeeScheduleField } from './employee-schedule-field'
+import {
+  DatedWorkLocationField,
+  RecurringWorkLocationFields,
+} from './employee-work-location-fields'
 import { AccountRoleFields } from './account-authorization-fields'
 import type { z } from 'zod'
 import type { EmployeeAccountRecord } from '../access.types'
+import type { WorkLocationPlan } from '#/features/scheduling/scheduling.types'
 
 const detailFields = [
   { name: 'name', label: 'სახელი და გვარი', autoComplete: 'off' },
@@ -49,6 +54,7 @@ export function EmployeeDetailsSheet({
   editingSelf,
   canAssignAdmin = false,
   canConfigureSchedule,
+  workLocations,
   onClose,
 }: {
   open: boolean
@@ -58,6 +64,7 @@ export function EmployeeDetailsSheet({
   canAssignAdmin?: boolean
   /** Editing the working week additionally requires the attendance.configure permission. */
   canConfigureSchedule: boolean
+  workLocations?: WorkLocationPlan
   onClose: () => void
 }) {
   const client = useQueryClient()
@@ -92,6 +99,9 @@ export function EmployeeDetailsSheet({
     phone: target.phone ?? '',
     // Undefined tells the server to leave the schedule untouched.
     workingWeek: canConfigureSchedule ? target.workingWeek : undefined,
+    remoteWeekdays: canConfigureSchedule
+      ? workLocations?.remoteWeekdays
+      : undefined,
   }
   const form = useForm({
     defaultValues,
@@ -99,11 +109,26 @@ export function EmployeeDetailsSheet({
     onSubmit: async ({ value, formApi }) => {
       setError('')
       try {
-        const { roles, expectedRoles, workingWeek, ...profile } = value
+        const {
+          roles,
+          expectedRoles,
+          workingWeek,
+          remoteWeekdays,
+          workLocationOverride,
+          ...profile
+        } = value
         const scheduleChanged =
           workingWeek !== undefined &&
           formApi.getFieldMeta('workingWeek')?.isDefaultValue === false
-        const details = scheduleChanged ? { ...profile, workingWeek } : profile
+        const weekdaysChanged =
+          remoteWeekdays !== undefined &&
+          formApi.getFieldMeta('remoteWeekdays')?.isDefaultValue === false
+        const details = {
+          ...profile,
+          ...(scheduleChanged ? { workingWeek } : {}),
+          ...(weekdaysChanged ? { remoteWeekdays } : {}),
+          ...(workLocationOverride ? { workLocationOverride } : {}),
+        }
         const originalRoles = parseRoles(expectedRoles ?? '')
         const rolesChanged =
           roles &&
@@ -118,7 +143,7 @@ export function EmployeeDetailsSheet({
           return
         }
         await client.invalidateQueries({ queryKey: ['employee-accounts'] })
-        if (scheduleChanged)
+        if (scheduleChanged || weekdaysChanged || workLocationOverride)
           await client.invalidateQueries({
             queryKey: ownScheduleOptions(target.userId).queryKey,
           })
@@ -248,9 +273,47 @@ export function EmployeeDetailsSheet({
                       value={field.state.value ?? null}
                       onChange={field.handleChange}
                       disabled={mutation.isPending}
+                      renderWorkLocations={(week) => (
+                        <form.Field name="remoteWeekdays">
+                          {(locations) => (
+                            <>
+                              <RecurringWorkLocationFields
+                                idPrefix="details"
+                                week={week}
+                                value={locations.state.value ?? []}
+                                onChange={locations.handleChange}
+                                disabled={mutation.isPending}
+                              />
+                              <FieldError
+                                errors={locations.state.meta.errors}
+                              />
+                            </>
+                          )}
+                        </form.Field>
+                      )}
                     />
                     <FieldError errors={field.state.meta.errors} />
                   </Field>
+                )}
+              </form.Field>
+            ) : null}
+            {canConfigureSchedule && workLocations ? (
+              <form.Field name="workLocationOverride">
+                {(field) => (
+                  <>
+                    <DatedWorkLocationField
+                      plan={workLocations}
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      onBlur={field.handleBlur}
+                      disabled={mutation.isPending}
+                      invalid={!field.state.meta.isValid}
+                    />
+                    <FieldError
+                      id="work-location-date-error"
+                      errors={field.state.meta.errors}
+                    />
+                  </>
                 )}
               </form.Field>
             ) : null}

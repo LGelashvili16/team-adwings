@@ -4,6 +4,25 @@ export const scheduleDateSchema = z.iso.date({
   error: 'მიუთითეთ სწორი თარიღი.',
 })
 
+const weekdaySchema = z
+  .number({ error: 'მიუთითეთ კვირის დღე.' })
+  .int('კვირის დღე არასწორია.')
+  .min(1, 'კვირის დღე არასწორია.')
+  .max(7, 'კვირის დღე არასწორია.')
+
+export const remoteWeekdaysSchema = z
+  .array(weekdaySchema, { error: 'მიუთითეთ დისტანციური სამუშაო დღეები.' })
+  .max(7, 'კვირაში მაქსიმუმ შვიდი დღეა.')
+  .refine(
+    (days) => new Set(days).size === days.length,
+    'კვირის დღეები არ უნდა მეორდებოდეს.',
+  )
+
+export const workLocationOverrideSchema = z.object({
+  date: scheduleDateSchema,
+  remote: z.boolean({ error: 'აირჩიეთ სამუშაო ადგილი.' }).nullable(),
+})
+
 export const scheduleTimezoneSchema = z
   .string({ error: 'მიუთითეთ დროის სარტყელი.' })
   .max(100, 'დროის სარტყელი ძალიან გრძელია.')
@@ -24,11 +43,7 @@ const localTimeSchema = z
 
 export const scheduleWeekdaySchema = z.object(
   {
-    weekday: z
-      .number({ error: 'მიუთითეთ კვირის დღე.' })
-      .int('კვირის დღე არასწორია.')
-      .min(1, 'კვირის დღე არასწორია.')
-      .max(7, 'კვირის დღე არასწორია.'),
+    weekday: weekdaySchema,
     hours: z
       .object(
         { start: localTimeSchema, end: localTimeSchema },

@@ -4,6 +4,10 @@ import { randomBytes } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import pg from 'pg'
 import { and, count, eq } from 'drizzle-orm'
+import {
+  followingDate,
+  isoWeekday,
+} from '#/features/scheduling/scheduling.rules'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { Actor } from '#/lib/authorization/actor'
 import type * as AccessService from './access.service.server'
@@ -789,10 +793,14 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
         weekday: index + 1,
         hours: index === 5 ? { start: '10:00', end: '14:00' } : null,
       }))
+      const remoteWeekdays = [6]
       if (role === 'employee') {
         const staleActor: Actor = { ...target, roles: ['admin'] }
         await expect(
-          service.editEmployeeDetails(staleActor, { ...details, workingWeek }),
+          service.editEmployeeDetails(staleActor, {
+            ...details,
+            remoteWeekdays,
+          }),
         ).rejects.toMatchObject({
           code: 'FORBIDDEN',
         })
@@ -806,14 +814,19 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
           expectedRoles: role,
         }),
       ).rejects.toMatchObject({ code: 'FORBIDDEN' })
-      await service.editEmployeeDetails(target, { ...details, workingWeek })
+      const account = await service.readEmployeeAccount(target, {
+        userId: target.id,
+      })
+      let date = account!.workLocations.today
+      while (isoWeekday(date) !== 6) date = followingDate(date)
+      const workLocationOverride = { date, remote: false }
+      const schedule = { workingWeek, remoteWeekdays, workLocationOverride }
+      await service.editEmployeeDetails(target, { ...details, ...schedule })
       expect(
-        (await service.readEmployeeAccount(target, { userId: target.id }))
-          ?.record,
+        await service.readEmployeeAccount(target, { userId: target.id }),
       ).toMatchObject({
-        jobTitle: details.jobTitle,
-        roles: role,
-        workingWeek,
+        record: { jobTitle: details.jobTitle, roles: role, workingWeek },
+        workLocations: { remoteWeekdays, overrides: [workLocationOverride] },
       })
 
       await service.editEmployeeDetails(target, {
@@ -833,12 +846,79 @@ describe.runIf(enabled)('employee account lifecycle against PostgreSQL', () => {
           })
           .where(eq(tables.user.id, target.id))
         await expect(
-          service.editEmployeeDetails(target, { ...details, workingWeek }),
+          service.editEmployeeDetails(target, {
+            ...details,
+            remoteWeekdays: [],
+          }),
+        ).rejects.toMatchObject({ code: 'FORBIDDEN' })
+        await expect(
+          service.editEmployeeDetails(target, {
+            ...details,
+            workLocationOverride: { date, remote: true },
+          }),
         ).rejects.toMatchObject({ code: 'FORBIDDEN' })
         await service.editEmployeeDetails(target, details)
       }
     },
   )
+
+  it('provisions remote weekdays without copying the company hours and audits changes by HR', async () => {
+    const hrIdentity = await identity('profile-hr_manager')
+    const hr: Actor = { ...owner, id: hrIdentity.id, roles: ['hr_manager'] }
+    const name = 'დისტანციური თანამშრომელი'
+    const issued = await service.provisionEmployee(hr, {
+      name,
+      contactEmail: '',
+      remoteWeekdays: [1],
+    })
+    const { id: userId } = await identityForCode(issued.code)
+    const initial = await service.readEmployeeAccount(hr, { userId })
+    expect(initial).toMatchObject({
+      record: { workingWeek: null },
+      workLocations: { remoteWeekdays: [1], overrides: [] },
+    })
+    const today = initial!.workLocations.today
+    const date = isoWeekday(today) === 7 ? followingDate(today) : today
+    const details = { userId, name, contactEmail: '' }
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      remoteWeekdays: [5],
+      workLocationOverride: { date, remote: true },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations,
+    ).toMatchObject({
+      remoteWeekdays: [5],
+      overrides: [{ date, remote: true }],
+    })
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      workLocationOverride: { date, remote: false },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations
+        .overrides,
+    ).toEqual([{ date, remote: false }])
+    await service.editEmployeeDetails(hr, {
+      ...details,
+      workLocationOverride: { date, remote: null },
+    })
+    expect(
+      (await service.readEmployeeAccount(hr, { userId }))?.workLocations
+        .overrides,
+    ).toEqual([])
+    const audits = await testDatabase()
+      .select()
+      .from(tables.accessAudit)
+      .where(
+        and(
+          eq(tables.accessAudit.targetId, userId),
+          eq(tables.accessAudit.action, 'account.dated_work_location_updated'),
+        ),
+      )
+    expect(audits).toHaveLength(3)
+    expect(audits.every((entry) => entry.actorId === hr.id)).toBe(true)
+  })
 
   it('allows only one concurrent consumption and authenticates through Better Auth username login', async () => {
     const issued = await provision('worker-active')

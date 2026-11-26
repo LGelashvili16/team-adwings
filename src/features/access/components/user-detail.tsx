@@ -101,7 +101,7 @@ export function UserDetail({
       </div>
     )
 
-  const { record, companyWeek } = detail
+  const { record, companyWeek, workLocations } = detail
   const isSelf = actor.id === record.userId
   const manageable = canManageAccount(record, actor)
   const canEdit = manageable || (isSelf && canEditOwnEmployeeProfile(actor))
@@ -134,6 +134,7 @@ export function UserDetail({
           <UserScheduleCard
             week={record.workingWeek}
             companyWeek={companyWeek}
+            workLocations={workLocations}
           />
           <UserWorkRecordsCard
             roles={actor.roles}
@@ -169,6 +170,7 @@ export function UserDetail({
         editingSelf={isSelf}
         canAssignAdmin={canAssignAdmin}
         canConfigureSchedule={hasPermission(actor, 'attendance.configure')}
+        workLocations={workLocations}
         onClose={() => setEditing(false)}
       />
       {issuedCode ? (

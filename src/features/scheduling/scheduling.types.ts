@@ -13,6 +13,12 @@ export type CompanyWorkday = {
 
 export type WorkingWeek = CompanySchedule['days']
 
+export type WorkLocationPlan = {
+  today: string
+  remoteWeekdays: Array<number>
+  overrides: Array<{ date: string; remote: boolean }>
+}
+
 /** Daily reference facts for historical calculations. Missing retained history is distinct from a known company-default assignment and a known day off. */
 export type EmployeeScheduleDay = {
   date: string
@@ -31,6 +37,7 @@ export type OwnSchedule = {
   timezone: string
   /** Company-local calendar date, so "today" never depends on the browser's timezone. */
   today: string
+  workLocations?: WorkLocationPlan
 }
 
 export type ScheduleSettings = {

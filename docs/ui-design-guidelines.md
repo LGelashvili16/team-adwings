@@ -32,6 +32,10 @@ Deliver an ultra-modern, visually polished interface from the first implementati
 
 Keep `თანამდებობა` as employee profile data, separate from permission-bearing account roles. Creation defaults to ordinary employee access. Put `სისტემაში წვდომა` in a closed-by-default Accordion in creation and employee editing, with selected presets visible in its summary. Explain the distinction inside and expand on validation errors. Explicit access administration remains expanded. Position edits never infer or change access.
 
+Group weekly work-location switches under the employee schedule and show the selected location beside each working day. Use ადგილზე as the default. Put date-specific changes in a separate field group on the employee edit sheet, with the date before the work location. Show saved upcoming changes beside the recurring week on the employee profile and personal schedule.
+
+Show a blue დისტანციურად badge immediately before the status badge in the dashboard timer header when today's effective working day is remote.
+
 During account activation, keep the username's typed case and replace spaces with hyphens as they are entered. Show a compact orange warning Alert below the field when a replacement occurs. Save and look up usernames in lowercase.
 
 ## Typography, hierarchy, and page structure

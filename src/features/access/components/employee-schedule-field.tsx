@@ -5,6 +5,7 @@ import { Skeleton } from '#/components/ui/skeleton'
 import { ScheduleWeekEditor } from '#/features/scheduling/components/schedule-week-editor'
 import { getScheduleSettings } from '#/features/scheduling/scheduling.functions'
 import type { z } from 'zod'
+import type { ReactNode } from 'react'
 import type { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
 
 export function EmployeeScheduleField({
@@ -12,12 +13,16 @@ export function EmployeeScheduleField({
   onChange,
   disabled,
   idPrefix = 'provision',
+  renderWorkLocations,
 }: {
   value: z.infer<typeof employeeWorkingWeekSchema> | null
   onChange: (value: z.infer<typeof employeeWorkingWeekSchema> | null) => void
   disabled: boolean
   /** Keeps element ids unique when this field appears twice on one page. */
   idPrefix?: string
+  renderWorkLocations?: (
+    week: z.infer<typeof employeeWorkingWeekSchema>,
+  ) => ReactNode
 }) {
   const query = useQuery({
     queryKey: ['schedule-settings'],
@@ -25,6 +30,7 @@ export function EmployeeScheduleField({
     retry: false,
   })
   const current = query.data?.ok ? query.data.value.current : null
+  const week = value ?? current?.days
   return (
     <div className="flex flex-col gap-4 rounded-xl border p-3">
       <Field orientation="horizontal">
@@ -63,6 +69,7 @@ export function EmployeeScheduleField({
           disabled={disabled}
         />
       ) : null}
+      {week && renderWorkLocations?.(week)}
     </div>
   )
 }

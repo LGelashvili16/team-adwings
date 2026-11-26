@@ -27,9 +27,90 @@ import {
   historicalCompanyScheduleDay,
 } from '../employee-schedule-history.rules'
 import type { Actor } from '#/lib/authorization/actor'
-import type { OwnSchedule, ScheduleSettings } from '../scheduling.types'
+import type {
+  CompanyWorkday,
+  OwnSchedule,
+  ScheduleSettings,
+} from '../scheduling.types'
+import type { z } from 'zod'
+import type { workLocationOverrideSchema } from '../scheduling.schemas'
 
 export class ScheduleWorkflowError extends Error {}
+
+/** Employee management establishes the target scope and locks the account before invoking this writer. */
+export async function updateEmployeeWorkLocations(
+  employeeId: string,
+  actorId: string,
+  changes: {
+    remoteWeekdays?: Array<number>
+    override?: z.infer<typeof workLocationOverrideSchema>
+  },
+  tx: repository.ScheduleTransaction,
+) {
+  await requireScheduleAdministrator(tx, actorId)
+  const now = new Date()
+  const { date: today } = await repository.companyWorkdayAt(now, tx)
+  const { remoteWeekdays, override } = changes
+  if (override) {
+    if (override.date < today)
+      throw new ScheduleWorkflowError('აირჩიეთ დღევანდელი ან მომავალი თარიღი.')
+    if (
+      override.remote !== null &&
+      (await repository.employeeWorkdayAt(now, employeeId, tx, override.date))
+        .kind !== 'scheduled'
+    )
+      throw new ScheduleWorkflowError(
+        'სამუშაო ადგილის შეცვლა მხოლოდ სამუშაო დღისთვის შეგიძლიათ.',
+      )
+  }
+  if (remoteWeekdays?.length) {
+    const [individual, companyWeek] = await Promise.all([
+      repository.employeeNotificationContext(tx, employeeId),
+      repository.readCurrentCompanyWeek(tx),
+    ])
+    const week = individual?.week ?? companyWeek
+    if (
+      !week ||
+      remoteWeekdays.some(
+        (weekday) => !week.some((day) => day.weekday === weekday && day.hours),
+      )
+    )
+      throw new ScheduleWorkflowError(
+        'დისტანციური რეჟიმი მხოლოდ სამუშაო დღეებისთვის აირჩიეთ.',
+      )
+  }
+  const recurringChanged =
+    remoteWeekdays !== undefined &&
+    (await repository.replaceRemoteWeekdays(tx, employeeId, remoteWeekdays))
+  const dateChanged =
+    override !== undefined &&
+    (await repository.setWorkLocationOverride(
+      tx,
+      employeeId,
+      override.date,
+      override.remote,
+    ))
+  return { recurringChanged, dateChanged }
+}
+
+export function readEmployeeWorkLocations(userId: string) {
+  return repository.transactSchedules(async (tx) => {
+    const { date } = await repository.companyWorkdayAt(new Date(), tx)
+    return repository.readWorkLocationPlan(tx, userId, date)
+  })
+}
+
+/** Only the currently authorized clock actor's schedule can grant a company-network exception. */
+export async function remoteClockWorkDate(
+  now: Date,
+  userId: string,
+  tx: repository.ScheduleTransaction,
+) {
+  const employeeId = await repository.readClockEmployeeId(tx, userId)
+  if (!employeeId) return null
+  const workday = await getEmployeeWorkday(now, employeeId, tx)
+  return (await isRemoteWorkday(workday, employeeId, tx)) ? workday.date : null
+}
 
 /** Only current schedule administrators can assign an individual week. */
 async function requireScheduleAdministrator(
@@ -143,7 +224,15 @@ export async function replaceEmployeeWeek(
 export function readOwnSchedule(actor: Actor): Promise<OwnSchedule> {
   return repository.transactSchedules(async (tx) => {
     const workday = await repository.companyWorkdayAt(new Date(), tx)
-    const context = { timezone: workday.timezone, today: workday.date }
+    const context = {
+      timezone: workday.timezone,
+      today: workday.date,
+      workLocations: await repository.readWorkLocationPlan(
+        tx,
+        actor.id,
+        workday.date,
+      ),
+    }
     const stored = await repository.readEmployeeWeekByUser(tx, actor.id)
     if (stored) {
       const own = employeeWorkingWeekSchema.safeParse(stored)
@@ -172,6 +261,17 @@ export function getEmployeeWorkday(
   tx: repository.ScheduleTransaction,
 ) {
   return repository.employeeWorkdayAt(now, employeeId, tx)
+}
+
+export async function isRemoteWorkday(
+  workday: CompanyWorkday,
+  employeeId: string,
+  tx: repository.ScheduleTransaction,
+) {
+  return (
+    workday.kind === 'scheduled' &&
+    (await repository.readRemoteFlag(tx, employeeId, workday.date))
+  )
 }
 
 /** Internal attendance interface; the caller establishes the active employee before reading expectations. */

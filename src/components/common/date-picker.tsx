@@ -16,6 +16,8 @@ export function DatePicker({
   id,
   value,
   today,
+  minimum,
+  disabled,
   invalid,
   required,
   clearLabel = 'დასრულების თარიღის გასუფთავება',
@@ -25,6 +27,8 @@ export function DatePicker({
   id: string
   value: string
   today?: string
+  minimum?: string
+  disabled?: boolean
   invalid: boolean
   required?: boolean
   clearLabel?: string
@@ -50,6 +54,7 @@ export function DatePicker({
             />
           }
           id={id}
+          disabled={disabled}
           aria-description={required ? 'სავალდებულო ველი' : undefined}
           aria-invalid={invalid}
           aria-describedby={invalid ? `${id}-error` : undefined}
@@ -64,6 +69,9 @@ export function DatePicker({
             locale={ka}
             captionLayout="dropdown"
             selected={selected}
+            disabled={
+              minimum ? { before: new Date(`${minimum}T00:00:00`) } : undefined
+            }
             defaultMonth={
               selected ?? (today ? new Date(`${today}T12:00:00`) : undefined)
             }
@@ -99,6 +107,7 @@ export function DatePicker({
         <Button
           variant="outline"
           size="icon"
+          disabled={disabled}
           aria-label={clearLabel}
           onClick={() => {
             onChange('')

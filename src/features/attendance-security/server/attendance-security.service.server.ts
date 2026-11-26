@@ -20,7 +20,10 @@ import {
   attendanceSecurityPolicy,
   user,
 } from '#/db/schema'
-import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
+import {
+  getCompanyWorkday,
+  remoteClockWorkDate,
+} from '#/features/scheduling/server/scheduling.service.server'
 import { APP_NAME } from '#/lib/app'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import {
@@ -89,6 +92,7 @@ async function enforceClockNetwork(
   policy: typeof defaultSecurityPolicy,
   actor: Actor,
   ip: string | null,
+  selfClockAt?: Date,
 ) {
   if (
     policy.blockedIps.length &&
@@ -114,9 +118,12 @@ async function enforceClockNetwork(
       .where(eq(attendanceEmployeeNetwork.userId, actorId))
   ).at(0)
   const allowed = individual?.allowedIps ?? policy.allowedIps
-  if (!ip || !allowed.some((value) => normalizeIp(value) === ip))
-    fail('ამ ქსელიდან დასწრების აღრიცხვა აკრძალულია. დაუკავშირდით HR-ს.')
-  return null
+  if (ip && allowed.some((value) => normalizeIp(value) === ip)) return null
+  if (!individual && ip && selfClockAt) {
+    const workDate = await remoteClockWorkDate(selfClockAt, actorId, tx)
+    if (workDate) return { workDate, policyRevision: policy.revision }
+  }
+  fail('ამ ქსელიდან დასწრების აღრიცხვა აკრძალულია. დაუკავშირდით HR-ს.')
 }
 async function browser(
   tx: AttendanceTransaction,
@@ -511,7 +518,13 @@ export async function prepareClock(
       throw new AuthorizationError()
     const device = await browser(tx, actor, context, true)
     const policy = await readPolicy(tx)
-    await enforceClockNetwork(tx, policy, current, context.ip)
+    await enforceClockNetwork(
+      tx,
+      policy,
+      current,
+      context.ip,
+      intent.targetUserId ? undefined : new Date(),
+    )
     assertClockDevice(device, policy)
     if (!policy.passkeyRequired) return { challengeId: null, options: null }
     if (!device.credentialId)
@@ -564,11 +577,13 @@ export async function authorizeClockAction(
     throw new AuthorizationError()
   const device = await browser(tx, actor, context, true)
   const policy = await readPolicy(tx)
+  const clockCheckedAt = new Date()
   const networkExemption = await enforceClockNetwork(
     tx,
     policy,
     current,
     context.ip,
+    proof.intent.targetUserId ? undefined : clockCheckedAt,
   )
   assertClockDevice(device, policy)
   let userVerified = false
@@ -622,6 +637,10 @@ export async function authorizeClockAction(
   }
   return {
     networkExemption,
+    remoteClockCheckedAt:
+      networkExemption && 'workDate' in networkExemption
+        ? clockCheckedAt
+        : null,
     deviceId: device.id,
     credentialId: userVerified ? device.credentialId : null,
     userVerified,
@@ -641,7 +660,9 @@ export async function recordPunch(
       value.actorId,
       value.sessionId,
       'clock.ip_allowlist_exempted',
-      'დასწრების IP შეზღუდვის გამონაკლისი ადმინისტრატორის ან მფლობელის როლით.',
+      'workDate' in networkExemption
+        ? 'კომპანიის IP შეზღუდვის გამონაკლისი დისტანციური სამუშაო დღისთვის.'
+        : 'დასწრების IP შეზღუდვის გამონაკლისი ადმინისტრატორის ან მფლობელის როლით.',
       {
         kind: value.kind,
         subjectUserId: value.subjectUserId,

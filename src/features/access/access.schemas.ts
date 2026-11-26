@@ -3,7 +3,11 @@ import {
   employeeRoleSchema,
   provisionableRoleSchema,
 } from '#/lib/authorization/permissions'
-import { employeeWorkingWeekSchema } from '#/features/scheduling/scheduling.schemas'
+import {
+  employeeWorkingWeekSchema,
+  remoteWeekdaysSchema,
+  workLocationOverrideSchema,
+} from '#/features/scheduling/scheduling.schemas'
 import { dayOffDaysSchema } from '#/features/leave/day-off-allowance.schemas'
 import { employmentDateSchema } from '#/features/employees/employment.schemas'
 import {
@@ -82,6 +86,7 @@ export const provisionAccountSchema = z.object({
   jobTitle: jobTitleSchema,
   phone: phoneSchema,
   workingWeek: employeeWorkingWeekSchema.nullable().default(null),
+  remoteWeekdays: remoteWeekdaysSchema.optional(),
   dayOffAllowance: dayOffDaysSchema.nullable().default(null),
   employmentStartDate: employmentDateSchema.optional(),
   roles: provisionableRolesSchema.default(['employee']),
@@ -108,6 +113,8 @@ export const employeeDetailsSchema = z
     phone: phoneSchema,
     /** Omitted leaves the schedule untouched, null returns to the company schedule, an array assigns a custom week. */
     workingWeek: employeeWorkingWeekSchema.nullable().optional(),
+    remoteWeekdays: remoteWeekdaysSchema.optional(),
+    workLocationOverride: workLocationOverrideSchema.optional(),
   })
   .strict()
   .refine(
