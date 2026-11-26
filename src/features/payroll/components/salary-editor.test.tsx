@@ -8,6 +8,10 @@ import { setSalaryTerms } from '../salary.functions'
 import type { SalaryEmployee } from '../salary.types'
 
 vi.mock('../salary.functions', () => ({ setSalaryTerms: vi.fn() }))
+vi.mock('../monthly.functions', () => ({
+  getMonthlyEmployee: vi.fn(),
+  getMonthlyPayroll: vi.fn(),
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 const targets: SalaryEmployee[] = [
   {

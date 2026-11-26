@@ -8,12 +8,13 @@ import {
   IconDeviceFloppy,
   IconAlertTriangle,
   IconAlertCircle,
+  IconCalendarDollar,
   IconWallet,
 } from '@tabler/icons-react'
 import { toast } from 'sonner'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Button } from '#/components/ui/button'
-import { Card, CardContent } from '#/components/ui/card'
+import { Card, CardContent, CardHeader } from '#/components/ui/card'
 import { Badge } from '#/components/ui/badge'
 import {
   Field,
@@ -21,6 +22,7 @@ import {
   FieldGroup,
   FieldLabel,
   FieldDescription,
+  FieldTitle,
 } from '#/components/ui/field'
 import { Input } from '#/components/ui/input'
 import { Textarea } from '#/components/ui/textarea'
@@ -33,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { Separator } from '#/components/ui/separator'
 import { Spinner } from '#/components/ui/spinner'
 import { TabsContent } from '#/components/ui/tabs'
 import { Empty, EmptyHeader, EmptyTitle } from '#/components/ui/empty'
@@ -275,6 +278,49 @@ export function MonthlyEntryForm({
       }
     },
   })
+  function paymentDateField(
+    stage: MonthlyDetail['defaultFineStage'],
+    label: string,
+  ) {
+    const paid = payments.find((payment) => payment.stage === stage)
+    const start = paymentWindows.find((window) => window.stage === stage)?.start
+    const id = `monthly-${stage}-payment-date`
+    return paid ? (
+      <Field>
+        <FieldTitle>{label}</FieldTitle>
+        <time
+          className="flex min-h-10 items-center rounded-lg border bg-muted/20 px-2.5 text-sm tabular-nums"
+          dateTime={paid.paidOn}
+        >
+          {formatGeorgianDate(paid.paidOn)}
+        </time>
+      </Field>
+    ) : (
+      <form.Field name={`paymentDates.${stage}`} key={stage}>
+        {(date) => (
+          <Field data-invalid={!date.state.meta.isValid}>
+            <FieldLabel htmlFor={id}>{label}</FieldLabel>
+            <DatePicker
+              id={id}
+              value={date.state.value}
+              today={start ?? `${month}-01`}
+              invalid={!date.state.meta.isValid}
+              clearLabel="გადახდის თარიღის გასუფთავება"
+              onBlur={date.handleBlur}
+              onChange={date.handleChange}
+            />
+            {start && (!date.state.value || date.state.value < start) ? (
+              <FieldDescription>
+                გრაფიკით {formatGeorgianDate(start)}-დან
+              </FieldDescription>
+            ) : null}
+            <FieldError id={`${id}-error`} errors={date.state.meta.errors} />
+          </Field>
+        )}
+      </form.Field>
+    )
+  }
+
   const panel = (section: 'salary' | 'adjustments', content: ReactNode) =>
     tabs ? (
       <TabsContent
@@ -536,7 +582,9 @@ export function MonthlyEntryForm({
                     <Button
                       type="button"
                       variant="outline"
+                      depth="raised"
                       size="sm"
+                      aria-label="ჩანაწერის დამატება"
                       disabled={
                         field.state.value.length >= 20 || mutation.isPending
                       }
@@ -549,82 +597,9 @@ export function MonthlyEntryForm({
                       }
                     >
                       <IconPlus data-icon="inline-start" aria-hidden="true" />
-                      ჩანაწერის დამატება
+                      დამატება
                     </Button>
                   </div>
-                  <form.Subscribe selector={(state) => state.values}>
-                    {({ fineStage: selectedStage, adjustments }) => {
-                      const fineStage = selectedStage ?? defaultFineStage
-                      return (['adjustments', 'salary'] as const).map(
-                        (stage) => {
-                          const hasItems = adjustments.some(({ kind }) =>
-                            kind === 'fine'
-                              ? fineStage === stage
-                              : stage === 'adjustments',
-                          )
-                          if (!hasItems) return null
-                          const paid = payments.find(
-                            (payment) => payment.stage === stage,
-                          )
-                          const start = paymentWindows.find(
-                            (window) => window.stage === stage,
-                          )?.start
-                          const label =
-                            stage === 'salary'
-                              ? 'ჯარიმის დაქვითვის თარიღი'
-                              : 'გაცემის თარიღი'
-                          const id = `monthly-${stage}-payment-date`
-                          return paid ? (
-                            <div
-                              key={stage}
-                              className="flex flex-col gap-1 rounded-lg border bg-muted/20 p-3"
-                            >
-                              <span className="text-sm font-medium">
-                                {label}
-                              </span>
-                              <time
-                                className="text-sm text-muted-foreground"
-                                dateTime={paid.paidOn}
-                              >
-                                {formatGeorgianDate(paid.paidOn)}
-                              </time>
-                            </div>
-                          ) : (
-                            <form.Field
-                              name={`paymentDates.${stage}`}
-                              key={stage}
-                            >
-                              {(date) => (
-                                <Field data-invalid={!date.state.meta.isValid}>
-                                  <FieldLabel htmlFor={id}>{label}</FieldLabel>
-                                  <DatePicker
-                                    id={id}
-                                    value={date.state.value}
-                                    today={start ?? `${month}-01`}
-                                    invalid={!date.state.meta.isValid}
-                                    clearLabel="გადახდის თარიღის გასუფთავება"
-                                    onBlur={date.handleBlur}
-                                    onChange={date.handleChange}
-                                  />
-                                  {start &&
-                                  (!date.state.value ||
-                                    date.state.value < start) ? (
-                                    <FieldDescription>
-                                      გრაფიკით {formatGeorgianDate(start)}-დან
-                                    </FieldDescription>
-                                  ) : null}
-                                  <FieldError
-                                    id={`${id}-error`}
-                                    errors={date.state.meta.errors}
-                                  />
-                                </Field>
-                              )}
-                            </form.Field>
-                          )
-                        },
-                      )
-                    }}
-                  </form.Subscribe>
                   {!field.state.value.length ? (
                     <Empty className="rounded-xl border border-dashed md:p-8">
                       <EmptyHeader>
@@ -633,97 +608,107 @@ export function MonthlyEntryForm({
                     </Empty>
                   ) : null}
                   {field.state.value.map((_, index) => (
-                    <FieldGroup
+                    <form.Subscribe
                       key={index}
-                      className="gap-4 rounded-xl border bg-muted/20 p-4"
+                      selector={(state) =>
+                        state.values.adjustments[index]?.kind === 'fine'
+                      }
                     >
-                      <div className="flex items-end gap-3">
-                        <form.Field name={`adjustments[${index}].kind`}>
-                          {(item) => (
-                            <Field className="min-w-0 flex-1">
-                              <FieldLabel htmlFor={`monthly-kind-${index}`}>
-                                ტიპი <span aria-hidden="true">*</span>
-                              </FieldLabel>
-                              <Select
-                                value={item.state.value}
-                                onValueChange={(v) => {
-                                  if (
-                                    v === 'bonus' ||
-                                    v === 'premium' ||
-                                    v === 'fine'
-                                  )
-                                    item.handleChange(v)
-                                }}
-                              >
-                                <SelectTrigger
-                                  id={`monthly-kind-${index}`}
-                                  aria-required="true"
-                                  className="w-full"
-                                >
-                                  <SelectValue>
-                                    {monthlyAdjustmentLabels[item.state.value]}
-                                  </SelectValue>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectGroup>
-                                    {(
-                                      ['bonus', 'premium', 'fine'] as const
-                                    ).map((kind) => (
-                                      <SelectItem key={kind} value={kind}>
-                                        {monthlyAdjustmentLabels[kind]}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                </SelectContent>
-                              </Select>
-                            </Field>
-                          )}
-                        </form.Field>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label={`ჩანაწერის წაშლა ${index + 1}`}
-                          onClick={() => field.removeValue(index)}
+                      {(fine) => (
+                        <FieldGroup
+                          data-fine={fine || undefined}
+                          className="gap-3 rounded-xl border bg-card p-3 data-[fine=true]:border-destructive/20 data-[fine=true]:bg-destructive/5 sm:p-4"
                         >
-                          <IconTrash aria-hidden="true" />
-                        </Button>
-                      </div>
-                      <form.Field name={`adjustments[${index}].amount`}>
-                        {(item) => (
-                          <Field data-invalid={!item.state.meta.isValid}>
-                            <FieldLabel htmlFor={`monthly-amount-${index}`}>
-                              თანხა ლარში <span aria-hidden="true">*</span>
-                            </FieldLabel>
-                            <Input
-                              id={`monthly-amount-${index}`}
-                              required
-                              inputMode="decimal"
-                              value={item.state.value}
-                              onBlur={item.handleBlur}
-                              onChange={(e) =>
-                                item.handleChange(e.target.value)
-                              }
-                              aria-invalid={!item.state.meta.isValid}
-                              aria-describedby={
-                                !item.state.meta.isValid
-                                  ? `monthly-amount-${index}-error`
-                                  : undefined
-                              }
-                            />
-                            <FieldError
-                              id={`monthly-amount-${index}-error`}
-                              errors={item.state.meta.errors}
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-                      <form.Subscribe
-                        selector={(s) =>
-                          s.values.adjustments[index]?.kind === 'fine'
-                        }
-                      >
-                        {(fine) => (
+                          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)_auto] items-start gap-2 sm:gap-3">
+                            <form.Field name={`adjustments[${index}].kind`}>
+                              {(item) => (
+                                <Field className="min-w-0">
+                                  <FieldLabel htmlFor={`monthly-kind-${index}`}>
+                                    ტიპი <span aria-hidden="true">*</span>
+                                  </FieldLabel>
+                                  <Select
+                                    value={item.state.value}
+                                    onValueChange={(v) => {
+                                      if (
+                                        v === 'bonus' ||
+                                        v === 'premium' ||
+                                        v === 'fine'
+                                      )
+                                        item.handleChange(v)
+                                    }}
+                                  >
+                                    <SelectTrigger
+                                      id={`monthly-kind-${index}`}
+                                      aria-required="true"
+                                      className="w-full"
+                                    >
+                                      <SelectValue>
+                                        {
+                                          monthlyAdjustmentLabels[
+                                            item.state.value
+                                          ]
+                                        }
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectGroup>
+                                        {(
+                                          ['bonus', 'premium', 'fine'] as const
+                                        ).map((kind) => (
+                                          <SelectItem key={kind} value={kind}>
+                                            {monthlyAdjustmentLabels[kind]}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
+                                </Field>
+                              )}
+                            </form.Field>
+                            <form.Field name={`adjustments[${index}].amount`}>
+                              {(item) => (
+                                <Field data-invalid={!item.state.meta.isValid}>
+                                  <FieldLabel
+                                    htmlFor={`monthly-amount-${index}`}
+                                  >
+                                    თანხა ლარში{' '}
+                                    <span aria-hidden="true">*</span>
+                                  </FieldLabel>
+                                  <Input
+                                    id={`monthly-amount-${index}`}
+                                    className="tabular-nums"
+                                    required
+                                    inputMode="decimal"
+                                    value={item.state.value}
+                                    onBlur={item.handleBlur}
+                                    onChange={(e) =>
+                                      item.handleChange(e.target.value)
+                                    }
+                                    aria-invalid={!item.state.meta.isValid}
+                                    aria-describedby={
+                                      !item.state.meta.isValid
+                                        ? `monthly-amount-${index}-error`
+                                        : undefined
+                                    }
+                                  />
+                                  <FieldError
+                                    id={`monthly-amount-${index}-error`}
+                                    errors={item.state.meta.errors}
+                                  />
+                                </Field>
+                              )}
+                            </form.Field>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="mt-7 text-muted-foreground hover:text-destructive"
+                              aria-label={`ჩანაწერის წაშლა ${index + 1}`}
+                              onClick={() => field.removeValue(index)}
+                            >
+                              <IconTrash aria-hidden="true" />
+                            </Button>
+                          </div>
                           <form.Field name={`adjustments[${index}].reason`}>
                             {(item) => (
                               <Field data-invalid={!item.state.meta.isValid}>
@@ -735,6 +720,7 @@ export function MonthlyEntryForm({
                                 </FieldLabel>
                                 <Textarea
                                   id={`monthly-reason-${index}`}
+                                  className="min-h-12"
                                   required={fine}
                                   maxLength={500}
                                   value={item.state.value}
@@ -756,73 +742,120 @@ export function MonthlyEntryForm({
                               </Field>
                             )}
                           </form.Field>
-                        )}
-                      </form.Subscribe>
-                    </FieldGroup>
+                        </FieldGroup>
+                      )}
+                    </form.Subscribe>
                   ))}
                   <FieldError errors={field.state.meta.errors} />
                 </div>
               )}
             </form.Field>
             <form.Subscribe
-              selector={(s) =>
-                s.values.adjustments.some((item) => item.kind === 'fine')
-              }
+              selector={({ values }) => ({
+                fineStage: values.fineStage ?? defaultFineStage,
+                hasFine: values.adjustments.some(({ kind }) => kind === 'fine'),
+                hasAdditions: values.adjustments.some(
+                  ({ kind }) => kind !== 'fine',
+                ),
+              })}
             >
-              {(hasFine) =>
-                hasFine ? (
-                  <form.Field name="fineStage">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="monthly-fine-stage">
-                          ჯარიმის დაქვითვის ეტაპი
-                        </FieldLabel>
-                        <Select
-                          value={field.state.value ?? 'default'}
-                          onValueChange={(value) => {
-                            if (
-                              value === 'default' ||
-                              value === 'salary' ||
-                              value === 'adjustments'
+              {({ fineStage, hasFine, hasAdditions }) =>
+                hasFine || hasAdditions ? (
+                  <Card className="gap-0">
+                    <CardHeader className="border-b bg-muted/25">
+                      <h3 className="flex items-center gap-2 font-semibold">
+                        <IconCalendarDollar
+                          className="size-4 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        გადახდის გრაფიკი
+                      </h3>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      <FieldGroup className="gap-4">
+                        {hasFine ? (
+                          <FieldGroup className="grid items-start gap-4 sm:has-[>:nth-child(2)]:grid-cols-2">
+                            <form.Field name="fineStage">
+                              {(field) => (
+                                <Field>
+                                  <FieldLabel htmlFor="monthly-fine-stage">
+                                    ჯარიმის დაქვითვის ეტაპი
+                                  </FieldLabel>
+                                  <Select
+                                    value={field.state.value ?? 'default'}
+                                    onValueChange={(value) => {
+                                      if (
+                                        value === 'default' ||
+                                        value === 'salary' ||
+                                        value === 'adjustments'
+                                      )
+                                        field.handleChange(
+                                          value === 'default' ? null : value,
+                                        )
+                                    }}
+                                  >
+                                    <SelectTrigger
+                                      id="monthly-fine-stage"
+                                      className="w-full"
+                                      aria-describedby={
+                                        field.state.value === null
+                                          ? 'monthly-default-fine-stage'
+                                          : undefined
+                                      }
+                                    >
+                                      <SelectValue>
+                                        {payStageLabel(
+                                          fineStage,
+                                          firstPaymentEnabled,
+                                        )}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectGroup>
+                                        <SelectItem value="default">
+                                          გრაფიკის მიხედვით
+                                        </SelectItem>
+                                        <SelectItem value="salary">
+                                          {payStageLabel(
+                                            'salary',
+                                            firstPaymentEnabled,
+                                          )}
+                                        </SelectItem>
+                                        <SelectItem value="adjustments">
+                                          {payStageLabel(
+                                            'adjustments',
+                                            firstPaymentEnabled,
+                                          )}
+                                        </SelectItem>
+                                      </SelectGroup>
+                                    </SelectContent>
+                                  </Select>
+                                  {field.state.value === null ? (
+                                    <FieldDescription id="monthly-default-fine-stage">
+                                      გრაფიკის მიხედვით
+                                    </FieldDescription>
+                                  ) : null}
+                                </Field>
+                              )}
+                            </form.Field>
+                            {fineStage === 'salary' || !hasAdditions
+                              ? paymentDateField(
+                                  fineStage,
+                                  'ჯარიმის დაქვითვის თარიღი',
+                                )
+                              : null}
+                          </FieldGroup>
+                        ) : null}
+                        {hasFine && hasAdditions ? <Separator /> : null}
+                        {hasAdditions
+                          ? paymentDateField(
+                              'adjustments',
+                              'ბონუსებისა და პრემიების გაცემის თარიღი',
                             )
-                              field.handleChange(
-                                value === 'default' ? null : value,
-                              )
-                          }}
-                        >
-                          <SelectTrigger
-                            id="monthly-fine-stage"
-                            className="w-full"
-                          >
-                            <SelectValue>
-                              {field.state.value
-                                ? payStageLabel(
-                                    field.state.value,
-                                    firstPaymentEnabled,
-                                  )
-                                : `გრაფიკის მიხედვით (${payStageLabel(defaultFineStage, firstPaymentEnabled)})`}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectGroup>
-                              <SelectItem value="default">
-                                გრაფიკის მიხედვით
-                              </SelectItem>
-                              <SelectItem value="salary">
-                                {payStageLabel('salary', firstPaymentEnabled)}
-                              </SelectItem>
-                              <SelectItem value="adjustments">
-                                {payStageLabel(
-                                  'adjustments',
-                                  firstPaymentEnabled,
-                                )}
-                              </SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    )}
-                  </form.Field>
+                          : null}
+                      </FieldGroup>
+                    </CardContent>
+                  </Card>
                 ) : null
               }
             </form.Subscribe>

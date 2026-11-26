@@ -28,7 +28,7 @@ const tabs = [
   {
     value: 'adjustments',
     to: '/manage/payroll/monthly',
-    label: 'ბონუსები, პრემიები და ჯარიმები',
+    label: 'ბონუსები / პრემიები / ჯარიმები',
     icon: IconMoneybagPlus,
     permission: 'payroll.read.all',
   },

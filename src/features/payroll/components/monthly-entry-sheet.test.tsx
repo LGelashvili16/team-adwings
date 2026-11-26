@@ -20,6 +20,11 @@ vi.mock('../monthly.functions', () => ({
   setMonthlyEmployee: vi.fn(),
   setMonthlyPayments: vi.fn(),
 }))
+vi.mock('../salary.functions', () => ({
+  getMySalary: vi.fn(),
+  getEmployeeSalary: vi.fn(),
+  getSalaryDirectory: vi.fn(),
+}))
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 const salary = {

@@ -72,7 +72,9 @@ it('saves a premium and fine together without any base-pay fields', async () => 
   await user.click(await screen.findByRole('button', { name: 'გიორგი' }))
   await user.click(await screen.findByRole('combobox', { name: /^ტიპი/ }))
   await user.click(await screen.findByRole('option', { name: 'პრემია' }))
-  await user.click(screen.getByRole('button', { name: 'გაცემის თარიღი' }))
+  const bonusDate = 'ბონუსებისა და პრემიების გაცემის თარიღი'
+  const fineDate = 'ჯარიმის დაქვითვის თარიღი'
+  await user.click(screen.getByRole('button', { name: bonusDate }))
   await user.click(
     await screen.findByRole('button', { name: /18 დეკემბერი 2026/ }),
   )
@@ -85,11 +87,27 @@ it('saves a premium and fine together without any base-pay fields', async () => 
   await user.click(screen.getByRole('button', { name: 'ჩანაწერის დამატება' }))
   await user.click(screen.getAllByRole('combobox', { name: /^ტიპი/ })[1])
   await user.click(await screen.findByRole('option', { name: 'ჯარიმა' }))
-  await user.click(
-    screen.getByRole('button', { name: 'ჯარიმის დაქვითვის თარიღი' }),
-  )
+  await user.click(screen.getByRole('button', { name: fineDate }))
   await user.click(
     await screen.findByRole('button', { name: /12 დეკემბერი 2026/ }),
+  )
+  const fineStage = screen.getByRole('combobox', {
+    name: 'ჯარიმის დაქვითვის ეტაპი',
+  })
+  await user.click(fineStage)
+  await user.click(
+    await screen.findByRole('option', { name: 'ბონუსები და პრემიები' }),
+  )
+  expect(screen.getByRole('button', { name: bonusDate })).toHaveTextContent(
+    /18 დეკემბერი/,
+  )
+  expect(screen.queryByRole('button', { name: fineDate })).toBeNull()
+  await user.click(fineStage)
+  await user.click(
+    await screen.findByRole('option', { name: 'გრაფიკის მიხედვით' }),
+  )
+  expect(screen.getByRole('button', { name: fineDate })).toHaveTextContent(
+    /12 დეკემბერი/,
   )
   await user.type(
     screen.getAllByRole('textbox', { name: /^თანხა ლარში/ })[1],

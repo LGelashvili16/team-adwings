@@ -39,6 +39,8 @@ Monthly Payroll now displays assigned base salaries before draft preparation, wi
 - [x] Refine the personal salary page, show planned changes only when scheduled, and highlight each payment for 24 hours after recording. Verified payment expiry in the component and PostgreSQL, and checked desktop, tablet and mobile layouts in Chrome with sample data.
 - [x] Use the full content width for the personal salary page, simplify payout labels, and collapse the salary change history by default. Verified the Georgian labels, keyboard controls and history pagination in desktop and mobile Chrome previews.
 - [x] Make the monthly draft removal reason optional and retain an audit note. Verified submitting an empty field in the dialog and retaining default and entered reasons in isolated PostgreSQL.
+- [x] Refine the payroll adjustments sheet with compact entries, a grouped payment schedule, and an always-visible save footer. Verified with payroll component tests and desktop and mobile Chrome previews in both themes using sample records.
+- [x] Tint fine entries and group the fine deduction stage with its date. Separate the bonus and premium payout date with a divider. Verified date retention when changing the deduction stage and inspected desktop and mobile Chrome previews using sample records.
 
 ## Historical simplified delivery, 2026-11-25
 
