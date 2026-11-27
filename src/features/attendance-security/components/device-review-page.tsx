@@ -3,7 +3,7 @@ import { AttendanceSecurityProvider } from '../providers/attendance-security-pro
 import type { readDeviceRequests } from '../attendance-security.functions'
 import { DeviceFilters } from './device-filters'
 import { useMemo, useState } from 'react'
-import { getRouteApi } from '@tanstack/react-router'
+import { getRouteApi, Link } from '@tanstack/react-router'
 import {
   useQuery,
   useQueryClient,
@@ -42,11 +42,8 @@ import {
   TableRow,
 } from '#/components/ui/table'
 import { Skeleton } from '#/components/ui/skeleton'
-import {
-  DeviceState,
-  SecurityPagination,
-  SecuritySubmit,
-} from './security-controls'
+import { DataPagination } from '#/components/common/data-pagination'
+import { DeviceState, SecuritySubmit } from './security-controls'
 import { formatAttendanceDateTime } from '#/features/attendance/attendance.rules'
 
 const route = getRouteApi('/_authenticated/manage/devices')
@@ -323,13 +320,16 @@ function DeviceReviewWorkspace() {
               ) : null}
             </TableBody>
           </Table>
-          <SecurityPagination
-            page={search.page}
-            total={result.total}
-            onPage={(page) => {
-              void navigate({ search: { ...search, page } })
-            }}
-          />
+          <div className="border-t px-4 py-3">
+            <DataPagination
+              page={search.page}
+              total={result.total}
+              pageSize={result.pageSize}
+              renderLink={(page) => (
+                <Link to="/manage/devices" search={{ ...search, page }} />
+              )}
+            />
+          </div>
         </div>
       )}
       <Dialog

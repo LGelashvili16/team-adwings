@@ -1645,5 +1645,81 @@ describe.runIf(process.env.RUN_ATTENDANCE_SECURITY_DB_TESTS === '1')(
         (await sql().query('select * from attendance_punch')).rows,
       ).toHaveLength(1)
     })
+    it('tracks actionable pending device requests for authorized reviewers in realtime state', async () => {
+      await sql().query(`delete from attendance_device`)
+      expect(await security.deviceRealtimeState(worker)).toBeNull()
+      expect(await security.deviceRealtimeState(hr)).toEqual({
+        changed: false,
+        hasPendingDeviceRequests: false,
+      })
+      expect(await security.deviceRealtimeState(administrator)).toEqual({
+        changed: false,
+        hasPendingDeviceRequests: false,
+      })
+      // Unrequested sign-in identification is not a pending approval request.
+      await security.registerAutomaticDevice(worker, context())
+      expect(await security.deviceRealtimeState(hr)).toEqual({
+        changed: false,
+        hasPendingDeviceRequests: false,
+      })
+      // HR requesting their own device is actionable when self-approval is granted,
+      // and hidden from the reviewer's own dot when self-approval is denied.
+      const hrDevice = await security.requestDevice(
+        hr,
+        { name: 'HR ბრაუზერი' },
+        context(hr),
+        true,
+      )
+      expect(await security.deviceRealtimeState(hr, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: true,
+      })
+      await sql().query(
+        `update "user" set permission_overrides='{"allow":[],"deny":["attendance.devices.approve.self"]}' where id='hr'`,
+      )
+      expect(await security.deviceRealtimeState(hr, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: false,
+      })
+      expect(await security.deviceRealtimeState(administrator, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: true,
+      })
+      // Worker requesting a device makes it actionable for HR even without self-approval.
+      const workerDevice = await security.requestDevice(
+        worker,
+        { name: 'სამუშაო ბრაუზერი' },
+        context(),
+        true,
+      )
+      expect(await security.deviceRealtimeState(hr, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: true,
+      })
+      expect(await security.deviceRealtimeState(worker, true)).toBeNull()
+      // Deciding the pending devices clears the indicator for each reviewer.
+      await security.decideDevice(hr, {
+        id: workerDevice.id,
+        revision: 1,
+        decision: 'approved',
+      })
+      expect(await security.deviceRealtimeState(hr, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: false,
+      })
+      expect(await security.deviceRealtimeState(administrator, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: true,
+      })
+      await security.decideDevice(administrator, {
+        id: hrDevice.id,
+        revision: 0,
+        decision: 'rejected',
+      })
+      expect(await security.deviceRealtimeState(administrator, true)).toEqual({
+        changed: true,
+        hasPendingDeviceRequests: false,
+      })
+    })
   },
 )

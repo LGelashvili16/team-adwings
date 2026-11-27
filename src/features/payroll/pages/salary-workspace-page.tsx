@@ -14,6 +14,7 @@ import { employeeSalaryQuery } from '../salary.queries'
 import { SalarySummary } from '../components/salary-summary'
 import { SalaryHistory } from '../components/salary-history'
 import { SalaryEditor } from '../components/salary-editor'
+import { EmployeeRestDayPolicyCard } from '../components/employee-rest-day-policy-card'
 import type { Actor } from '#/lib/authorization/actor'
 import type { SalaryEmployee } from '../salary.types'
 
@@ -101,7 +102,8 @@ export function SalaryWorkspace({
       {query.isPending ? (
         <div role="status" aria-busy="true" aria-label="ხელფასი იტვირთება">
           <div aria-hidden="true" className="flex flex-col gap-6">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Skeleton className="h-56 rounded-xl" />
               <Skeleton className="h-56 rounded-xl" />
               <Skeleton className="h-56 rounded-xl" />
             </div>
@@ -119,7 +121,10 @@ export function SalaryWorkspace({
         </Alert>
       ) : (
         <>
-          <SalarySummary employee={view.employee} />
+          <SalarySummary
+            employee={view.employee}
+            extra={<EmployeeRestDayPolicyCard actor={actor} userId={userId} />}
+          />
           {userId === actor.id ? (
             <p className="text-sm text-muted-foreground">
               საკუთარი ხელფასის შესაცვლელად მიმართეთ სხვა უფლებამოსილ პირს.

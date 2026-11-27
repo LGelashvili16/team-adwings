@@ -76,6 +76,7 @@ function overview(): Overview {
     serverNow: '2026-11-04T07:00:00.000Z',
     approvedLeave: null,
     remoteWorkday: false,
+    restDayClockInAllowed: true,
     workday: {
       date: '2026-11-04',
       timezone: 'Asia/Tbilisi',

@@ -65,6 +65,10 @@ export function AttendanceClock({
     sampleReceivedAt.current = startedAt
   }, [])
   const open = overview.openSession
+  const restDayBlocked =
+    !open &&
+    overview.workday.kind === 'day_off' &&
+    !overview.restDayClockInAllowed
   const workdayLimitReached =
     !open && (overview.today?.seconds ?? 0) >= MAX_WORKDAY_SECONDS
   const status = attendanceStatus(overview)
@@ -176,6 +180,7 @@ export function AttendanceClock({
             disabled={
               action.pending ||
               workdayLimitReached ||
+              restDayBlocked ||
               setupRequired ||
               (!open && overview.workday.kind === 'unconfigured')
             }
@@ -297,6 +302,18 @@ export function AttendanceClock({
             {activeDay ? <AttendanceDeviationBadges {...activeDay} /> : null}
           </div>
         </div>
+        {restDayBlocked ? (
+          <Alert
+            className={cn(workLog && 'order-4 lg:col-span-3')}
+            variant="info"
+            role="note"
+          >
+            <AlertDescription>
+              დასვენების დღეს სამუშაოს დაწყება თქვენს ანგარიშზე გამორთულია.
+              საჭიროების შემთხვევაში მიმართეთ HR-ს ან ადმინისტრატორს.
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {workdayLimitReached ? (
           <Alert
             className={cn(workLog && 'order-4 lg:col-span-3')}

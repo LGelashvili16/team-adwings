@@ -70,6 +70,7 @@ import { Route as AuthenticatedManageGpsDeviceIdRouteImport } from './routes/_au
 import { Route as AuthenticatedManagePayrollIndexRouteImport } from './routes/_authenticated/manage/payroll/index'
 import { Route as AuthenticatedManagePayrollUserIdRouteImport } from './routes/_authenticated/manage/payroll/$userId'
 import { Route as AuthenticatedManagePayrollMonthlyRouteImport } from './routes/_authenticated/manage/payroll/monthly'
+import { Route as AuthenticatedManagePayrollReviewRouteImport } from './routes/_authenticated/manage/payroll/review'
 import { Route as AuthenticatedManagePayrollSettingsRouteImport } from './routes/_authenticated/manage/payroll/settings'
 import { Route as AuthenticatedManagePayrollDeductionsIndexRouteImport } from './routes/_authenticated/manage/payroll/deductions/index'
 import { Route as AuthenticatedManagePayrollDeductionsDeductionIdRouteImport } from './routes/_authenticated/manage/payroll/deductions/$deductionId'
@@ -417,6 +418,12 @@ const AuthenticatedManagePayrollMonthlyRoute =
     path: '/payroll/monthly',
     getParentRoute: () => AuthenticatedManageRouteRoute,
   } as any)
+const AuthenticatedManagePayrollReviewRoute =
+  AuthenticatedManagePayrollReviewRouteImport.update({
+    id: '/payroll/review',
+    path: '/payroll/review',
+    getParentRoute: () => AuthenticatedManageRouteRoute,
+  } as any)
 const AuthenticatedManagePayrollSettingsRoute =
   AuthenticatedManagePayrollSettingsRouteImport.update({
     id: '/payroll/settings',
@@ -494,6 +501,7 @@ export interface FileRoutesByFullPath {
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
   '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/manage/payroll/review': typeof AuthenticatedManagePayrollReviewRoute
   '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
@@ -557,6 +565,7 @@ export interface FileRoutesByTo {
   '/manage/gps/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
   '/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/manage/payroll/review': typeof AuthenticatedManagePayrollReviewRoute
   '/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/manage/attendance': typeof AuthenticatedManageAttendanceIndexRoute
   '/manage/employees': typeof AuthenticatedManageEmployeesIndexRoute
@@ -624,6 +633,7 @@ export interface FileRoutesById {
   '/_authenticated/manage/gps_/$deviceId': typeof AuthenticatedManageGpsDeviceIdRoute
   '/_authenticated/manage/payroll/$userId': typeof AuthenticatedManagePayrollUserIdRoute
   '/_authenticated/manage/payroll/monthly': typeof AuthenticatedManagePayrollMonthlyRoute
+  '/_authenticated/manage/payroll/review': typeof AuthenticatedManagePayrollReviewRoute
   '/_authenticated/manage/payroll/settings': typeof AuthenticatedManagePayrollSettingsRoute
   '/_authenticated/manage/attendance/': typeof AuthenticatedManageAttendanceIndexRoute
   '/_authenticated/manage/employees/': typeof AuthenticatedManageEmployeesIndexRoute
@@ -691,6 +701,7 @@ export interface FileRouteTypes {
     | '/manage/gps/$deviceId'
     | '/manage/payroll/$userId'
     | '/manage/payroll/monthly'
+    | '/manage/payroll/review'
     | '/manage/payroll/settings'
     | '/manage/attendance/'
     | '/manage/employees/'
@@ -754,6 +765,7 @@ export interface FileRouteTypes {
     | '/manage/gps/$deviceId'
     | '/manage/payroll/$userId'
     | '/manage/payroll/monthly'
+    | '/manage/payroll/review'
     | '/manage/payroll/settings'
     | '/manage/attendance'
     | '/manage/employees'
@@ -820,6 +832,7 @@ export interface FileRouteTypes {
     | '/_authenticated/manage/gps_/$deviceId'
     | '/_authenticated/manage/payroll/$userId'
     | '/_authenticated/manage/payroll/monthly'
+    | '/_authenticated/manage/payroll/review'
     | '/_authenticated/manage/payroll/settings'
     | '/_authenticated/manage/attendance/'
     | '/_authenticated/manage/employees/'
@@ -1267,6 +1280,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedManagePayrollMonthlyRouteImport
       parentRoute: typeof AuthenticatedManageRouteRoute
     }
+    '/_authenticated/manage/payroll/review': {
+      id: '/_authenticated/manage/payroll/review'
+      path: '/payroll/review'
+      fullPath: '/manage/payroll/review'
+      preLoaderRoute: typeof AuthenticatedManagePayrollReviewRouteImport
+      parentRoute: typeof AuthenticatedManageRouteRoute
+    }
     '/_authenticated/manage/payroll/settings': {
       id: '/_authenticated/manage/payroll/settings'
       path: '/payroll/settings'
@@ -1382,6 +1402,7 @@ interface AuthenticatedManageRouteRouteChildren {
   AuthenticatedManageGpsDeviceIdRoute: typeof AuthenticatedManageGpsDeviceIdRoute
   AuthenticatedManagePayrollUserIdRoute: typeof AuthenticatedManagePayrollUserIdRoute
   AuthenticatedManagePayrollMonthlyRoute: typeof AuthenticatedManagePayrollMonthlyRoute
+  AuthenticatedManagePayrollReviewRoute: typeof AuthenticatedManagePayrollReviewRoute
   AuthenticatedManagePayrollSettingsRoute: typeof AuthenticatedManagePayrollSettingsRoute
   AuthenticatedManageEmployeesIndexRoute: typeof AuthenticatedManageEmployeesIndexRoute
   AuthenticatedManagePayrollIndexRoute: typeof AuthenticatedManagePayrollIndexRoute
@@ -1410,6 +1431,8 @@ const AuthenticatedManageRouteRouteChildren: AuthenticatedManageRouteRouteChildr
       AuthenticatedManagePayrollUserIdRoute,
     AuthenticatedManagePayrollMonthlyRoute:
       AuthenticatedManagePayrollMonthlyRoute,
+    AuthenticatedManagePayrollReviewRoute:
+      AuthenticatedManagePayrollReviewRoute,
     AuthenticatedManagePayrollSettingsRoute:
       AuthenticatedManagePayrollSettingsRoute,
     AuthenticatedManageEmployeesIndexRoute:

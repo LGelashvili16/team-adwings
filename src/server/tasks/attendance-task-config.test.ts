@@ -15,12 +15,16 @@ it.each([true, false])(
       expect(nitro.options.scheduledTasks['* * * * *']).toEqual([
         'employees:departures',
         'attendance:reminders',
+        'gps:geofence-presence',
       ])
       expect(nitro.options.tasks['attendance:reminders'].handler).toMatch(
         /attendance-reminders\.ts$/,
       )
       expect(nitro.options.tasks['employees:departures'].handler).toMatch(
         /employee-departures\.ts$/,
+      )
+      expect(nitro.options.tasks['gps:geofence-presence'].handler).toMatch(
+        /gps-geofence-presence\.ts$/,
       )
       expect(
         nitro.options.handlers.some((handler) =>

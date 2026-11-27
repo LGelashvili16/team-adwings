@@ -243,7 +243,10 @@ export async function saveCompanyJobGeofenceSettings(
   actor: Actor | null,
   input: unknown,
 ) {
-  const { diameter } = validateInput(jobGeofenceSettingsSchema, input)
+  const { diameter, autoAttendanceEnabled } = validateInput(
+    jobGeofenceSettingsSchema,
+    input,
+  )
   return repository.transactJobs(async (tx) => {
     const current = await requireJobActor(tx, actor, true)
     assertPermissions(current, ['manage.access', 'gps.read', 'gps.manage'])
@@ -251,6 +254,7 @@ export async function saveCompanyJobGeofenceSettings(
       tx,
       current.id,
       diameter,
+      autoAttendanceEnabled,
     )
     if (changed) await signalRealtime(tx, { topic: 'jobs' })
     return setting

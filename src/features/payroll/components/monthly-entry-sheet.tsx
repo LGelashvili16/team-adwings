@@ -120,15 +120,117 @@ export function MonthlyEntrySheet({
     if (body.current) body.current.scrollTop = 0
   }
   const revision = view?.current
-  const salaryFooter = view?.payments.length ? (
-    <section className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-      <h3 className="text-sm font-medium">გაცემული თანხები</h3>
-      <PaymentBreakdown
-        payments={view.payments}
-        twice={view.firstPaymentEnabled}
-      />
-    </section>
-  ) : null
+  const attendanceSummary = view?.attendanceSummary
+  const mixedCalculatedBaseMinor = attendanceSummary?.fixedProrationComplete
+    ? attendanceSummary.proratedFixedMinor +
+      attendanceSummary.hourlyCalculatedMinor
+    : null
+  const attendanceCard =
+    attendanceSummary &&
+    (attendanceSummary.hasMixedSalaryKinds ||
+      attendanceSummary.autoBonusMinor > 0 ||
+      attendanceSummary.hourlyCalculatedMinor > 0 ||
+      attendanceSummary.salaryNeedsReviewCount > 0 ||
+      attendanceSummary.adjustmentsNeedsReviewCount > 0) ? (
+      <section className="flex flex-col gap-2.5 rounded-xl border bg-muted/25 p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="font-medium">დასწრებით გამოთვლილი მონაცემები</h3>
+          <Link
+            to="/manage/payroll/review"
+            search={{ month, q: employeeName, onlyFlagged: false, page: 1 }}
+            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+          >
+            გადამოწმებაზე გადასვლა
+          </Link>
+        </div>
+        {attendanceSummary.hasMixedSalaryKinds ? (
+          attendanceSummary.fixedProrationComplete ? (
+            <>
+              {attendanceSummary.fixedProrationSegments.map((segment) => (
+                <div
+                  key={`${segment.version}-${segment.startDate}`}
+                  className="flex items-center justify-between gap-2 tabular-nums"
+                >
+                  <span className="text-muted-foreground">
+                    ფიქსირებული ნაწილი ({segment.startDate} - {segment.endDate} ·{' '}
+                    {segment.coveredWorkingDays} / {segment.totalWorkingDays}{' '}
+                    სამუშაო დღე)
+                  </span>
+                  <strong>
+                    {formatSalary({ amountMinor: segment.amountMinor })}
+                  </strong>
+                </div>
+              ))}
+            </>
+          ) : (
+            <Alert variant="warning" role="status">
+              <AlertDescription>
+                ამ თვეში ფიქსირებული და საათობრივი ტარიფი იცვლება, თუმცა
+                სამუშაო განრიგი არასრულია. დაადასტურეთ თვის ხელფასი ხელით.
+              </AlertDescription>
+            </Alert>
+          )
+        ) : null}
+        {attendanceSummary.autoBonusMinor > 0 ? (
+          <div className="flex items-center justify-between gap-2 tabular-nums">
+            <span className="text-muted-foreground">
+              დასვენების დღის ავტომატური ბონუსი
+            </span>
+            <strong>
+              {formatSalary({ amountMinor: attendanceSummary.autoBonusMinor })}
+            </strong>
+          </div>
+        ) : null}
+        {attendanceSummary.hourlyCalculatedMinor > 0 ? (
+          <div className="flex items-center justify-between gap-2 tabular-nums">
+            <span className="text-muted-foreground">
+              საათობრივი დარიცხვა (
+              {formatWorkedTime(attendanceSummary.hourlyPayableSeconds)})
+            </span>
+            <strong>
+              {formatSalary({
+                amountMinor: attendanceSummary.hourlyCalculatedMinor,
+              })}
+            </strong>
+          </div>
+        ) : null}
+        {mixedCalculatedBaseMinor !== null ? (
+          <div className="flex items-center justify-between gap-2 border-t pt-2 font-medium tabular-nums">
+            <span>ჯამური გამოთვლილი საბაზო ხელფასი</span>
+            <strong>
+              {formatSalary({ amountMinor: mixedCalculatedBaseMinor })}
+            </strong>
+          </div>
+        ) : null}
+        {attendanceSummary.salaryNeedsReviewCount +
+          attendanceSummary.adjustmentsNeedsReviewCount >
+        0 ? (
+          <Alert variant="warning" role="status">
+            <AlertDescription>
+              გაცემამდე საჭიროა HR-ის ან ადმინისტრატორის გადამოწმება (
+              {attendanceSummary.salaryNeedsReviewCount +
+                attendanceSummary.adjustmentsNeedsReviewCount}{' '}
+              ჩანაწერი).
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </section>
+    ) : null
+  const salaryFooter =
+    view?.payments.length || attendanceCard ? (
+      <div className="flex flex-col gap-3">
+        {attendanceCard}
+        {view?.payments.length ? (
+          <section className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+            <h3 className="text-sm font-medium">გაცემული თანხები</h3>
+            <PaymentBreakdown
+              payments={view.payments}
+              twice={view.firstPaymentEnabled}
+            />
+          </section>
+        ) : null}
+      </div>
+    ) : null
   const removeAction =
     view &&
     canEdit &&
@@ -252,6 +354,7 @@ export function MonthlyEntrySheet({
                     source={editable}
                     current={view.current}
                     baseNeedsReview={view.baseNeedsReview}
+                    suggestedBaseMinor={mixedCalculatedBaseMinor}
                     firstPaymentEnabled={view.firstPaymentEnabled}
                     firstAlreadyPaid={view.payments.some(
                       (payment) => payment.stage !== 'adjustments',

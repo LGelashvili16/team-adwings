@@ -57,6 +57,7 @@ import { salaryKindLabels } from '../salary.presentation'
 import { setSalaryTerms } from '../salary.functions'
 import { salaryKey } from '../salary.queries'
 import { monthlyKey } from '../monthly.queries'
+import { restDayPolicyKey } from '../rest-day-policy.queries'
 import type { SalaryEmployee } from '../salary.types'
 
 export function SalaryEditor({
@@ -135,6 +136,7 @@ export function SalaryEditor({
             targets.some(({ userId }) => userId === queryKey[4]),
         })
         void client.invalidateQueries({ queryKey: monthlyKey(actorId) })
+        void client.invalidateQueries({ queryKey: restDayPolicyKey(actorId) })
         onClose()
       } catch {
         const message =

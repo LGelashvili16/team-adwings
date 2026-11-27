@@ -5,6 +5,7 @@ import {
   isRemoteWorkday,
 } from '#/features/scheduling/server/scheduling.service.server'
 import { readApprovedLeaveForAttendance } from '#/features/leave/server/leave.service.server'
+import { readEmployeeRestDayPolicyOnDate } from '#/features/payroll/server/rest-day-policy.repository.server'
 import {
   checkInSchema,
   checkOutSchema,
@@ -73,6 +74,11 @@ export async function getAttendanceOverview(
     const now = new Date()
     const workday = await getEmployeeWorkday(now, employeeId, tx)
     const remoteWorkday = await isRemoteWorkday(workday, employeeId, tx)
+    const restDayPolicy = await readEmployeeRestDayPolicyOnDate(
+      tx,
+      employeeId,
+      workday.date,
+    )
     const approvedLeave = await readApprovedLeaveForAttendance(
       tx,
       actor.id,
@@ -91,6 +97,7 @@ export async function getAttendanceOverview(
       serverNow: now.toISOString(),
       workday,
       remoteWorkday,
+      restDayClockInAllowed: restDayPolicy.restDayClockInAllowed,
       approvedLeave,
       lastSessionId: last?.id ?? null,
       openSession: open
@@ -208,6 +215,19 @@ export async function checkIn(
       )
     const workday = await getEmployeeWorkday(now, employeeId, tx)
     const nonWorkingDay = workday.kind === 'day_off'
+    // Self-service clock-in on a configured rest day respects the employee's effective switch.
+    // Assisted HR/admin punches and closing already-open sessions remain allowed.
+    if (nonWorkingDay && !security.intent.targetUserId) {
+      const restDayPolicy = await readEmployeeRestDayPolicyOnDate(
+        tx,
+        employeeId,
+        workday.date,
+      )
+      if (!restDayPolicy.restDayClockInAllowed)
+        throw new AttendanceWorkflowError(
+          'დასვენების დღეს სამუშაოს დაწყება თქვენს ანგარიშზე გამორთულია. საჭიროების შემთხვევაში მიმართეთ HR-ს ან ადმინისტრატორს.',
+        )
+    }
     if (await repository.workdayLimitReached(tx, employeeId, workday.date))
       throw new AttendanceWorkflowError(
         'ამ სამუშაო დღისთვის 18-საათიანი ჯამური ზღვარი მიღწეულია.',

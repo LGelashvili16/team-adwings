@@ -11,7 +11,7 @@ const actor: Actor = {
   roles: ['employee'],
 }
 it('preserves safe forbidden metadata through SSR serialization', () => {
-  for (const roles of [['employee'], ['hr_manager']] as const) {
+  for (const roles of [['employee'], ['supervisor']] as const) {
     try {
       requireSalaryWorkspace({ ...actor, roles: [...roles] })
       throw new Error('Expected denial')
@@ -21,7 +21,7 @@ it('preserves safe forbidden metadata through SSR serialization', () => {
   }
 })
 it('allows only payroll roles and honors explicit denials', () => {
-  for (const role of ['accountant', 'admin', 'owner'] as const) {
+  for (const role of ['hr_manager', 'accountant', 'admin', 'owner'] as const) {
     expect(() =>
       requireSalaryWorkspace({ ...actor, roles: [role] }),
     ).not.toThrow()
@@ -29,7 +29,7 @@ it('allows only payroll roles and honors explicit denials', () => {
   expect(() =>
     requireSalaryWorkspace({
       ...actor,
-      roles: ['hr_manager'],
+      roles: ['supervisor'],
       permissionOverrides: { allow: ['payroll.read.all'], deny: [] },
     }),
   ).toThrow()

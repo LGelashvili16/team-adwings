@@ -15,6 +15,7 @@ import {
 import { Avatar, AvatarFallback } from '#/components/ui/avatar'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { workLocationLabel } from '#/features/scheduling/scheduling.content'
 import {
   Table,
   TableBody,
@@ -75,11 +76,7 @@ export function CompanyAttendanceUsersTable({
             </Button>
           ),
           cell: ({ row }) => (
-            <Link
-              className="group flex min-w-48 items-center gap-3 rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              to="/manage/attendance/$userId"
-              params={{ userId: row.original.userId }}
-            >
+            <div className="flex min-w-48 items-center gap-3">
               <Avatar aria-hidden="true">
                 <AvatarFallback>
                   {row.original.name
@@ -91,10 +88,23 @@ export function CompanyAttendanceUsersTable({
                     .toLocaleUpperCase('ka-GE')}
                 </AvatarFallback>
               </Avatar>
-              <span className="group-hover:underline group-hover:underline-offset-4">
-                {row.original.name}
-              </span>
-            </Link>
+              <div className="flex min-w-0 flex-col">
+                <Link
+                  className="group w-fit rounded-md font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  to="/manage/attendance/$userId"
+                  params={{ userId: row.original.userId }}
+                >
+                  <span className="group-hover:underline group-hover:underline-offset-4">
+                    {row.original.name}
+                  </span>
+                </Link>
+                {row.original.username ? (
+                  <span className="font-mono text-xs text-muted-foreground">
+                    @{row.original.username}
+                  </span>
+                ) : null}
+              </div>
+            </div>
           ),
         }),
         helper.accessor('jobTitle', {
@@ -105,61 +115,42 @@ export function CompanyAttendanceUsersTable({
             </span>
           ),
         }),
-        helper.accessor('username', {
-          header: () => (
-            <Button
-              variant="link"
-              size="sm"
-              nativeButton={false}
-              role="link"
-              render={
-                <Link
-                  to="/manage/attendance"
-                  search={{
-                    ...search,
-                    page: 1,
-                    sort:
-                      sort === 'username-asc'
-                        ? 'username-desc'
-                        : 'username-asc',
-                  }}
-                />
-              }
-            >
-              მომხმარებლის სახელი
-              {sort.startsWith('username') ? (
-                sort.endsWith('desc') ? (
-                  <IconArrowDown data-icon="inline-end" aria-hidden="true" />
-                ) : (
-                  <IconArrowUp data-icon="inline-end" aria-hidden="true" />
-                )
-              ) : (
-                <IconArrowsSort data-icon="inline-end" aria-hidden="true" />
-              )}
-            </Button>
-          ),
-          cell: ({ row }) => (
-            <span className="font-mono text-sm text-muted-foreground">
-              {row.original.username || 'არ არის მითითებული'}
-            </span>
-          ),
+        helper.accessor('salaryKind', {
+          header: 'ხელფასის ტიპი',
+          cell: ({ row }) => {
+            const kind = row.original.salaryKind
+            if (kind === 'hourly')
+              return <Badge variant="blue">საათობრივი</Badge>
+            if (kind === 'monthly')
+              return <Badge variant="outline">ყოველთვიური</Badge>
+            return (
+              <span className="text-sm text-muted-foreground">
+                არ არის მითითებული
+              </span>
+            )
+          },
         }),
         helper.accessor('attendanceStatus', {
           header: 'დღევანდელი დასწრება',
           cell: ({ row }) => {
             const status = row.original.attendanceStatus
             return (
-              <Badge variant={status === 'working' ? 'green' : 'secondary'}>
-                {status === 'working'
-                  ? 'სამუშაოზეა'
-                  : status === 'recorded'
-                    ? 'დაფიქსირებულია'
-                    : status === 'unavailable'
-                      ? 'წვდომა შეზღუდულია'
-                      : status === 'former'
-                        ? 'ყოფილი თანამშრომელი'
-                        : 'არ დაფიქსირებულა'}
-              </Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={status === 'working' ? 'green' : 'secondary'}>
+                  {status === 'working'
+                    ? 'სამუშაოზეა'
+                    : status === 'recorded'
+                      ? 'დაფიქსირებულია'
+                      : status === 'unavailable'
+                        ? 'წვდომა შეზღუდულია'
+                        : status === 'former'
+                          ? 'ყოფილი თანამშრომელი'
+                          : 'არ დაფიქსირებულა'}
+                </Badge>
+                {row.original.remoteWorkday ? (
+                  <Badge variant="blue">{workLocationLabel(true)}</Badge>
+                ) : null}
+              </div>
             )
           },
         }),

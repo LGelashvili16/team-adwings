@@ -13,6 +13,7 @@ import {
 import { Input } from '#/components/ui/input'
 import { Skeleton } from '#/components/ui/skeleton'
 import { Spinner } from '#/components/ui/spinner'
+import { Switch } from '#/components/ui/switch'
 import {
   jobGeofenceSettingsQueryOptions,
   jobsKeys,
@@ -22,7 +23,8 @@ import { jobGeofenceFormSchema } from '#/features/jobs/jobs.schemas'
 import type { JobGeofenceDiameter } from '#/features/jobs/jobs.types'
 
 const diameterLabel = 'სამუშაოების გეოზონის დიამეტრი (მ)'
-const saveError = 'გეოზონის დიამეტრი ვერ შეინახა. სცადეთ ხელახლა.'
+const autoModeLabel = 'ავტომატური დასწრება გეოზონით'
+const saveError = 'გეოზონის პარამეტრები ვერ შეინახა. სცადეთ ხელახლა.'
 
 export function GpsGeofenceSettings({
   actorId,
@@ -32,21 +34,28 @@ export function GpsGeofenceSettings({
   canManage: boolean
 }) {
   const query = useQuery(jobGeofenceSettingsQueryOptions(actorId))
+  const autoEnabled = query.data?.autoAttendanceEnabled ?? false
   return (
-    <div className="w-full min-w-0 sm:w-64">
+    <div className="w-full min-w-0 sm:w-72">
       {query.data ? (
         canManage ? (
           <GeofenceForm
-            key={query.data.diameter}
+            key={`${query.data.diameter}-${autoEnabled}`}
             actorId={actorId}
             diameter={query.data.diameter}
+            autoAttendanceEnabled={autoEnabled}
           />
         ) : (
           <div className="flex flex-col items-start gap-2">
             <span className="text-xs font-medium text-muted-foreground">
               {diameterLabel}
             </span>
-            <Badge variant="secondary">{query.data.diameter} მ</Badge>
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="secondary">{query.data.diameter} მ</Badge>
+              <Badge variant={autoEnabled ? 'green' : 'outline'}>
+                {autoEnabled ? 'ავტომატური დასწრება' : 'დაკვირვების რეჟიმი'}
+              </Badge>
+            </div>
           </div>
         )
       ) : query.isPending ? (
@@ -75,13 +84,18 @@ export function GpsGeofenceSettings({
 function GeofenceForm({
   actorId,
   diameter,
+  autoAttendanceEnabled,
 }: {
   actorId: string
   diameter: JobGeofenceDiameter
+  autoAttendanceEnabled: boolean
 }) {
   const client = useQueryClient()
   const mutation = useMutation({
-    mutationFn: async (value: { diameter: JobGeofenceDiameter }) => {
+    mutationFn: async (value: {
+      diameter: JobGeofenceDiameter
+      autoAttendanceEnabled?: boolean
+    }) => {
       const result = await updateJobGeofenceSettings({ data: value })
       if (!result.ok) throw new Error(result.message)
       return result.value
@@ -93,19 +107,27 @@ function GeofenceForm({
           current && current.version > setting.version ? current : setting,
       )
       void client.invalidateQueries({ queryKey: jobsKeys.all(actorId) })
-      toast.success('გეოზონის დიამეტრი შენახულია.')
+      toast.success('გეოზონის პარამეტრები შენახულია.')
     },
     onError: () => toast.error(saveError),
   })
   const form = useForm({
-    defaultValues: { diameter: String(diameter) },
+    defaultValues: {
+      diameter: String(diameter),
+      autoAttendanceEnabled,
+    },
     validators: {
       onChange: jobGeofenceFormSchema,
       onSubmit: jobGeofenceFormSchema,
     },
     onSubmit: async ({ value }) => {
       const parsed = jobGeofenceFormSchema.parse(value)
-      if (parsed.diameter === diameter || mutation.isPending) return
+      if (
+        (parsed.diameter === diameter &&
+          parsed.autoAttendanceEnabled === autoAttendanceEnabled) ||
+        mutation.isPending
+      )
+        return
       await mutation.mutateAsync(parsed).catch(() => {})
     },
   })
@@ -113,13 +135,13 @@ function GeofenceForm({
   return (
     <form
       noValidate
-      className="flex flex-col gap-2"
+      className="flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
       }}
     >
-      <FieldGroup>
+      <FieldGroup className="gap-3">
         <form.Field name="diameter">
           {(field) => (
             <Field
@@ -147,22 +169,53 @@ function GeofenceForm({
                     : undefined
                 }
               />
-              <Button
-                type="submit"
-                depth="raised"
-                className="h-11 sm:h-9"
-                disabled={
-                  Number(field.state.value) === diameter || mutation.isPending
-                }
-                aria-busy={mutation.isPending}
-              >
-                {mutation.isPending ? <Spinner aria-hidden="true" /> : null}
-                შენახვა
-              </Button>
+              <form.Subscribe selector={(s) => s.values.autoAttendanceEnabled}>
+                {(autoVal) => (
+                  <Button
+                    type="submit"
+                    depth="raised"
+                    className="h-11 sm:h-9"
+                    disabled={
+                      (Number(field.state.value) === diameter &&
+                        autoVal === autoAttendanceEnabled) ||
+                      mutation.isPending
+                    }
+                    aria-busy={mutation.isPending}
+                  >
+                    {mutation.isPending ? <Spinner aria-hidden="true" /> : null}
+                    შენახვა
+                  </Button>
+                )}
+              </form.Subscribe>
               <FieldError
                 id="gps-geofence-diameter-error"
                 className="col-span-2"
                 errors={field.state.meta.errors}
+              />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="autoAttendanceEnabled">
+          {(field) => (
+            <Field orientation="horizontal">
+              <div className="flex flex-col gap-0.5">
+                <FieldLabel
+                  htmlFor="gps-geofence-auto-attendance"
+                  className="text-xs text-muted-foreground"
+                >
+                  {autoModeLabel}
+                </FieldLabel>
+                <span className="text-[11px] text-muted-foreground">
+                  {field.state.value
+                    ? 'ჯგუფი ავტომატურად იწყებს და ასრულებს ცვლას'
+                    : 'მხოლოდ დაკვირვების რეჟიმი'}
+                </span>
+              </div>
+              <Switch
+                id="gps-geofence-auto-attendance"
+                checked={field.state.value}
+                disabled={mutation.isPending}
+                onCheckedChange={field.handleChange}
               />
             </Field>
           )}

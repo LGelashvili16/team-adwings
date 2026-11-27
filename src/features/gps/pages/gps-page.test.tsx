@@ -144,7 +144,7 @@ it('lets GPS managers edit and explicitly save the diameter in the map legend', 
   expect(saveGeofenceSettings).not.toHaveBeenCalled()
   await user.click(save)
   expect(saveGeofenceSettings).toHaveBeenCalledExactlyOnceWith({
-    data: { diameter: 100 },
+    data: { diameter: 100, autoAttendanceEnabled: false },
   })
   expect(
     await within(legend).findByRole('textbox', {
@@ -186,7 +186,7 @@ it('validates and saves the diameter in whole meters', async () => {
   await user.type(input, '350')
   await user.click(screen.getByRole('button', { name: 'შენახვა' }))
   expect(saveGeofenceSettings).toHaveBeenCalledExactlyOnceWith({
-    data: { diameter: 350 },
+    data: { diameter: 350, autoAttendanceEnabled: false },
   })
   expect(
     await screen.findByRole('textbox', {

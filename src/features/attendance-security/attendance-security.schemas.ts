@@ -102,6 +102,10 @@ export const ownSecuritySearchSchema = z.object({
   deviceSort: securityListSchema.shape.sort,
   devicePage: securityListSchema.shape.page,
 })
+export const deviceRealtimeSchema = z.object({
+  changed: z.boolean(),
+  hasPendingDeviceRequests: z.boolean(),
+})
 export function parseIpLines(text: string) {
   return [...new Set(text.split(/[\s,;]+/).filter(Boolean))]
 }

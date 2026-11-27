@@ -1,5 +1,10 @@
 import { useState } from 'react'
-import { IconDownload, IconShare2 } from '@tabler/icons-react'
+import {
+  IconChevronLeft,
+  IconChevronRight,
+  IconDownload,
+  IconShare2,
+} from '@tabler/icons-react'
 import { usePwa } from '#/hooks/use-pwa'
 import { APP_NAME } from '#/lib/app'
 import { Button } from '#/components/ui/button'
@@ -14,10 +19,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/components/ui/dialog'
+import { cn } from '#/lib/utils'
 
 export function PwaInstallButton() {
   const pwa = usePwa()
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState(false)
 
@@ -44,23 +51,56 @@ export function PwaInstallButton() {
     <>
       {/* A desktop install action is available only when the browser offers it. */}
       {pwa.requestInstall || pwa.ios ? (
-        <Button
-          variant="outline"
-          depth="raised"
-          className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 h-10 min-w-10 shadow-lg"
-          onClick={() => void install()}
-          disabled={pending}
-          aria-busy={pending}
-          aria-label="აპის დაყენება"
-          title="აპის დაყენება"
-        >
-          {pending ? (
-            <Spinner aria-hidden="true" />
-          ) : (
-            <IconDownload aria-hidden="true" />
+        <div
+          className={cn(
+            'fixed bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 flex items-center gap-1',
+            collapsed
+              ? 'right-0'
+              : 'right-[max(1rem,env(safe-area-inset-right))]',
           )}
-          <span className="hidden sm:inline">აპის დაყენება</span>
-        </Button>
+        >
+          {!collapsed ? (
+            <Button
+              variant="outline"
+              depth="raised"
+              className="h-10 min-w-10 shadow-lg"
+              onClick={() => void install()}
+              disabled={pending}
+              aria-busy={pending}
+              aria-label="აპის დაყენება"
+              title="აპის დაყენება"
+            >
+              {pending ? (
+                <Spinner aria-hidden="true" />
+              ) : (
+                <IconDownload aria-hidden="true" />
+              )}
+              <span className="hidden sm:inline">აპის დაყენება</span>
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="outline"
+            depth="raised"
+            size="icon-sm"
+            className={cn(
+              'h-10 w-7 shadow-lg',
+              collapsed && 'rounded-r-none border-r-0',
+            )}
+            onClick={() => setCollapsed((value) => !value)}
+            aria-expanded={!collapsed}
+            aria-label={
+              collapsed ? 'აპის დაყენების ჩვენება' : 'აპის დაყენების დამალვა'
+            }
+            title={collapsed ? 'აპის დაყენების ჩვენება' : 'დამალვა'}
+          >
+            {collapsed ? (
+              <IconChevronLeft className="size-4" aria-hidden="true" />
+            ) : (
+              <IconChevronRight className="size-4" aria-hidden="true" />
+            )}
+          </Button>
+        </div>
       ) : null}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent showCloseButton={false}>

@@ -10,7 +10,10 @@ import {
 import * as repository from './company-attendance.repository.server'
 import { attendanceWeek } from '../attendance.rules'
 import type { Actor } from '#/lib/authorization/actor'
-import { getCompanyWorkday } from '#/features/scheduling/server/scheduling.service.server'
+import {
+  getCompanyWorkday,
+  readRemoteWorkdayEmployeeIds,
+} from '#/features/scheduling/server/scheduling.service.server'
 
 export async function listCompanyAttendanceUsers(
   actor: Actor | null,
@@ -32,11 +35,23 @@ export async function listCompanyAttendanceUsers(
           canReadAttendance: access.canReadAttendance,
         },
       )
+      const remoteEmployees = access.canReadAttendance
+        ? await readRemoteWorkdayEmployeeIds(
+            workday,
+            result.items.flatMap((item) =>
+              item.employeeId && item.employmentStatus !== 'inactive'
+                ? [item.employeeId]
+                : [],
+            ),
+            tx,
+          )
+        : new Set<string>()
       return {
         ...result,
         companyTimezone: workday.timezone,
         items: result.items.map(
           ({
+            employeeId,
             hasOpenSession,
             hasTodaySession,
             latestCheckIn,
@@ -53,6 +68,9 @@ export async function listCompanyAttendanceUsers(
                   : hasTodaySession
                     ? ('recorded' as const)
                     : ('not-recorded' as const),
+            remoteWorkday: Boolean(
+              employeeId && remoteEmployees.has(employeeId),
+            ),
             latestCheckIn: latestCheckIn
               ? new Date(latestCheckIn).toISOString()
               : null,

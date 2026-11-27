@@ -2,12 +2,16 @@ import { Link } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import {
   IconCalendarDollar,
+  IconChecklist,
   IconMoneybagPlus,
   IconSettings,
   IconUserDollar,
 } from '@tabler/icons-react'
 import { Tabs, TabsList, TabsTrigger } from '#/components/ui/tabs'
-import { hasPermission } from '#/lib/authorization/permissions'
+import {
+  hasAnyPermission,
+  hasPermission,
+} from '#/lib/authorization/permissions'
 import type { Actor } from '#/lib/authorization/actor'
 
 const tabs = [
@@ -31,6 +35,13 @@ const tabs = [
     label: 'ბონუსები / პრემიები / ჯარიმები',
     icon: IconMoneybagPlus,
     permission: 'payroll.read.all',
+  },
+  {
+    value: 'review',
+    to: '/manage/payroll/review',
+    label: 'დასწრებით გამოთვლები',
+    icon: IconChecklist,
+    permission: ['payroll.read.all', 'payroll.attendance.review'],
   },
   {
     value: 'settings',
@@ -62,6 +73,12 @@ export function PayrollNavigation({
     else if (item.left < bounds.left)
       rail.scrollLeft -= bounds.left - item.left + 4
   }, [active])
+  const visibleTabs = tabs.filter((item) =>
+    typeof item.permission === 'string'
+      ? hasPermission(actor, item.permission)
+      : hasAnyPermission(actor, item.permission),
+  )
+  if (visibleTabs.length <= 1) return null
   return (
     <Tabs value={active} className="min-w-0">
       <nav
@@ -70,9 +87,7 @@ export function PayrollNavigation({
         className="-m-1 overflow-x-auto p-1"
       >
         <TabsList className="w-max gap-1 rounded-xl border p-0.5 group-data-horizontal/tabs:h-auto">
-          {tabs
-            .filter((item) => hasPermission(actor, item.permission))
-            .map(({ value, to, label, icon: Icon }) => (
+          {visibleTabs.map(({ value, to, label, icon: Icon }) => (
               <TabsTrigger
                 key={value}
                 nativeButton={false}
@@ -88,7 +103,9 @@ export function PayrollNavigation({
                             view:
                               value === 'adjustments' ? 'bonuses' : undefined,
                           }
-                        : undefined
+                        : to === '/manage/payroll/review'
+                          ? { month, page: 1, q: '', onlyFlagged: false }
+                          : undefined
                     }
                     aria-current={value === active ? 'page' : undefined}
                   />

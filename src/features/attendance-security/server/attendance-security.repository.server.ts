@@ -72,6 +72,23 @@ export async function auditSecurity(
     .insert(attendanceSecurityAudit)
     .values({ actorId, targetId, action, reason, details })
 }
+export async function hasPendingDeviceRequests(
+  tx: AttendanceTransaction,
+  actorId: string,
+  canApproveOwn: boolean,
+) {
+  const rows = await tx
+    .select({ id: attendanceDevice.id })
+    .from(attendanceDevice)
+    .where(
+      and(
+        eq(attendanceDevice.state, 'pending'),
+        canApproveOwn ? undefined : ne(attendanceDevice.userId, actorId),
+      ),
+    )
+    .limit(1)
+  return rows.length > 0
+}
 export async function listDevices(
   tx: AttendanceTransaction,
   input: z.infer<typeof securityListSchema>,

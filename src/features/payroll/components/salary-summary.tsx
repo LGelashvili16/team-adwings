@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { IconCalendarClock, IconWallet } from '@tabler/icons-react'
 import { Alert, AlertDescription, AlertTitle } from '#/components/ui/alert'
 import { Card, CardHeader, CardTitle, CardContent } from '#/components/ui/card'
@@ -82,16 +83,21 @@ function SalaryTermSummary({
 export function SalarySummary({
   employee,
   personal = false,
+  extra,
 }: {
   employee: SalaryEmployee
   personal?: boolean
+  extra?: ReactNode
 }) {
   const next = employee.next
   return (
     <div
       className={cn(
         'grid min-w-0 gap-4',
-        !personal && 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]',
+        !personal &&
+          (extra
+            ? 'lg:grid-cols-3'
+            : 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]'),
       )}
     >
       <Card
@@ -168,6 +174,7 @@ export function SalarySummary({
           </CardContent>
         </Card>
       )}
+      {!personal ? extra : null}
     </div>
   )
 }

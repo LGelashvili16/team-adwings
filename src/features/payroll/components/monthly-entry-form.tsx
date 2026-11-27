@@ -68,6 +68,7 @@ export function MonthlyEntryForm({
   source: initialSource,
   current: initialCurrent,
   baseNeedsReview = false,
+  suggestedBaseMinor = null,
   onSaved,
   onPending,
   showSubmit = true,
@@ -84,6 +85,7 @@ export function MonthlyEntryForm({
   source: MonthlySource | null
   current: MonthlyDetail['current']
   baseNeedsReview?: boolean
+  suggestedBaseMinor?: number | null
   onSaved: () => void
   onPending: (value: boolean) => void
   showSubmit?: boolean
@@ -203,6 +205,7 @@ export function MonthlyEntryForm({
   const defaultBase =
     paidBase ??
     savedBase ??
+    suggestedBaseMinor ??
     (source?.salary.kind === 'monthly' ? source.salary.amountMinor : null)
   const form = useForm({
     defaultValues: {

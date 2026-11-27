@@ -16,6 +16,7 @@ import {
   attendanceReviewer,
   attendanceSession,
   employee,
+  employeeSalaryTerm,
   user,
 } from '#/db/schema'
 import { effectiveEmploymentStatus } from '#/features/employees/server/employment-status.server'
@@ -83,10 +84,12 @@ export async function companyAttendanceUsers(
   const items = await tx
     .select({
       userId: user.id,
+      employeeId: employee.id,
       name,
       username,
       state: user.accessState,
       jobTitle: employee.jobTitle,
+      salaryKind: sql<'monthly' | 'hourly' | null>`(select ${employeeSalaryTerm.kind} from ${employeeSalaryTerm} where ${employeeSalaryTerm.employeeId} = ${employee.id} and ${employeeSalaryTerm.effectiveFrom} <= ${summary.date}::date order by ${employeeSalaryTerm.effectiveFrom} desc, ${employeeSalaryTerm.version} desc limit 1)`,
       employmentStatus: effectiveEmploymentStatus,
       hasOpenSession: summary.canReadAttendance
         ? sql<boolean>`exists (select 1 from ${attendanceSession} where ${attendanceSession.employeeId} = ${employee.id} and ${attendanceSession.endedAt} is null and ${attendanceSession.startedAt} <= ${summary.now}::timestamptz)`

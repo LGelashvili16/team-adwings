@@ -110,6 +110,13 @@ export const navigationItems = [
     permission: 'payroll.read.all',
   },
   {
+    to: '/manage/payroll/review',
+    icon: IconChecklist,
+    label: 'ხელფასების გადამოწმება',
+    permission: 'payroll.attendance.review',
+    hideWhenHasPermission: 'payroll.read.all',
+  },
+  {
     to: '/manage/attendance',
     icon: IconClock,
     label: 'დასწრებები',
@@ -245,6 +252,7 @@ export const navigationItems = [
   label: string
   icon: typeof IconLayoutDashboard
   permission: Permission | ReadonlyArray<Permission> | null
+  hideWhenHasPermission?: Permission
   secondary?: boolean
 }>
 

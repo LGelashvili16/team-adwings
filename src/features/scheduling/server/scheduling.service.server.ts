@@ -274,6 +274,15 @@ export async function isRemoteWorkday(
   )
 }
 
+/** Batched remote workday lookup for directory views; callers establish employee read scope first. */
+export function readRemoteWorkdayEmployeeIds(
+  workday: CompanyWorkday,
+  employeeIds: Array<string>,
+  tx: repository.ScheduleTransaction,
+) {
+  return repository.readRemoteWorkdayEmployeeIds(tx, workday, employeeIds)
+}
+
 /** Internal attendance interface; the caller establishes the active employee before reading expectations. */
 export function getCompanyWorkday(
   now: Date,

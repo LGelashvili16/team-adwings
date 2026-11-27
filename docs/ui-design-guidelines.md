@@ -34,7 +34,7 @@ Keep `თანამდებობა` as employee profile data, separate from
 
 Group weekly work-location switches under the employee schedule and show the selected location beside each working day. Use ადგილზე as the default. Put date-specific changes in a separate field group on the employee edit sheet, with the date before the work location. Show saved upcoming changes beside the recurring week on the employee profile and personal schedule.
 
-Show a blue დისტანციურად badge immediately before the status badge in the dashboard timer header when today's effective working day is remote.
+Show a blue დისტანციურად badge immediately before the status badge in the dashboard timer header, and immediately after the today's attendance status badge in the `/manage/attendance` directory, when today's effective working day is remote.
 
 During account activation, keep the username's typed case and replace spaces with hyphens as they are entered. Show a compact orange warning Alert below the field when a replacement occurs. Save and look up usernames in lowercase.
 

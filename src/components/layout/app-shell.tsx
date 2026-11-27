@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useNotificationRealtime } from '#/features/notifications/hooks/use-notification-realtime'
 import { notificationsQueryOptions } from '#/features/notifications/notifications.queries'
 import { useComplaintRealtime } from '#/features/complaints/hooks/use-complaint-realtime'
+import { useDeviceRealtime } from '#/features/attendance-security/hooks/use-device-realtime'
 import { RealtimeProvider } from '#/providers/realtime-provider'
 import { Link, Outlet, useLocation, useRouter } from '@tanstack/react-router'
 import { toast } from 'sonner'
@@ -58,6 +59,7 @@ function WorkspaceShell({ actor }: { actor: Actor }) {
     (notificationsSummary.data?.unseenCount ?? 0) > 0
   const { hasUnreadComplaints } = useComplaintRealtime(actor.id)
   const { hasUnreadAnnouncements } = useAnnouncementRealtime(actor.id)
+  const { hasPendingDeviceRequests } = useDeviceRealtime(actor.id)
   const router = useRouter()
   const pathname = useLocation({ select: (location) => location.pathname })
   const pageTitle =
@@ -100,6 +102,7 @@ function WorkspaceShell({ actor }: { actor: Actor }) {
           hasUnreadJobs={
             !unreadJobs.isError && Boolean(unreadJobs.data?.hasUnread)
           }
+          hasPendingDeviceRequests={hasPendingDeviceRequests}
           inset
           footer={
             <WorkspaceUserMenu

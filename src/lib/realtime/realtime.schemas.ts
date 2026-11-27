@@ -5,6 +5,7 @@ export const realtimeTopicSchema = z.enum([
   'complaints',
   'notifications',
   'jobs',
+  'devices',
 ])
 export type RealtimeTopic = z.infer<typeof realtimeTopicSchema>
 

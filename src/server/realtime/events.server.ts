@@ -4,6 +4,7 @@ import { notificationRealtimeHandler } from '#/features/notifications/server/not
 import { announcementRealtimeHandler } from '#/features/announcements/server/announcements-stream.server'
 import { eventsResponse } from '#/lib/realtime/events-response.server'
 import { complaintRealtimeHandler } from '#/features/complaints/server/complaints-stream.server'
+import { deviceRealtimeHandler } from '#/features/attendance-security/server/devices-stream.server'
 
 /** Compose feature handlers here; shared transport never imports business features. */
 export function applicationEventsResponse(request: Request) {
@@ -12,5 +13,6 @@ export function applicationEventsResponse(request: Request) {
     notificationRealtimeHandler,
     announcementRealtimeHandler,
     complaintRealtimeHandler,
+    deviceRealtimeHandler,
   ])
 }

@@ -30,6 +30,9 @@ vi.mock('#/features/announcements/hooks/use-announcement-realtime', () => ({
 vi.mock('#/features/complaints/hooks/use-complaint-realtime', () => ({
   useComplaintRealtime: () => ({ hasUnreadComplaints: false }),
 }))
+vi.mock('#/features/attendance-security/hooks/use-device-realtime', () => ({
+  useDeviceRealtime: () => ({ hasPendingDeviceRequests: false }),
+}))
 vi.mock('#/features/notifications/hooks/use-notification-realtime', () => ({
   useNotificationRealtime: () => undefined,
 }))

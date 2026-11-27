@@ -31,6 +31,7 @@ import {
   hasPermission,
 } from '#/lib/authorization/permissions'
 import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
+import { signalRealtime } from '#/lib/realtime/postgres-events.server'
 import {
   clockIntentSchema,
   clockProofSchema,
@@ -44,6 +45,7 @@ import {
 import {
   auditSecurity,
   currentActor,
+  hasPendingDeviceRequests,
   listDevices,
   policyForUpdate,
 } from './attendance-security.repository.server'
@@ -284,6 +286,7 @@ async function provisionDevice(
             existing.id,
             existing.revision + 1,
           )
+        await signalRealtime(tx, { topic: 'devices', subjectId: existing.id })
         return { id: existing.id, state: 'pending' }
       }
       return { id: existing.id, state: existing.state }
@@ -311,6 +314,8 @@ async function provisionDevice(
     )
     if (trigger !== 'sign_in' && policy.browserApprovalRequired)
       await notifyReviewers(tx, actor.id, created.id, 0)
+    if (trigger !== 'sign_in')
+      await signalRealtime(tx, { topic: 'devices', subjectId: created.id })
     return { id: created.id, state: created.state }
   })
 }
@@ -481,6 +486,7 @@ export async function finishRegistration(
       },
     )
     await notifyReviewers(tx, actor.id, device.id, device.revision + 1)
+    await signalRealtime(tx, { topic: 'devices', subjectId: device.id })
     return { id: device.id }
   })
 }
@@ -837,7 +843,32 @@ export async function decideDevice(actor: Actor, input: unknown) {
           ? 'დასწრების მოწყობილობა დადასტურებულია. შეგიძლიათ ხელახლა სცადოთ.'
           : 'მოწყობილობა შეზღუდულია. შეკითხვებისთვის დაუკავშირდით HR-ს.',
     })
+    await signalRealtime(tx, { topic: 'devices', subjectId: device.id })
     return { id: device.id }
+  })
+}
+export async function deviceRealtimeState(actor: Actor, changed = false) {
+  return db.transaction(async (tx) => {
+    let current: Actor
+    try {
+      current = await currentActor(tx, actor)
+    } catch (error) {
+      if (error instanceof AuthorizationError) return null
+      throw error
+    }
+    if (
+      !hasPermission(current, 'manage.access') ||
+      !hasPermission(current, 'attendance.devices.manage')
+    )
+      return null
+    return {
+      changed,
+      hasPendingDeviceRequests: await hasPendingDeviceRequests(
+        tx,
+        current.id,
+        hasPermission(current, 'attendance.devices.approve.self'),
+      ),
+    }
   })
 }
 export async function securitySettings(actor: Actor) {

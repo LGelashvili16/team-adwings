@@ -201,11 +201,11 @@ describe.runIf(process.env.RUN_SALARY_DB_TESTS === '1')(
       })
       vi.setSystemTime(new Date('2026-11-25T12:00:00+04:00'))
     })
-    it('uses current database authorization and rejects HR, unauthenticated and self-assignment', async () => {
+    it('uses current database authorization and allows HR while rejecting unauthenticated and self-assignment', async () => {
       await expect(service.saveSalaryTerms(null, input())).rejects.toThrow()
       await expect(
         service.readSalaryDirectory({ ...actor, id: 'salary-hr_manager' }, {}),
-      ).rejects.toThrow()
+      ).resolves.toBeDefined()
       await expect(
         service.saveSalaryTerms(
           actor,

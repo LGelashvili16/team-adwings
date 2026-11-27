@@ -43,6 +43,7 @@ export function AppSidebar({
   hasUnreadComplaints = false,
   hasUnreadNotifications = false,
   hasUnreadJobs = false,
+  hasPendingDeviceRequests = false,
 }: {
   actor: Actor
   inset?: boolean
@@ -51,6 +52,7 @@ export function AppSidebar({
   hasUnreadComplaints?: boolean
   hasUnreadNotifications?: boolean
   hasUnreadJobs?: boolean
+  hasPendingDeviceRequests?: boolean
 }) {
   const pathname = useLocation({ select: (location) => location.pathname })
   const { setOpenMobile, isMobile } = useSidebar()
@@ -127,12 +129,15 @@ export function AppSidebar({
             return null
           const items = group.items.filter(
             (item) =>
-              !item.permission ||
-              (typeof item.permission === 'string'
-                ? hasPermission(actor, item.permission)
-                : item.permission.some((permission) =>
-                    hasPermission(actor, permission),
-                  )),
+              (!('hideWhenHasPermission' in item) ||
+                !item.hideWhenHasPermission ||
+                !hasPermission(actor, item.hideWhenHasPermission)) &&
+              (!item.permission ||
+                (typeof item.permission === 'string'
+                  ? hasPermission(actor, item.permission)
+                  : item.permission.some((permission) =>
+                      hasPermission(actor, permission),
+                    ))),
           )
           if (!items.length) return null
           const popup = inset && !isMobile && group.label === 'ადმინისტრირება'
@@ -167,7 +172,20 @@ export function AppSidebar({
                       ) : (
                         <item.icon aria-hidden="true" />
                       )}
-                      <span>{item.label}</span>
+                      <span className="min-w-0 truncate">{item.label}</span>
+                      {item.to === '/manage/devices' &&
+                      hasPendingDeviceRequests ? (
+                        <>
+                          <span
+                            aria-hidden="true"
+                            data-slot="device-pending-dot"
+                            className="ml-auto size-2 shrink-0 rounded-full bg-destructive"
+                          />
+                          <span className="sr-only">
+                            , დასადასტურებელი მოწყობილობები
+                          </span>
+                        </>
+                      ) : null}
                       {item.to === '/jobs' && hasUnreadJobs ? (
                         <>
                           <span

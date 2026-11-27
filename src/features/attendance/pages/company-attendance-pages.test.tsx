@@ -125,7 +125,9 @@ beforeEach(() => {
           username: 'worker-1',
           state: 'active',
           jobTitle: 'ოპერატორი',
+          salaryKind: 'monthly',
           attendanceStatus: 'working',
+          remoteWorkday: false,
           latestCheckIn: '2026-11-17T06:30:00.000Z',
         },
       ],
@@ -176,7 +178,7 @@ describe('company attendance navigation', () => {
   it('opens the dynamic employee route from non-link row content', async () => {
     const user = userEvent.setup()
     mount('users')
-    await user.click(await screen.findByText('worker-1'))
+    await user.click(await screen.findByText('@worker-1'))
     expect(calls.navigate).toHaveBeenCalledExactlyOnceWith({
       to: '/manage/attendance/$userId',
       params: { userId: 'worker' },
@@ -184,7 +186,7 @@ describe('company attendance navigation', () => {
   })
   it('preserves modified clicks, text selection and the native employee link', async () => {
     mount('users')
-    const cell = await screen.findByText('worker-1')
+    const cell = await screen.findByText('@worker-1')
     for (const modifier of ['ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
       fireEvent.click(cell, { [modifier]: true })
     }
@@ -345,8 +347,12 @@ describe('company attendance navigation', () => {
     expect(linkSearch('შემდეგი გვერდი').get('page')).toBe('3')
     expect(linkSearch('შემდეგი გვერდი').get('q')).toBe('ანა')
     expect(linkSearch('შემდეგი გვერდი').get('sort')).toBe('name-asc')
-    expect(linkSearch('მომხმარებლის სახელი').get('sort')).toBe('username-asc')
-    expect(linkSearch('მომხმარებლის სახელი').get('page')).toBe('1')
+    expect(linkSearch('თანამშრომელი').get('sort')).toBe('name-desc')
+    expect(linkSearch('თანამშრომელი').get('page')).toBe('1')
+    expect(
+      screen.queryByRole('columnheader', { name: 'მომხმარებლის სახელი' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByText('@worker-1')).toBeInTheDocument()
   })
   it('validates search and resets pagination for a new query', async () => {
     const user = userEvent.setup()
@@ -435,7 +441,9 @@ it.each([
             username: 'worker',
             state: 'active',
             jobTitle: null,
+            salaryKind: null,
             attendanceStatus,
+            remoteWorkday: false,
             latestCheckIn: null,
           },
         ]}
@@ -446,8 +454,39 @@ it.each([
     expect(screen.getAllByRole('cell', { name: label }).length).toBeGreaterThan(
       0,
     )
+    expect(screen.queryByText('დისტანციურად')).not.toBeInTheDocument()
     expect(document.querySelector('time')).not.toBeInTheDocument()
     expect(screen.queryByText('არ გამოცხადდა')).not.toBeInTheDocument()
+  },
+)
+
+it.each([true, false])(
+  'shows the remote badge beside today’s attendance status when remoteWorkday is %s',
+  (remoteWorkday) => {
+    render(
+      <CompanyAttendanceUsersTable
+        items={[
+          {
+            userId: 'worker',
+            name: 'ანა',
+            username: 'worker',
+            state: 'active',
+            jobTitle: null,
+            salaryKind: 'hourly',
+            attendanceStatus: 'working',
+            remoteWorkday,
+            latestCheckIn: null,
+          },
+        ]}
+        timezone="Asia/Tbilisi"
+        search={{ page: 1, sort: 'name-asc' }}
+      />,
+    )
+    expect(screen.getByText('საათობრივი')).toBeInTheDocument()
+    const status = screen.getByText('სამუშაოზეა')
+    if (remoteWorkday)
+      expect(status.nextElementSibling).toHaveTextContent('დისტანციურად')
+    else expect(screen.queryByText('დისტანციურად')).not.toBeInTheDocument()
   },
 )
 

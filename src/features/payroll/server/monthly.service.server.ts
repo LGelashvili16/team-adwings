@@ -37,6 +37,7 @@ import {
 } from './payroll-settings.repository.server'
 import * as salaries from './salary.repository.server'
 import * as repository from './monthly.repository.server'
+import { evaluateEmployeeAttendancePayroll } from './attendance-payroll.service.server'
 import { payStageLabel } from '../payroll-settings.schemas'
 import type { Actor } from '#/lib/authorization/actor'
 import type { MonthlyPaymentDates } from '../monthly.schemas'
@@ -335,11 +336,9 @@ export async function readMonthlyPayroll(
     async (tx) => {
       const currentActor = await authorize(tx, actor)
       const now = new Date()
-      const workday =
-        !data.view && !data.period ? await getCompanyWorkday(now, tx) : null
-      const month =
-        data.month ??
-        (workday ?? (await getCompanyWorkday(now, tx))).date.slice(0, 7)
+      const currentWorkday = await getCompanyWorkday(now, tx)
+      const workday = !data.view && !data.period ? currentWorkday : null
+      const month = data.month ?? currentWorkday.date.slice(0, 7)
       const snapshot = await state(tx, month)
       const policy = snapshot.closed ? null : await scheduleForMonth(tx, month)
       const windows = paymentWindows(month, policy?.schedule)
@@ -427,6 +426,25 @@ export async function readMonthlyPayroll(
           }
         }),
       )
+      const attendanceEvaluations = new Map<
+        string,
+        Awaited<ReturnType<typeof evaluateEmployeeAttendancePayroll>>['evaluation']
+      >()
+      if (!snapshot.closed) {
+        await Promise.all(
+          result.records.map(async (row) => {
+            const { evaluation } = await evaluateEmployeeAttendancePayroll(tx, {
+              employeeId: row.employeeId,
+              userId: row.userId,
+              employeeName: row.employeeName,
+              month,
+              today: currentWorkday.date,
+              timezone: currentWorkday.timezone,
+            })
+            attendanceEvaluations.set(row.employeeId, evaluation)
+          }),
+        )
+      }
       const records = result.records.map(
         ({
           employeeId,
@@ -446,12 +464,31 @@ export async function readMonthlyPayroll(
         }) => {
           const term = salaryByEmployee.get(employeeId)
           const revised = revisedDrafts.get(employeeId)
+          const attendanceEval = attendanceEvaluations.get(employeeId)
+          const autoBonusMinor = adjustmentsPaidOn
+            ? 0
+            : (attendanceEval?.autoBonusMinor ?? 0)
           const salary = revised?.salary ?? row.salary ?? term?.salary ?? null
           const automatic =
             term?.fullEmployment &&
             term.salary.kind === 'monthly' &&
             term.salary.amountBasis === 'net' &&
             term.salary.effectiveFrom <= start
+          const autoMixedBase =
+            !row.salary &&
+            salary?.amountBasis === 'net' &&
+            attendanceEval?.fixedProrationComplete
+              ? attendanceEval.proratedFixedMinor +
+                attendanceEval.hourlyCalculatedMinor
+              : null
+          const autoHourlyBase =
+            !row.salary &&
+            autoMixedBase === null &&
+            salary?.kind === 'hourly' &&
+            salary.amountBasis === 'net' &&
+            (attendanceEval?.hourlyCalculatedMinor ?? 0) > 0
+              ? attendanceEval!.hourlyCalculatedMinor
+              : null
           // An adjustments-only revision stores zero without preparing a base.
           const baseMinor = salaryPaidOn
             ? salaryBaseMinor
@@ -459,21 +496,27 @@ export async function readMonthlyPayroll(
               ? revised.baseMinor
               : row.salary
                 ? row.baseMinor
-                : automatic
-                  ? term.salary.amountMinor
-                  : null
+                : autoMixedBase !== null
+                  ? autoMixedBase
+                  : automatic
+                    ? term.salary.amountMinor
+                    : autoHourlyBase
+          const effectiveBonusMinor =
+            row.bonusMinor === null && autoBonusMinor === 0
+              ? null
+              : (row.bonusMinor ?? 0) + autoBonusMinor
           const calculatedTotal =
             baseMinor === null
               ? null
               : baseMinor +
-                (row.bonusMinor ?? 0) +
+                (effectiveBonusMinor ?? 0) +
                 (row.premiumMinor ?? 0) -
                 (row.fineMinor ?? 0)
           const fineStage =
             storedFineStage ?? policy?.schedule?.fineStage ?? 'salary'
           const hasSalaryFine = fineStage === 'salary' && Boolean(row.fineMinor)
           const hasAdjustments = Boolean(
-            row.bonusMinor ||
+            effectiveBonusMinor ||
             row.premiumMinor ||
             (fineStage === 'adjustments' && row.fineMinor),
           )
@@ -542,18 +585,25 @@ export async function readMonthlyPayroll(
                 : []
             },
           )
+          const attendanceReviewCount = attendanceEval
+            ? attendanceEval.salaryNeedsReviewCount +
+              attendanceEval.adjustmentsNeedsReviewCount
+            : 0
           const full = {
             ...row,
             salary,
             baseMinor,
+            bonusMinor: effectiveBonusMinor,
             totalMinor:
-              row.salary && !revised && !salaryPaidOn
+              row.salary && !revised && !salaryPaidOn && autoBonusMinor === 0
                 ? row.totalMinor
                 : calculatedTotal !== null && calculatedTotal >= 0
                   ? calculatedTotal
                   : null,
             baseNeedsConfirmation:
               baseMinor === null && salary !== null && !snapshot.closed,
+            hasMixedSalaryKinds: attendanceEval?.hasMixedSalaryKinds ?? false,
+            attendanceReviewCount,
             adjustmentDates,
             payoutDates,
           }
@@ -561,9 +611,17 @@ export async function readMonthlyPayroll(
           const plannedFirst =
             baseMinor === null
               ? null
-              : salary?.kind === 'monthly'
-                ? firstSalaryPayment(baseMinor, firstPaymentMinor)
-                : baseMinor
+              : !row.salary && autoMixedBase !== null
+                ? Math.min(
+                    autoMixedBase,
+                    (attendanceEval?.firstHalfProratedFixedMinor ?? 0) +
+                      (attendanceEval?.firstHalfHourlyMinor ?? 0),
+                  )
+                : salary?.kind === 'monthly'
+                  ? firstSalaryPayment(baseMinor, firstPaymentMinor)
+                  : !row.salary && autoHourlyBase !== null
+                    ? (attendanceEval?.firstHalfHourlyMinor ?? 0)
+                    : baseMinor
           const first = period === 'first'
           const published = first
             ? firstPaidBase !== null
@@ -574,7 +632,10 @@ export async function readMonthlyPayroll(
             : salaryPaidOn
               ? salaryBaseMinor - (firstPaidBase ?? 0)
               : baseMinor !== null &&
-                  (firstPaidBase !== null || salary?.kind === 'monthly')
+                  (firstPaidBase !== null ||
+                    salary?.kind === 'monthly' ||
+                    autoMixedBase !== null ||
+                    autoHourlyBase !== null)
                 ? baseMinor - (firstPaidBase ?? plannedFirst ?? 0)
                 : null
           const fineMinor = first
@@ -685,8 +746,21 @@ export async function readMonthlyEmployee(
         data.month,
       )
       const entry = latest.at(0)?.entry
+      const workday = await getCompanyWorkday(new Date(), tx)
+      const attendanceSummary = closed
+        ? null
+        : (
+            await evaluateEmployeeAttendancePayroll(tx, {
+              employeeId: target.id,
+              userId: target.userId,
+              employeeName: target.name,
+              month: data.month,
+              today: workday.date,
+              timezone: workday.timezone,
+            })
+          ).evaluation
       return {
-        timezone: (await getCompanyWorkday(new Date(), tx)).timezone,
+        timezone: workday.timezone,
         source: currentSource,
         baseNeedsReview:
           !closed &&
@@ -713,6 +787,7 @@ export async function readMonthlyEmployee(
         firstPaymentEnabled: Boolean(policy?.schedule?.first),
         defaultFineStage: policy?.schedule?.fineStage ?? 'salary',
         paymentWindows: paymentWindows(data.month, policy?.schedule),
+        attendanceSummary,
       }
     },
     { isolationLevel: 'repeatable read' },
@@ -930,7 +1005,8 @@ async function planPayment(
   }: z.infer<typeof paymentPreviewSchema>,
   lock: boolean,
 ) {
-  const { date: paidOn } = await getCompanyWorkday(new Date(), tx)
+  const companyWorkday = await getCompanyWorkday(new Date(), tx)
+  const paidOn = companyWorkday.date
   if ((await state(tx, month)).closed)
     throw new MonthlyPayrollError('ეს თვე ძველი ფორმატით არის დასრულებული.')
   if (selectedUserId === actorId)
@@ -991,16 +1067,45 @@ async function planPayment(
     )
       continue
     const fineStage = entry?.fineStage ?? schedule.fineStage
-    const bonusMinor = stage === 'adjustments' ? (entry?.bonusMinor ?? 0) : 0
+    const { evaluation: attendanceEval } =
+      await evaluateEmployeeAttendancePayroll(tx, {
+        employeeId,
+        userId,
+        employeeName: name,
+        month,
+        today: paidOn,
+        timezone: companyWorkday.timezone,
+      })
+    const bonusMinor =
+      stage === 'adjustments'
+        ? (entry?.bonusMinor ?? 0) + attendanceEval.autoBonusMinor
+        : 0
     const premiumMinor =
       stage === 'adjustments' ? (entry?.premiumMinor ?? 0) : 0
     const fineMinor = stage === fineStage ? (entry?.fineMinor ?? 0) : 0
-    if (stage === 'adjustments' && !bonusMinor && !premiumMinor && !fineMinor)
+    if (
+      stage === 'adjustments' &&
+      !bonusMinor &&
+      !premiumMinor &&
+      !fineMinor &&
+      attendanceEval.adjustmentsNeedsReviewCount === 0
+    )
       continue
     try {
       if (userId === actorId)
         throw new MonthlyPayrollError(
           'საკუთარი თანხა სხვა უფლებამოსილმა პირმა უნდა გასცეს.',
+        )
+      if (
+        stage === 'adjustments' &&
+        attendanceEval.adjustmentsNeedsReviewCount > 0
+      )
+        throw new MonthlyPayrollError(
+          'დასწრებით გამოთვლილი ბონუსი საჭიროებს HR-ის ან ადმინისტრატორის გადამოწმებას.',
+        )
+      if (stage !== 'adjustments' && attendanceEval.salaryNeedsReviewCount > 0)
+        throw new MonthlyPayrollError(
+          'დასწრების გადასამოწმებელი ჩანაწერები დასადასტურებელია HR-ის ან ადმინისტრატორის მიერ.',
         )
       const plannedDate =
         stage === 'adjustments' || (stage === 'salary' && fineMinor)
@@ -1025,8 +1130,17 @@ async function planPayment(
           throw new MonthlyPayrollError(
             'ხელფასი ან დასაქმების თარიღები შეიცვალა. ხელახლა შეინახეთ უწყისი.',
           )
+        const hasAutoMixed =
+          !entry?.salary && attendanceEval.fixedProrationComplete
+        const hasAutoHourly =
+          !entry?.salary &&
+          !hasAutoMixed &&
+          prepared.salary.kind === 'hourly' &&
+          attendanceEval.hourlyCalculatedMinor > 0
         if (
           !entry?.salary &&
+          !hasAutoMixed &&
+          !hasAutoHourly &&
           (prepared.salary.kind === 'hourly' ||
             prepared.requiresBaseConfirmation)
         )
@@ -1035,12 +1149,27 @@ async function planPayment(
           )
         const base =
           refreshed ??
-          (entry?.salary ? entry.baseMinor : prepared.salary.amountMinor)
+          (entry?.salary
+            ? entry.baseMinor
+            : hasAutoMixed
+              ? attendanceEval.proratedFixedMinor +
+                attendanceEval.hourlyCalculatedMinor
+              : hasAutoHourly
+                ? attendanceEval.hourlyCalculatedMinor
+                : prepared.salary.amountMinor)
         baseMinor =
           stage === 'first'
-            ? prepared.salary.kind === 'monthly'
-              ? firstSalaryPayment(base, entry?.firstPaymentMinor ?? null)
-              : base
+            ? hasAutoMixed
+              ? Math.min(
+                  base,
+                  attendanceEval.firstHalfProratedFixedMinor +
+                    attendanceEval.firstHalfHourlyMinor,
+                )
+              : prepared.salary.kind === 'monthly'
+                ? firstSalaryPayment(base, entry?.firstPaymentMinor ?? null)
+                : hasAutoHourly
+                  ? attendanceEval.firstHalfHourlyMinor
+                  : base
             : base - (first?.baseMinor ?? 0)
         if (baseMinor < 0)
           throw new MonthlyPayrollError(

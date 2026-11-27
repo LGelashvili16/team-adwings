@@ -139,7 +139,7 @@ describe.runIf(enabled)(
     })
     it('rechecks persisted roles rather than accepting a forged or stale actor', async () => {
       for (const role of roleSchema.options) {
-        if (['admin', 'owner', 'accountant'].includes(role)) {
+        if (['hr_manager', 'admin', 'owner', 'accountant'].includes(role)) {
           await expect(
             service.readPayrollSettings(actor(role)),
           ).resolves.toBeDefined()

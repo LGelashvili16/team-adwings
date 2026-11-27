@@ -31,6 +31,7 @@ function renderSidebar(
   hasUnreadComplaints = false,
   hasUnreadNotifications = false,
   hasUnreadJobs = false,
+  hasPendingDeviceRequests = false,
 ) {
   return render(
     <SidebarProvider>
@@ -40,6 +41,7 @@ function renderSidebar(
         hasUnreadComplaints={hasUnreadComplaints}
         hasUnreadNotifications={hasUnreadNotifications}
         hasUnreadJobs={hasUnreadJobs}
+        hasPendingDeviceRequests={hasPendingDeviceRequests}
         inset={inset}
         actor={{
           id: 'test',
@@ -75,8 +77,8 @@ describe('workspace navigation', () => {
       screen.queryByRole('link', { name: 'თანამშრომლები' }),
     ).not.toBeInTheDocument()
   })
-  it('keeps HR on personal payroll even with management payroll overrides', () => {
-    renderSidebar('hr_manager', false, {
+  it('keeps non-payroll managers on personal payroll even with management payroll overrides', () => {
+    renderSidebar('supervisor', false, {
       allow: ['payroll.read.all', 'payroll.configure'],
       deny: [],
     })
@@ -391,6 +393,7 @@ describe('workspace navigation', () => {
     {
       roles: ['hr_manager'],
       paths: [
+        'payroll/monthly',
         'attendance',
         'employees',
         'gps',
@@ -591,6 +594,51 @@ it('shows a complaint dot on the management destination without granting employe
   renderSidebar('employee', false, undefined, false, true)
   expect(
     screen.queryByRole('link', { name: /საჩივრების მართვა/ }),
+  ).not.toBeInTheDocument()
+})
+
+it.each(['hr_manager', 'admin'] as const)(
+  'shows the pending device dot to %s beside the attendance devices destination',
+  (role) => {
+    const { container } = renderSidebar(
+      role,
+      true,
+      undefined,
+      false,
+      false,
+      false,
+      false,
+      true,
+    )
+    expect(
+      screen.getByRole('link', {
+        name: /დასწრების მოწყობილობები.*დასადასტურებელი მოწყობილობები/,
+      }),
+    ).toHaveAttribute('href', '/manage/devices')
+    expect(
+      container.querySelector('[data-slot="device-pending-dot"]'),
+    ).toHaveAttribute('aria-hidden', 'true')
+  },
+)
+
+it('hides the pending device dot when there are no pending requests or no review permission', () => {
+  const { container, unmount } = renderSidebar(
+    'hr_manager',
+    true,
+    undefined,
+    false,
+    false,
+    false,
+    false,
+    false,
+  )
+  expect(
+    container.querySelector('[data-slot="device-pending-dot"]'),
+  ).not.toBeInTheDocument()
+  unmount()
+  renderSidebar('employee', true, undefined, false, false, false, false, true)
+  expect(
+    screen.queryByRole('link', { name: /დასწრების მოწყობილობები/ }),
   ).not.toBeInTheDocument()
 })
 

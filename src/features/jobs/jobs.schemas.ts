@@ -31,6 +31,7 @@ const jobGeofenceDiameterSchema = z
   .max(32767, geofenceDiameterError)
 export const jobGeofenceSettingsSchema = z.object({
   diameter: jobGeofenceDiameterSchema,
+  autoAttendanceEnabled: z.boolean().optional(),
 })
 export const jobGeofenceFormSchema = z.object({
   diameter: z
@@ -39,6 +40,7 @@ export const jobGeofenceFormSchema = z.object({
     .regex(/^\d+$/, geofenceDiameterError)
     .transform(Number)
     .pipe(jobGeofenceDiameterSchema),
+  autoAttendanceEnabled: z.boolean(),
 })
 export const jobIdSchema = z.uuid({
   error: 'სამუშაოს იდენტიფიკატორი არასწორია.',

@@ -47,7 +47,7 @@ describe('role and permission boundaries', () => {
         'payroll.manage',
       ] as const)
         expect(hasPermission([role], permission)).toBe(
-          ['accountant', 'admin', 'owner'].includes(role),
+          ['hr_manager', 'accountant', 'admin', 'owner'].includes(role),
         )
     expect(
       hasPermission(
@@ -81,7 +81,7 @@ describe('role and permission boundaries', () => {
         },
       }
       expect(hasEveryPermission(subject, payroll)).toBe(
-        ['accountant', 'admin', 'owner'].includes(role),
+        ['hr_manager', 'accountant', 'admin', 'owner'].includes(role),
       )
       expect(hasPermission(subject, 'manage.access')).toBe(
         ['supervisor', 'hr_manager', 'accountant', 'admin', 'owner'].includes(
@@ -209,6 +209,7 @@ describe('role and permission boundaries', () => {
       'gps.manage',
       'teams.manage',
       'attendance.record.manage',
+      'attendance.gps.correct',
       'attendance.correct.self',
       'attendance.clock.assist',
       'attendance.devices.manage',
@@ -236,6 +237,7 @@ describe('role and permission boundaries', () => {
       'payroll.read.all',
       'payroll.terms.manage',
       'payroll.manage',
+      'payroll.attendance.review',
       'leave.review',
       'security.configure',
       'notifications.configure',

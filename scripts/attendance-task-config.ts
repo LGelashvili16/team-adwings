@@ -15,9 +15,18 @@ export const attendanceTaskConfig = {
         new URL('../src/server/tasks/employee-departures.ts', import.meta.url),
       ),
     },
+    'gps:geofence-presence': {
+      handler: fileURLToPath(
+        new URL('../src/server/tasks/gps-geofence-presence.ts', import.meta.url),
+      ),
+    },
   },
   scheduledTasks: {
-    '* * * * *': ['employees:departures', 'attendance:reminders'],
+    '* * * * *': [
+      'employees:departures',
+      'attendance:reminders',
+      'gps:geofence-presence',
+    ],
   },
   modules: [
     (nitro) => {

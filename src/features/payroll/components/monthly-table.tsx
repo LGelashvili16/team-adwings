@@ -70,9 +70,11 @@ export function MonthlyTable({
               </Button>
               {!adjustmentsOnly && r.salary ? (
                 <Badge variant="outline">
-                  {r.salary.kind === 'monthly'
-                    ? 'ყოველთვიური'
-                    : salaryKindLabels[r.salary.kind]}
+                  {r.hasMixedSalaryKinds
+                    ? 'შერეული (ფიქს. + საათ.)'
+                    : r.salary.kind === 'monthly'
+                      ? 'ყოველთვიური'
+                      : salaryKindLabels[r.salary.kind]}
                 </Badge>
               ) : null}
               {adjustmentsOnly && r.status === 'finalized' ? (
@@ -119,6 +121,11 @@ export function MonthlyTable({
                       (r.paidMinor === null || period === 'all') ? (
                         <Badge variant="yellow">
                           თვის ხელფასი დასადასტურებელია
+                        </Badge>
+                      ) : null}
+                      {(r.attendanceReviewCount ?? 0) > 0 ? (
+                        <Badge variant="orange">
+                          დასწრება გადასამოწმებელია ({r.attendanceReviewCount})
                         </Badge>
                       ) : null}
                     </div>

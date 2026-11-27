@@ -50,26 +50,43 @@ export async function readGeofenceSetting(tx: JobsTransaction) {
       .select({
         version: jobGeofenceSetting.version,
         diameter: jobGeofenceSetting.diameter,
+        autoAttendanceEnabled: jobGeofenceSetting.autoAttendanceEnabled,
       })
       .from(jobGeofenceSetting)
       .orderBy(desc(jobGeofenceSetting.version))
       .limit(1)
   ).at(0)
-  return current ?? { version: 0, diameter: defaultJobGeofenceDiameter }
+  return (
+    current ?? {
+      version: 0,
+      diameter: defaultJobGeofenceDiameter,
+      autoAttendanceEnabled: false,
+    }
+  )
 }
 
 export async function saveGeofenceSetting(
   tx: JobsTransaction,
   actorId: string,
   diameter: JobGeofenceDiameter,
+  autoAttendanceEnabled?: boolean,
 ) {
   // Serialize revisions, including the first save, and keep retries idempotent.
   await tx.execute(
     sql`select pg_advisory_xact_lock(hashtext('team-adwings-job-geofence-settings'))`,
   )
   const current = await readGeofenceSetting(tx)
-  if (current.diameter === diameter) return { setting: current, changed: false }
-  const setting = { diameter, version: current.version + 1 }
+  const nextAuto = autoAttendanceEnabled ?? current.autoAttendanceEnabled
+  if (
+    current.diameter === diameter &&
+    current.autoAttendanceEnabled === nextAuto
+  )
+    return { setting: current, changed: false }
+  const setting = {
+    diameter,
+    autoAttendanceEnabled: nextAuto,
+    version: current.version + 1,
+  }
   await tx.insert(jobGeofenceSetting).values({ ...setting, actorId })
   return { setting, changed: true }
 }

@@ -57,6 +57,7 @@ export type AttendanceOverview = {
   serverNow: string
   workday: CompanyWorkday
   remoteWorkday: boolean
+  restDayClockInAllowed: boolean
   approvedLeave: ApprovedLeave | null
   openSession: WorkingSession | null
   lastSessionId: string | null

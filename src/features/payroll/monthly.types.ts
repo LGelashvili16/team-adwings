@@ -1,6 +1,7 @@
 import type { MonthlyAdjustment, MonthlyPaymentDates } from './monthly.schemas'
 import type { SalaryTerm } from './salary.types'
 import type { FineStage, PayStage } from './payroll-settings.schemas'
+import type { EmployeeAttendancePayrollEvaluation } from './attendance-payroll.types'
 
 export type PaymentAmounts = {
   baseMinor: number
@@ -65,6 +66,7 @@ export type MonthlyDetail = {
   firstPaymentEnabled: boolean
   defaultFineStage: FineStage
   paymentWindows: PayStageWindow[]
+  attendanceSummary?: EmployeeAttendancePayrollEvaluation | null
 }
 export type MonthlyDirectory = {
   entryCount: number
@@ -92,6 +94,8 @@ export type MonthlyDirectoryRow = Pick<
   paidMinor: number | null
   paidAdjustments: boolean | null
   baseNeedsConfirmation: boolean
+  hasMixedSalaryKinds?: boolean
+  attendanceReviewCount?: number
   payoutDates: Partial<Record<PayStage, PayrollPayoutDates>>
   adjustmentDates: {
     stage: FineStage

@@ -105,6 +105,85 @@ export async function readRemoteFlag(
   return rows.at(0)?.remote ?? false
 }
 
+export async function readRemoteWorkdayEmployeeIds(
+  tx: ScheduleTransaction,
+  workday: CompanyWorkday,
+  employeeIds: Array<string>,
+): Promise<Set<string>> {
+  if (!employeeIds.length || !workday.effectiveFrom) return new Set()
+  const weekday = isoWeekday(workday.date)
+  const locationRows = await tx
+    .select({
+      employeeId: employeeWorkLocation.employeeId,
+      date: employeeWorkLocation.date,
+      remote: employeeWorkLocation.remote,
+    })
+    .from(employeeWorkLocation)
+    .where(
+      and(
+        inArray(employeeWorkLocation.employeeId, employeeIds),
+        or(
+          eq(employeeWorkLocation.date, workday.date),
+          eq(employeeWorkLocation.weekday, weekday),
+        ),
+      ),
+    )
+  const effectiveRemote = new Map<string, { remote: boolean; dated: boolean }>()
+  for (const row of locationRows) {
+    const dated = row.date !== null
+    const existing = effectiveRemote.get(row.employeeId)
+    if (!existing || (dated && !existing.dated))
+      effectiveRemote.set(row.employeeId, { remote: row.remote, dated })
+  }
+  const candidates = [...effectiveRemote.entries()].flatMap(
+    ([employeeId, value]) => (value.remote ? [employeeId] : []),
+  )
+  if (!candidates.length) return new Set()
+  const assignments = await tx
+    .select({
+      employeeId: employeeWorkSchedule.employeeId,
+      days: employeeWorkSchedule.days,
+    })
+    .from(employeeWorkSchedule)
+    .where(inArray(employeeWorkSchedule.employeeId, candidates))
+  const byEmployee = new Map(
+    assignments.map((row) => [row.employeeId, row.days]),
+  )
+  const result = new Set<string>()
+  const customShifts = new Map<
+    string,
+    { start: string; end: string; employeeIds: Array<string> }
+  >()
+  for (const employeeId of candidates) {
+    const days = byEmployee.get(employeeId)
+    if (!days) {
+      if (workday.kind === 'scheduled') result.add(employeeId)
+      continue
+    }
+    const parsed = employeeWorkingWeekSchema.safeParse(days)
+    if (!parsed.success) continue
+    const hours = parsed.data.find((day) => day.weekday === weekday)?.hours
+    if (!hours) continue
+    const key = `${hours.start}-${hours.end}`
+    const group = customShifts.get(key)
+    if (group) group.employeeIds.push(employeeId)
+    else customShifts.set(key, { ...hours, employeeIds: [employeeId] })
+  }
+  for (const shift of customShifts.values()) {
+    // Verify local-time validity on DST transitions, matching employeeWorkdayAt.
+    const start = sql`(${workday.date}::date + ${shift.start}::time) at time zone ${workday.timezone}`
+    const end = sql`(${workday.date}::date + ${shift.end}::time) at time zone ${workday.timezone}`
+    const valid = (
+      await tx.execute<{ valid: boolean }>(
+        sql`select to_char((${start}) at time zone ${workday.timezone}, 'HH24:MI') = ${shift.start} and to_char((${end}) at time zone ${workday.timezone}, 'HH24:MI') = ${shift.end} and (${end}) > (${start}) as valid`,
+      )
+    ).rows.at(0)?.valid
+    if (valid)
+      for (const employeeId of shift.employeeIds) result.add(employeeId)
+  }
+  return result
+}
+
 /** The employee account transaction locks the target before replacing location entries. */
 export async function replaceRemoteWeekdays(
   tx: ScheduleTransaction,

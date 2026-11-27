@@ -19,6 +19,7 @@ export const permissionLabels: Record<Permission, string> = {
   'attendance.read.all': 'კომპანიის დასწრებისა და საათების ნახვა',
   'attendance.review.team': 'დასწრების განხილვა და შესწორება',
   'attendance.record.manage': 'დასწრების ხელით აღრიცხვა',
+  'attendance.gps.correct': 'GPS დასწრების ჩანაწერების შესწორება',
   'attendance.correct.self': 'საკუთარი დასწრების დროის შესწორება',
   'attendance.correct.all': 'კომპანიის დასწრების დროის შესწორება',
   'timesheets.review.team': 'მინიჭებული თანამშრომლების საათების ნახვა',
@@ -45,6 +46,8 @@ export const permissionLabels: Record<Permission, string> = {
   'payroll.read.all': 'თანამშრომლების ხელფასების ნახვა',
   'payroll.terms.manage': 'თანამშრომლების ხელფასების განსაზღვრა',
   'payroll.manage': 'თვის სახელფასო უწყისის მართვა',
+  'payroll.attendance.review':
+    'დასწრებით ხელფასების გადამოწმება და დასვენების დღის წესები',
   'security.configure': 'უსაფრთხოების პოლიტიკის მართვა',
   'notifications.configure': 'შეტყობინებების პარამეტრების მართვა',
   'locations.manage': 'სამუშაო ადგილების მართვა',

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
+import type { AnchorHTMLAttributes } from 'react'
 import { DeviceReviewPage } from './device-review-page'
 import { SecurityPage } from '#/features/account/pages/security-page'
 import { SecuritySettingsPage } from '#/features/access/pages/security-settings-page'
@@ -13,13 +14,15 @@ const calls = vi.hoisted(() => ({
   decide: vi.fn(),
   request: vi.fn(),
   state: 'all',
+  page: 1,
+  q: '',
 }))
 vi.mock('@tanstack/react-router', () => ({
   getRouteApi: () => ({
     useRouteContext: () => ({ actor: { id: 'reviewer' } }),
     useSearch: () => ({
-      page: 1,
-      q: '',
+      page: calls.page,
+      q: calls.q,
       state: calls.state,
       sort: 'newest',
       devicePage: 1,
@@ -29,6 +32,21 @@ vi.mock('@tanstack/react-router', () => ({
     }),
     useNavigate: () => calls.navigate,
   }),
+  Link: ({
+    to,
+    search,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    to: string
+    search?: Record<string, unknown>
+  }) => {
+    const query = new URLSearchParams(
+      Object.entries(search ?? {})
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [key, String(value)]),
+    )
+    return <a href={`${to}${query.size ? `?${query}` : ''}`} {...props} />
+  },
 }))
 vi.mock('../attendance-security.functions', () => ({
   readDeviceRequests: calls.review,
@@ -53,10 +71,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   calls.request.mockResolvedValue({ ok: true, value: {} })
   calls.state = 'all'
+  calls.page = 1
+  calls.q = ''
   calls.decide.mockResolvedValue({ ok: true, value: {} })
   calls.review.mockResolvedValue({
     ok: true,
-    value: { items: [], total: 0, timezone: 'Asia/Tbilisi' },
+    value: { items: [], total: 0, pageSize: 20, timezone: 'Asia/Tbilisi' },
   })
   calls.own.mockResolvedValue({
     ok: true,
@@ -165,6 +185,7 @@ it.each([true, false])(
         passkeyRequired: false,
         timezone: 'Asia/Tbilisi',
         total: 1,
+        pageSize: 20,
         items: [
           {
             id,
@@ -232,6 +253,7 @@ it.each(['approved', 'revoked'] as const)(
           },
         ],
         total: 1,
+        pageSize: 20,
         timezone: 'Asia/Tbilisi',
       },
     })
@@ -293,6 +315,7 @@ it.each([
       ok: true,
       value: {
         total: 2,
+        pageSize: 20,
         browserApprovalRequired,
         passkeyRequired,
         timezone: 'Asia/Tbilisi',
@@ -340,6 +363,7 @@ it.each(['approved', 'rejected', 'revoked', 'pending'])(
       ok: true,
       value: {
         total: 1,
+        pageSize: 20,
         timezone: 'Asia/Tbilisi',
         browserApprovalRequired: true,
         passkeyRequired: false,
@@ -377,3 +401,51 @@ it.each(['approved', 'rejected', 'revoked', 'pending'])(
     }
   },
 )
+
+it('always shows the shared pagination footer with total count and URL-preserving page links', async () => {
+  calls.page = 2
+  calls.q = 'ბრაუზერი'
+  calls.state = 'approved'
+  calls.review.mockResolvedValue({
+    ok: true,
+    value: {
+      items: [],
+      total: 41,
+      pageSize: 20,
+      timezone: 'Asia/Tbilisi',
+    },
+  })
+  render(<DeviceReviewPage />)
+  expect(await screen.findByText('სულ: 41. გვერდი 2 / 3')).toBeVisible()
+  expect(screen.getByRole('navigation', { name: 'გვერდები' })).toBeVisible()
+  expect(screen.getByRole('link', { name: 'გვერდი 2' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+  const nextHref = screen
+    .getByRole('link', { name: 'შემდეგი გვერდი' })
+    .getAttribute('href')
+  const params = new URL(nextHref ?? '', 'http://localhost').searchParams
+  expect(params.get('page')).toBe('3')
+  expect(params.get('q')).toBe('ბრაუზერი')
+  expect(params.get('state')).toBe('approved')
+  expect(params.get('sort')).toBe('newest')
+})
+
+it('shows the pagination footer even on single-page device results', async () => {
+  calls.review.mockResolvedValue({
+    ok: true,
+    value: {
+      items: [],
+      total: 16,
+      pageSize: 20,
+      timezone: 'Asia/Tbilisi',
+    },
+  })
+  render(<DeviceReviewPage />)
+  expect(await screen.findByText('სულ: 16. გვერდი 1 / 1')).toBeVisible()
+  expect(screen.getByRole('link', { name: 'გვერდი 1' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+})

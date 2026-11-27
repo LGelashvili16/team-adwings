@@ -64,6 +64,8 @@ export const attendanceSession = pgTable(
       .default(0),
     /** Warning threshold captured at check-in; exceeding it never fabricates checkout. */
     maxOpenHours: integer('max_open_hours').notNull().default(16),
+    /** Optional GPS job visit identifier when this attendance session was created automatically from a confirmed geofence entry; null for manual sessions. */
+    gpsVisitId: uuid('gps_visit_id'),
     /** Database-generated UTC insert time, distinct from actual worked times. */
     createdAt: createdAt(),
   },

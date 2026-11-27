@@ -122,4 +122,32 @@ describe('PWA installation', () => {
     )
     expect(screen.queryByText('Browser failure')).not.toBeInTheDocument()
   })
+
+  it('collapses and reopens the install button through its chevron toggle', async () => {
+    const user = userEvent.setup()
+    render(
+      <PwaContext
+        value={{
+          online: true,
+          installed: false,
+          ios: true,
+          requestInstall: null,
+        }}
+      >
+        <PwaInstallButton />
+      </PwaContext>,
+    )
+    const hide = screen.getByRole('button', { name: 'აპის დაყენების დამალვა' })
+    expect(hide).toHaveAttribute('aria-expanded', 'true')
+    await user.click(hide)
+    expect(
+      screen.queryByRole('button', { name: 'აპის დაყენება' }),
+    ).not.toBeInTheDocument()
+    const show = screen.getByRole('button', { name: 'აპის დაყენების ჩვენება' })
+    expect(show).toHaveAttribute('aria-expanded', 'false')
+    await user.click(show)
+    expect(
+      screen.getByRole('button', { name: 'აპის დაყენება' }),
+    ).toBeInTheDocument()
+  })
 })

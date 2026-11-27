@@ -1,4 +1,8 @@
-import { hasEveryPermission, hasPermission } from './permissions'
+import {
+  hasAnyPermission,
+  hasEveryPermission,
+  hasPermission,
+} from './permissions'
 import { AuthorizationError } from './authorization-error'
 import type { Actor } from './actor'
 import type { Permission } from './permissions'
@@ -14,5 +18,13 @@ export function assertPermissions(
   permissions: ReadonlyArray<Permission>,
 ) {
   if (!hasEveryPermission(actor, permissions)) throw new AuthorizationError()
+  return actor
+}
+
+export function assertAnyPermission(
+  actor: Actor,
+  permissions: ReadonlyArray<Permission>,
+) {
+  if (!hasAnyPermission(actor, permissions)) throw new AuthorizationError()
   return actor
 }

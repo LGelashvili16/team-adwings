@@ -1,6 +1,7 @@
 import { EmployeeDayOffBalanceCard } from '#/features/leave/components/day-off-allowance-card'
 import { EmployeeNetworkCard } from '#/features/attendance-security/components/employee-network-card'
 import { EmployeeEmploymentCard } from '#/features/employees/components/employee-employment-card'
+import { EmployeeRestDayPolicyCard } from '#/features/payroll/components/employee-rest-day-policy-card'
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
@@ -139,6 +140,7 @@ export function UserDetail({
             employmentPage={employmentPage}
             employmentHistoryPage={employmentHistoryPage}
           />
+          <EmployeeRestDayPolicyCard actor={actor} userId={userId} />
           {employed ? (
             <UserScheduleCard
               week={record.workingWeek}

@@ -1,7 +1,7 @@
 import { deliverNotifications } from '#/features/notifications/server/notifications.service.server'
 import '@tanstack/react-start/server-only'
 import { and, or, eq, sql } from 'drizzle-orm'
-import { attendanceAudit, attendanceSession, employee, user } from '#/db/schema'
+import { attendanceAudit, attendanceSession, employee, gpsJobVisitCrew, user } from '#/db/schema'
 import { AuthorizationError } from '#/lib/authorization/authorization-error'
 import { hasPermission } from '#/lib/authorization/permissions'
 import { assertPermission } from '#/lib/authorization/access'
@@ -85,6 +85,8 @@ export async function listAttendanceForReview(
             subjectUserId === current.id
               ? hasPermission(current, 'attendance.correct.self')
               : hasPermission(current, 'attendance.correct.all') ||
+                (session.gpsVisitId !== null &&
+                  hasPermission(current, 'attendance.gps.correct')) ||
                 (scope === 'team' &&
                   hasPermission(current, 'attendance.review.team')),
         }),
@@ -250,6 +252,8 @@ export async function correctAttendance(actor: Actor | null, input: unknown) {
     const access = await authorizeAttendanceWorkspace(tx, actor)
     const companyCorrection =
       access.company && hasPermission(access.actor, 'attendance.correct.all')
+    const gpsCorrection =
+      access.company && hasPermission(access.actor, 'attendance.gps.correct')
     const current = access.actor
     // Self-correction is an explicit grant and never shares the approval path.
     let record = hasPermission(current, 'attendance.correct.self')
@@ -261,14 +265,40 @@ export async function correctAttendance(actor: Actor | null, input: unknown) {
         )
       : null
     if (!record) {
-      if (!companyCorrection)
+      if (companyCorrection) {
+        record = await repository.lockReviewSubject(
+          tx,
+          current.id,
+          data.sessionId,
+          'company',
+        )
+      } else if (gpsCorrection) {
+        const candidate = await repository.lockReviewSubject(
+          tx,
+          current.id,
+          data.sessionId,
+          'company',
+        )
+        if (candidate?.gpsVisitId) {
+          record = candidate
+        } else {
+          assertPermission(current, 'attendance.review.team')
+          record = await repository.lockReviewSubject(
+            tx,
+            current.id,
+            data.sessionId,
+            'team',
+          )
+        }
+      } else {
         assertPermission(current, 'attendance.review.team')
-      record = await repository.lockReviewSubject(
-        tx,
-        current.id,
-        data.sessionId,
-        companyCorrection ? 'company' : 'team',
-      )
+        record = await repository.lockReviewSubject(
+          tx,
+          current.id,
+          data.sessionId,
+          'team',
+        )
+      }
     }
     if (!record) throw new AuthorizationError()
     checkVersion(record, data.revision)
@@ -333,6 +363,21 @@ export async function correctAttendance(actor: Actor | null, input: unknown) {
       .returning()
     const updated = updates.at(0)
     if (!updated) throw new AttendanceWorkflowError('ჩანაწერი ვერ განახლდა.')
+    if (record.gpsVisitId) {
+      const correctedSeconds = Math.max(
+        0,
+        Math.round((end.getTime() - start.getTime()) / 1000),
+      )
+      await tx
+        .update(gpsJobVisitCrew)
+        .set({ onSiteSeconds: correctedSeconds })
+        .where(
+          and(
+            eq(gpsJobVisitCrew.visitId, record.gpsVisitId),
+            eq(gpsJobVisitCrew.employeeId, record.employeeId),
+          ),
+        )
+    }
     await repository.recordAttendanceAudit(
       tx,
       current.id,

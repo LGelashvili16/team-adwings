@@ -51,20 +51,20 @@ export function DeviceState({ state }: { state: string }) {
 export function SecurityPagination({
   page,
   total,
+  pageSize = 20,
   onPage,
 }: {
   page: number
   total: number
+  pageSize?: number
   onPage: (page: number) => void
 }) {
-  const last = Math.max(1, Math.ceil(total / 20))
-  if (last === 1 && page === 1) return null
   return (
-    <div className="border-t p-3">
+    <div className="border-t px-4 py-3">
       <DataPagination
         page={page}
         total={total}
-        pageSize={20}
+        pageSize={pageSize}
         renderLink={(next) => (
           <button type="button" onClick={() => onPage(next)} />
         )}

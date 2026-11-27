@@ -1392,6 +1392,87 @@ describe.runIf(enabled)('attendance workflow against PostgreSQL', () => {
       latestCheckIn: '2026-11-04T06:30:00.000Z',
     })
   })
+  it('reports remoteWorkday in the attendance directory for effective remote workdays only', async () => {
+    const administrator: Actor = {
+      ...actor,
+      id: 'review-admin',
+      roles: ['admin'],
+    }
+    const readFor = async (viewer: Actor, employment?: 'active' | 'former') =>
+      (
+        await companyAttendance.listCompanyAttendanceUsers(viewer, {
+          employment,
+        })
+      ).items.find((item) => item.userId === actor.id)
+
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: false,
+    })
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, weekday, remote) VALUES ($1, 3, true)`,
+      [employeeId],
+    )
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: true,
+    })
+    // Dated overrides take precedence over recurring weekdays.
+    await sql().query(
+      `INSERT INTO employee_work_location (employee_id, date, remote) VALUES ($1, '2026-11-04', false), ($1, '2026-11-05', true), ($1, '2026-11-08', true)`,
+      [employeeId],
+    )
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: false,
+    })
+    time('2026-11-05T06:05:00Z')
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: true,
+    })
+    // Non-working company day is not remote unless an individual schedule makes it a working day.
+    time('2026-11-08T06:05:00Z')
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: false,
+    })
+    await sql().query(
+      `INSERT INTO employee_work_schedule (employee_id, days, assigned_by) VALUES ($1, $2::jsonb, 'review-admin')`,
+      [
+        employeeId,
+        JSON.stringify(
+          [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+            weekday,
+            hours: weekday === 7 ? { start: '10:00', end: '18:00' } : null,
+          })),
+        ),
+      ],
+    )
+    expect(await readFor(administrator)).toMatchObject({
+      remoteWorkday: true,
+    })
+    // Former employees and summary-only readers never expose remoteWorkday.
+    await sql().query(
+      `INSERT INTO attendance_reviewer (reviewer_id, employee_id) VALUES ('review-manager', $1) ON CONFLICT DO NOTHING`,
+      [employeeId],
+    )
+    await sql().query(
+      `UPDATE "user" SET permission_overrides = '{"allow":["manage.access","timesheets.review.team"],"deny":["attendance.read.all","attendance.read.team"]}' WHERE id = 'review-manager'`,
+    )
+    expect(
+      await readFor({
+        ...actor,
+        id: 'review-manager',
+        roles: ['supervisor'],
+      }),
+    ).toMatchObject({
+      attendanceStatus: 'unavailable',
+      remoteWorkday: false,
+    })
+    await sql().query(`UPDATE employee SET status = 'inactive' WHERE id = $1`, [
+      employeeId,
+    ])
+    expect(await readFor(administrator, 'former')).toMatchObject({
+      attendanceStatus: 'former',
+      remoteWorkday: false,
+    })
+  })
   it('lists all attendance accounts including empty accounts with server search, sorting and pagination', async () => {
     await sql().query(
       `UPDATE employee SET username = 'separate-employee-code' WHERE user_id = 'attendance-a'`,

@@ -2,7 +2,10 @@ import { createMiddleware } from '@tanstack/react-start'
 import { redirect } from '@tanstack/react-router'
 import { readActor } from './session.server'
 import { enforcePolicy, requireActor } from '#/lib/authorization/guards.server'
-import { assertPermissions } from '#/lib/authorization/access'
+import {
+  assertAnyPermission,
+  assertPermissions,
+} from '#/lib/authorization/access'
 import type { Permission } from '#/lib/authorization/permissions'
 
 export const sessionMiddleware = createMiddleware({ type: 'function' }).server(
@@ -32,6 +35,17 @@ export function permissionsMiddleware(
     .middleware([authenticatedMiddleware])
     .server(async ({ next, context }) => {
       await enforcePolicy(() => assertPermissions(context.actor, permissions))
+      return next()
+    })
+}
+
+export function anyPermissionMiddleware(
+  ...permissions: [Permission, ...Array<Permission>]
+) {
+  return createMiddleware({ type: 'function' })
+    .middleware([authenticatedMiddleware])
+    .server(async ({ next, context }) => {
+      await enforcePolicy(() => assertAnyPermission(context.actor, permissions))
       return next()
     })
 }

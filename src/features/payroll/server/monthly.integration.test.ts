@@ -289,16 +289,16 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
     })
     it('requires current grants, denies stale/suspended identities and self modifications', async () => {
       await expect(service.readMonthlyPayroll(null, {})).rejects.toThrow()
-      const staleHr = { ...actor, id: 'monthly-hr' }
+      const staleNonPayroll = { ...actor, id: 'monthly-other' }
       await sql().query(
-        `update "user" set permission_overrides='{"allow":["payroll.read.all","payroll.manage"],"deny":[]}' where id=$1`,
-        [staleHr.id],
+        `update "user" set roles='supervisor', permission_overrides='{"allow":["payroll.read.all","payroll.manage"],"deny":[]}' where id=$1`,
+        [staleNonPayroll.id],
       )
       await expect(
-        service.readMonthlyPayroll(staleHr, { month }),
+        service.readMonthlyPayroll(staleNonPayroll, { month }),
       ).rejects.toThrow()
       await expect(
-        service.saveMonthlyEmployee(staleHr, await input()),
+        service.saveMonthlyEmployee(staleNonPayroll, await input()),
       ).rejects.toThrow()
       await salary(actor.id, 1, '2026-01-01')
       await expect(
@@ -600,10 +600,13 @@ describe.runIf(process.env.RUN_MONTHLY_DB_TESTS === '1')(
           service.publishMonthlyPayments(actor, { ...single, userId }),
         ).rejects.toThrow('გასაცემი თანხები შეიცვალა')
       }
+      await sql().query(
+        `update "user" set roles='supervisor' where id='monthly-hr'`,
+      )
       const denied: Actor = {
         ...actor,
         id: 'monthly-hr',
-        roles: ['hr_manager'],
+        roles: ['supervisor'],
       }
       await expect(
         service.previewMonthlyPayments(denied, selection),

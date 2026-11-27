@@ -533,6 +533,20 @@
       "when": 1795735556457,
       "tag": "0075_scheduled_employee_departure",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1795774571222,
+      "tag": "0076_attendance_payroll_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1795775918686,
+      "tag": "0077_gps_geofence_presence",
+      "breakpoints": true
     }
   ]
 }
